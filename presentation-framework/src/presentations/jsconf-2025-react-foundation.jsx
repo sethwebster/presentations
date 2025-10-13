@@ -6,7 +6,7 @@
  * Place accompanying assets in a folder named "jsconf-2025-react-foundation-assets/"
  */
 
-import { useState, useEffect } from 'react';
+import { Reveal } from '../components/Reveal.jsx';
 
 // ============================================================================
 // CONFIGURATION
@@ -123,27 +123,11 @@ export const customStyles = `
   align-items: center;
   justify-content: center;
   min-height: 120px;
-  opacity: 0;
-  transform: scale(0.8);
-  animation: partner-reveal 0.6s ease-out forwards;
 }
 
-.partner-logo-box:nth-child(1) { animation-delay: 0.1s; }
-.partner-logo-box:nth-child(2) { animation-delay: 0.2s; }
-.partner-logo-box:nth-child(3) { animation-delay: 0.3s; }
-.partner-logo-box:nth-child(4) { animation-delay: 0.4s; }
-.partner-logo-box:nth-child(5) { animation-delay: 0.5s; }
-.partner-logo-box:nth-child(6) { animation-delay: 0.6s; }
-.partner-logo-box:nth-child(7) { animation-delay: 0.7s; }
-.partner-logo-box:nth-child(8) { animation-delay: 0.8s; }
-
-@keyframes partner-reveal {
-  0% { opacity: 0; transform: scale(0.8); }
-  50% { opacity: 0.5; transform: scale(1.05); }
-  100% { opacity: 1; transform: scale(1); }
+.partner-logo-box.community {
+  background: transparent;
 }
-
-.partner-logo-box.community { background: transparent; }
 
 .logo-placeholder-text {
   font-size: 2rem;
@@ -198,78 +182,46 @@ export const customStyles = `
 `;
 
 // ============================================================================
-// CUSTOM COMPONENTS
+// DATA
 // ============================================================================
 
-const PartnersSlide = ({ assetsPath }) => {
-  const [showCommunity, setShowCommunity] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setShowCommunity(true), 1500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const partners = [
-    {
-      id: 'meta',
-      name: 'Meta',
-      logo: 'https://upload.wikimedia.org/wikipedia/commons/7/7b/Meta_Platforms_Inc._logo.svg'
-    },
-    {
-      id: 'microsoft',
-      name: 'Microsoft',
-      logo: 'https://upload.wikimedia.org/wikipedia/commons/9/96/Microsoft_logo_%282012%29.svg'
-    },
-    {
-      id: 'amazon',
-      name: 'Amazon',
-      logo: 'https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg'
-    },
-    {
-      id: 'expo',
-      name: 'Expo',
-      logo: `${assetsPath}/expo-logo-wordmark.svg`
-    },
-    {
-      id: 'vercel',
-      name: 'Vercel',
-      logo: `${assetsPath}/vercel-logotype-light.png`
-    },
-    {
-      id: 'callstack',
-      name: 'Callstack',
-      logo: `${assetsPath}/callstack-logo.svg`
-    },
-    {
-      id: 'softwaremansion',
-      name: 'Software Mansion',
-      logo: `${assetsPath}/software-mansion.svg`
-    }
-  ];
-
-  return (
-    <>
-      <h1>Building Together</h1>
-      <div className="partners-logo-grid">
-        {partners.map((partner) => (
-          <div key={partner.id} className="partner-logo-box" data-company={partner.id}>
-            <img src={partner.logo} alt={partner.name} className="partner-logo-img" />
-          </div>
-        ))}
-        <div className="partner-logo-box community" data-company="community">
-          <div className="logo-placeholder-text community-text">
-            {showCommunity ? (
-              <>
-                <span className="plus-sign">+</span>
-                <span className="pointing-finger">🫵</span>
-              </>
-            ) : '???'}
-          </div>
-        </div>
-      </div>
-    </>
-  );
-};
+const partners = [
+  {
+    id: 'meta',
+    name: 'Meta',
+    logo: 'https://upload.wikimedia.org/wikipedia/commons/7/7b/Meta_Platforms_Inc._logo.svg'
+  },
+  {
+    id: 'microsoft',
+    name: 'Microsoft',
+    logo: 'https://upload.wikimedia.org/wikipedia/commons/9/96/Microsoft_logo_%282012%29.svg'
+  },
+  {
+    id: 'amazon',
+    name: 'Amazon',
+    logo: 'https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg'
+  },
+  {
+    id: 'expo',
+    name: 'Expo',
+    logo: 'expo-logo-wordmark.svg'
+  },
+  {
+    id: 'vercel',
+    name: 'Vercel',
+    logo: 'vercel-logotype-light.png'
+  },
+  {
+    id: 'callstack',
+    name: 'Callstack',
+    logo: 'callstack-logo.svg'
+  },
+  {
+    id: 'softwaremansion',
+    name: 'Software Mansion',
+    logo: 'software-mansion.svg'
+  }
+];
 
 // ============================================================================
 // SLIDES
@@ -431,7 +383,48 @@ export const getSlides = (assetsPath) => {
       id: 'partners',
       className: 'slide-partners',
       notes: 'It brings together partners like Meta, Microsoft, Amazon, Expo, Vercel, Callstack, and Software Mansion, working alongside the global developer community—not above it.',
-      content: <PartnersSlide assetsPath={assetsPath} />
+      content: (
+        <>
+          <h1>Building Together</h1>
+          <div className="partners-logo-grid">
+            {partners.map((partner, index) => (
+              <Reveal
+                key={partner.id}
+                delay={100 * (index + 1)}
+                animation="scale"
+                duration={600}
+                className="partner-logo-box"
+              >
+                <div data-company={partner.id}>
+                  <img
+                    src={partner.logo.startsWith('http') ? partner.logo : `${assetsPath}/${partner.logo}`}
+                    alt={partner.name}
+                    className="partner-logo-img"
+                  />
+                </div>
+              </Reveal>
+            ))}
+            <Reveal
+              delay={1500}
+              animation="bounce"
+              duration={800}
+              className="partner-logo-box community"
+              placeholder={
+                <div data-company="community">
+                  <div className="logo-placeholder-text">???</div>
+                </div>
+              }
+            >
+              <div data-company="community">
+                <div className="logo-placeholder-text community-text">
+                  <span className="plus-sign">+</span>
+                  <span className="pointing-finger">🫵</span>
+                </div>
+              </div>
+            </Reveal>
+          </div>
+        </>
+      )
     },
     {
       id: 'governance',
