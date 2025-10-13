@@ -106,12 +106,33 @@ export const customStyles = `
 .slide-why { background: linear-gradient(135deg, #5c3d1f 0%, #3d5c5c 100%); }
 .slide-closing { background: linear-gradient(135deg, #2d4d5c 0%, #1f3d6b 100%); }
 
+/* Partners Slide Layout */
+.partners-title {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: title-slide-up 0.8s ease-out forwards;
+  animation-delay: 2s;
+}
+
+@keyframes title-slide-up {
+  from {
+    top: 50%;
+    transform: translate(-50%, -50%);
+  }
+  to {
+    top: 20%;
+    transform: translate(-50%, -50%);
+  }
+}
+
 /* Partners Grid */
 .partners-logo-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 2rem;
-  margin-top: 2rem;
+  margin-top: 8rem;
   max-width: 85%;
 }
 
@@ -402,14 +423,14 @@ export const getSlides = (assetsPath) => {
       notes: 'It brings together partners like Meta, Microsoft, Amazon, Expo, Vercel, Callstack, and Software Mansion, working alongside the global developer community—not above it.',
       content: (
         <>
-          <Reveal delay={0} animation="slide-up" duration={800}>
-            <h1>Building Together</h1>
+          <Reveal delay={0} animation="slide-up" duration={800} className="partners-title">
+            <h1 style={{ whiteSpace: 'nowrap' }}>Building Together</h1>
           </Reveal>
           <div className="partners-logo-grid">
             {partners.map((partner, index) => (
               <Reveal
                 key={partner.id}
-                delay={100 * (index + 1)}
+                delay={2000 + (100 * (index + 1))}
                 animation="scale"
                 duration={600}
                 className="partner-logo-box"
@@ -424,7 +445,7 @@ export const getSlides = (assetsPath) => {
               </Reveal>
             ))}
             <Reveal
-              delay={800}
+              delay={2800}
               animation="bounce"
               duration={800}
               className="partner-logo-box community"
