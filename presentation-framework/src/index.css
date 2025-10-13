@@ -95,8 +95,8 @@
   vertical-align: middle;
   background: linear-gradient(135deg, var(--lume-primary) 0%, var(--lume-accent) 50%, var(--lume-ember) 100%);
   -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   background-clip: text;
-  color: transparent;
   text-rendering: optimizeLegibility;
 }
 
