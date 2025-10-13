@@ -1,7 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export function PresentationThumbnail({ slides, isHovered, assetsPath, customStyles }) {
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Inject custom styles
+  useEffect(() => {
+    if (customStyles) {
+      const styleId = `thumbnail-styles`;
+      let styleElement = document.getElementById(styleId);
+
+      if (!styleElement) {
+        styleElement = document.createElement('style');
+        styleElement.id = styleId;
+        document.head.appendChild(styleElement);
+      }
+
+      styleElement.textContent = customStyles;
+    }
+  }, [customStyles]);
 
   const handleMouseMove = (e) => {
     if (!isHovered || slides.length <= 1) return;
@@ -27,11 +43,18 @@ export function PresentationThumbnail({ slides, isHovered, assetsPath, customSty
       onMouseLeave={() => setCurrentIndex(0)}
     >
       <div
-        className={`w-full h-full flex items-center justify-center p-4 text-center ${currentSlide.className || ''}`}
+        className={`slide ${currentSlide.className || ''}`}
         style={{
-          fontSize: '0.5rem',
-          transform: 'scale(0.3)',
-          transformOrigin: 'center',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          fontSize: '0.35rem',
+          padding: '0.5rem',
+          position: 'relative',
         }}
       >
         {currentSlide.content}
