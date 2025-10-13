@@ -137,7 +137,7 @@ export function Presentation({ slides, config = {} }) {
             {!currentSlideData.hideQRCode && (
               <SlideQRCode
                 currentSlide={currentSlide}
-                nextSlide={currentSlide < slides.length - 1 ? currentSlide + 1 : null}
+                totalSlides={slides.length}
               />
             )}
           </div>
