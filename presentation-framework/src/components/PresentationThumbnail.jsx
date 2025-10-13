@@ -1,8 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import '../styles/Presentation.css';
 
-export function PresentationThumbnail({ slides, isHovered, assetsPath }) {
+export function PresentationThumbnail({ slides, isHovered, assetsPath, customStyles }) {
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Inject custom styles
+  useEffect(() => {
+    if (customStyles) {
+      const styleId = 'presentation-custom-styles';
+      let styleElement = document.getElementById(styleId);
+
+      if (!styleElement) {
+        styleElement = document.createElement('style');
+        styleElement.id = styleId;
+        document.head.appendChild(styleElement);
+      }
+
+      styleElement.textContent = customStyles;
+    }
+  }, [customStyles]);
 
   const handleMouseMove = (e) => {
     if (slides.length <= 1) return;

@@ -20,7 +20,11 @@ export function HomePage() {
           const module = await presentations[name]();
           const assetsDir = `/presentations/${name}-assets`;
           const slides = module.getSlides(assetsDir);
-          loaded[name] = { slides, assetsPath: assetsDir };
+          loaded[name] = {
+            slides,
+            assetsPath: assetsDir,
+            customStyles: module.customStyles
+          };
         } catch (err) {
           console.error(`Failed to load ${name}:`, err);
         }
