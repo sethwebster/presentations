@@ -13,8 +13,8 @@ export function PresenterView({ currentSlide, nextSlide, slides, onSlideClick })
       if (e.key === 'Escape') {
         const now = Date.now();
         if (now - lastEscapeTime.current < 500) {
-          // Double escape pressed within 500ms
-          navigate('/');
+          // Double escape pressed within 500ms - close presenter window
+          window.close();
         }
         lastEscapeTime.current = now;
       }
@@ -22,7 +22,7 @@ export function PresenterView({ currentSlide, nextSlide, slides, onSlideClick })
 
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [navigate]);
+  }, []);
 
   const handleSlideClick = (index) => {
     const channel = new BroadcastChannel('presentation-sync');
