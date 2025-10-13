@@ -45,7 +45,7 @@ export function PresentationThumbnail({ slides, isHovered, assetsPath, customSty
       onMouseLeave={() => setCurrentIndex(0)}
     >
       {/* Progress bar */}
-      {slides.length > 1 && (
+      {isHovered && slides.length > 1 && (
         <div className="absolute top-0 left-0 right-0 h-1 z-10" style={{ background: 'rgba(0, 0, 0, 0.3)' }}>
           <div
             className="h-full transition-all duration-100"
