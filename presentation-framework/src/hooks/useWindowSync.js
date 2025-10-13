@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 export const useWindowSync = (currentSlide, setCurrentSlide) => {
   const [presenterWindowOpen, setPresenterWindowOpen] = useState(false);
+  const presenterWindowRef = useRef(null);
 
   // Broadcast slide changes
   useEffect(() => {
@@ -22,6 +23,7 @@ export const useWindowSync = (currentSlide, setCurrentSlide) => {
         setPresenterWindowOpen(true);
       } else if (event.data.type === 'PRESENTER_CLOSED') {
         setPresenterWindowOpen(false);
+        presenterWindowRef.current = null;
       }
     };
 
@@ -29,6 +31,12 @@ export const useWindowSync = (currentSlide, setCurrentSlide) => {
   }, [setCurrentSlide]);
 
   const openPresenterView = useCallback(() => {
+    // If window already exists and is open, just focus it
+    if (presenterWindowRef.current && !presenterWindowRef.current.closed) {
+      presenterWindowRef.current.focus();
+      return;
+    }
+
     // Preserve existing query parameters and add presenter=true
     const params = new URLSearchParams(window.location.search);
     params.set('presenter', 'true');
@@ -40,6 +48,7 @@ export const useWindowSync = (currentSlide, setCurrentSlide) => {
     );
 
     if (presenterWindow) {
+      presenterWindowRef.current = presenterWindow;
       presenterWindow.focus();
       setPresenterWindowOpen(true);
 
@@ -52,6 +61,7 @@ export const useWindowSync = (currentSlide, setCurrentSlide) => {
         if (presenterWindow.closed) {
           clearInterval(checkClosed);
           setPresenterWindowOpen(false);
+          presenterWindowRef.current = null;
           const channel = new BroadcastChannel('presentation-sync');
           channel.postMessage({ type: 'PRESENTER_CLOSED' });
         }
