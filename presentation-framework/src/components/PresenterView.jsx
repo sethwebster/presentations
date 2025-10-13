@@ -1,8 +1,28 @@
+import { useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import '../styles/PresenterView.css';
 
 export function PresenterView({ currentSlide, nextSlide, slides, onSlideClick }) {
   const current = slides[currentSlide];
   const next = currentSlide < slides.length - 1 ? slides[currentSlide + 1] : null;
+  const navigate = useNavigate();
+  const lastEscapeTime = useRef(0);
+
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        const now = Date.now();
+        if (now - lastEscapeTime.current < 500) {
+          // Double escape pressed within 500ms
+          navigate('/');
+        }
+        lastEscapeTime.current = now;
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [navigate]);
 
   const handleSlideClick = (index) => {
     const channel = new BroadcastChannel('presentation-sync');
