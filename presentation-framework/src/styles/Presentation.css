@@ -91,27 +91,14 @@ body {
 .nav-arrow {
   position: fixed;
   top: 50%;
-  transform: translateY(-50%);
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.3);
   font-size: 4rem;
   cursor: pointer;
   padding: 2rem 1rem;
-  transition: color 0.3s ease;
+  transition: transform 0.4s ease, color 0.3s ease;
   z-index: 1000;
-  opacity: 0;
-  animation: nav-fade-in 0.8s ease-out forwards;
-  animation-delay: 0.3s;
-}
-
-@keyframes nav-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
 }
 
 .nav-arrow:hover {
@@ -126,10 +113,73 @@ body {
 
 .nav-arrow-left {
   left: 0;
+  transform: translateY(-50%);
 }
 
 .nav-arrow-right {
   right: 0;
+  transform: translateY(-50%);
+}
+
+/* Initial state - arrows appear then slide out */
+.nav-arrow.initial {
+  animation: arrow-intro 2s ease-out forwards;
+}
+
+.nav-arrow-left.initial {
+  animation: arrow-intro-left 2s ease-out forwards;
+}
+
+.nav-arrow-right.initial {
+  animation: arrow-intro-right 2s ease-out forwards;
+}
+
+@keyframes arrow-intro-left {
+  0% {
+    opacity: 0;
+    transform: translate(-100%, -50%);
+  }
+  30% {
+    opacity: 1;
+    transform: translate(0, -50%);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-100%, -50%);
+  }
+}
+
+@keyframes arrow-intro-right {
+  0% {
+    opacity: 0;
+    transform: translate(100%, -50%);
+  }
+  30% {
+    opacity: 1;
+    transform: translate(0, -50%);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(100%, -50%);
+  }
+}
+
+/* Visible state - arrows slide in */
+.nav-arrow-left.visible {
+  transform: translate(0, -50%);
+}
+
+.nav-arrow-right.visible {
+  transform: translate(0, -50%);
+}
+
+/* Hidden state - arrows slide out */
+.nav-arrow-left.hidden {
+  transform: translate(-100%, -50%);
+}
+
+.nav-arrow-right.hidden {
+  transform: translate(100%, -50%);
 }
 
 .presenter-button {

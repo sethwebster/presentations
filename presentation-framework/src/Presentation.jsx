@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { usePresentation } from './hooks/usePresentation';
 import { useKeyboardNavigation } from './hooks/useKeyboardNavigation';
 import { useWindowSync } from './hooks/useWindowSync';
+import { useMouseIdle } from './hooks/useMouseIdle';
 import { PresenterView } from './components/PresenterView';
 
 /**
@@ -56,6 +57,7 @@ export function Presentation({ slides, config = {} }) {
 
   useKeyboardNavigation(nextSlide, prevSlide, goToSlide, slides.length);
   const { openPresenterView, presenterWindowOpen } = useWindowSync(currentSlide, goToSlide);
+  const { isIdle, hasMouseMoved } = useMouseIdle(500);
 
   if (isPresenterMode) {
     return (
@@ -80,7 +82,7 @@ export function Presentation({ slides, config = {} }) {
   const defaultNavigationRenderer = () => (
     <>
       <button
-        className="nav-arrow nav-arrow-left"
+        className={`nav-arrow nav-arrow-left ${!hasMouseMoved ? 'initial' : isIdle ? 'hidden' : 'visible'}`}
         onClick={prevSlide}
         disabled={isFirst}
         aria-label="Previous slide"
@@ -88,7 +90,7 @@ export function Presentation({ slides, config = {} }) {
         ←
       </button>
       <button
-        className="nav-arrow nav-arrow-right"
+        className={`nav-arrow nav-arrow-right ${!hasMouseMoved ? 'initial' : isIdle ? 'hidden' : 'visible'}`}
         onClick={nextSlide}
         disabled={isLast}
         aria-label="Next slide"
