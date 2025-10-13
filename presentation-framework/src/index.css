@@ -4,6 +4,16 @@
 
 @layer base {
   :root {
+    /* Lume brand tokens */
+    --lume-size: 64px;
+    --lume-gap: 12px;
+    --lume-teal: #16c2c7;
+    --lume-magenta: #c84bd2;
+    --lume-orange: #ff6a3d;
+    --lume-text: #ececec;
+    --lume-text-dark: #141414;
+
+    /* shadcn tokens */
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
@@ -48,6 +58,55 @@
     --ring: 0 0% 83.1%;
   }
 }
+
+/* Lume branding components */
+.lume-mark {
+  inline-size: var(--lume-size);
+  block-size: var(--lume-size);
+  background-image: url("/assets/logo-no-wordmark.png");
+  background-size: cover;
+  background-position: center;
+  display: inline-block;
+  vertical-align: middle;
+  border-radius: 999px;
+}
+
+.lume-lockup {
+  display: inline-block;
+  inline-size: calc(var(--lume-size) * 4.5);
+  block-size: var(--lume-size);
+  background: url("/assets/logo.png") center/contain no-repeat;
+}
+
+.lume-word {
+  font-family: ui-serif, "SF Pro Display", "New York", "Times New Roman", Georgia, serif;
+  font-weight: 600;
+  font-size: calc(var(--lume-size) * 0.6);
+  letter-spacing: 0.01em;
+  line-height: 1;
+  display: inline-block;
+  vertical-align: middle;
+  color: var(--lume-text);
+  background: linear-gradient(90deg, var(--lume-teal), var(--lume-magenta), var(--lume-orange));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-rendering: optimizeLegibility;
+}
+
+.lume-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lume-gap);
+}
+
+@media (prefers-color-scheme: light) {
+  .lume-word { color: var(--lume-text-dark); }
+}
+
+.lume--sm { --lume-size: 40px; }
+.lume--lg { --lume-size: 96px; }
+.lume--xl { --lume-size: 128px; }
 
 @layer base {
   :root {

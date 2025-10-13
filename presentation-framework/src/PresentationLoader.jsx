@@ -106,8 +106,8 @@ export function PresentationLoader() {
     return (
       <div className="presentation-loader">
         <div className="loader-container">
-          <div className="flex items-center justify-center mb-8">
-            <img src="/assets/logo.png" alt="Lume" className="h-32" />
+          <div className="flex items-center justify-center mb-8 lume--xl">
+            <div className="lume-lockup"></div>
           </div>
           <p className="subtitle">Presentation Framework</p>
 
