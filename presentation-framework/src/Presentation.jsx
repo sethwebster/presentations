@@ -78,13 +78,22 @@ export function Presentation({ slides, config = {} }) {
 
   // Default navigation renderer
   const defaultNavigationRenderer = () => (
-    <div className="navigation">
+    <>
       <button
-        className="nav-button"
+        className="nav-arrow nav-arrow-left"
         onClick={prevSlide}
         disabled={isFirst}
+        aria-label="Previous slide"
       >
-        Previous
+        ←
+      </button>
+      <button
+        className="nav-arrow nav-arrow-right"
+        onClick={nextSlide}
+        disabled={isLast}
+        aria-label="Next slide"
+      >
+        →
       </button>
       {!presenterWindowOpen && (
         <button
@@ -92,7 +101,7 @@ export function Presentation({ slides, config = {} }) {
           onClick={openPresenterView}
           aria-label="Open presenter view"
         >
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="6" cy="15" r="4"/>
             <circle cx="18" cy="15" r="4"/>
             <path d="M6 11h12"/>
@@ -100,14 +109,7 @@ export function Presentation({ slides, config = {} }) {
           </svg>
         </button>
       )}
-      <button
-        className="nav-button"
-        onClick={nextSlide}
-        disabled={isLast}
-      >
-        Next
-      </button>
-    </div>
+    </>
   );
 
   const renderSlideNumber = config.renderSlideNumber || defaultSlideNumberRenderer;
