@@ -436,48 +436,12 @@ export const getSlides = (assetsPath) => {
       )
     },
     {
-      id: 'partners',
+      id: 'partners-new',
       className: 'slide-partners',
-      notes: 'It brings together partners like Meta, Microsoft, Amazon, Expo, Vercel, Callstack, and Software Mansion, working alongside the global developer community—not above it.',
+      notes: 'Building together - partners slide redesign',
       content: (
         <>
-          <div className="partners-title">
-            <h1 style={{ whiteSpace: 'nowrap' }}>Building Together</h1>
-          </div>
-          <div className="partners-logo-grid">
-            {partners.map((partner, index) => (
-              <Reveal
-                key={partner.id}
-                delay={2000 + (100 * (index + 1))}
-                animation="scale"
-                duration={600}
-                className="partner-logo-box"
-                data-company={partner.id}
-              >
-                <img
-                  src={partner.logo.startsWith('http') ? partner.logo : `${assetsPath}/${partner.logo}`}
-                  alt={partner.name}
-                  className="partner-logo-img"
-                  style={partner.scale ? { transform: `scale(${partner.scale})` } : {}}
-                />
-              </Reveal>
-            ))}
-            <Reveal
-              delay={2800}
-              animation="bounce"
-              duration={800}
-              className="partner-logo-box community"
-              data-company="community"
-              placeholder={
-                <div className="logo-placeholder-text">???</div>
-              }
-            >
-              <div className="logo-placeholder-text community-text">
-                <span className="plus-sign">+</span>
-                <span className="pointing-finger">🫵</span>
-              </div>
-            </Reveal>
-          </div>
+          <h1>Building Together</h1>
         </>
       )
     },
