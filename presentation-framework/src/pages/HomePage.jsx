@@ -49,7 +49,11 @@ export function HomePage() {
                       const slides = module.getSlides(assetsDir);
                       setLoadedPresentations(prev => ({
                         ...prev,
-                        [name]: { slides, assetsPath: assetsDir }
+                        [name]: {
+                          slides,
+                          assetsPath: assetsDir,
+                          customStyles: module.customStyles
+                        }
                       }));
                     } catch (err) {
                       console.error('Failed to load presentation preview:', err);
@@ -74,6 +78,7 @@ export function HomePage() {
                       slides={presentationData.slides}
                       isHovered={isHovered}
                       assetsPath={presentationData.assetsPath}
+                      customStyles={presentationData.customStyles}
                     />
                   ) : (
                     <div className="w-full aspect-video flex items-center justify-center"
