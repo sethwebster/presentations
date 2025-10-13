@@ -16,6 +16,7 @@
     "@radix-ui/react-slot": "^1.2.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "qrcode.react": "^4.2.0",
     "react": "^0.0.0-experimental-ead92181-20251010",
     "react-dom": "^0.0.0-experimental-ead92181-20251010",
     "react-router-dom": "^7.9.4",

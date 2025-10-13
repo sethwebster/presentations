@@ -7,6 +7,7 @@ import { useKeyboardNavigation } from './hooks/useKeyboardNavigation';
 import { useWindowSync } from './hooks/useWindowSync';
 import { useMouseIdle } from './hooks/useMouseIdle';
 import { PresenterView } from './components/PresenterView';
+import { SlideQRCode } from './components/SlideQRCode';
 
 /**
  * Main Presentation component - framework core
@@ -131,6 +132,14 @@ export function Presentation({ slides, config = {} }) {
               </div>
             )}
             {renderSlideNumber()}
+
+            {/* QR Code for current slide */}
+            {!currentSlideData.hideQRCode && (
+              <SlideQRCode
+                currentSlide={currentSlide}
+                nextSlide={currentSlide < slides.length - 1 ? currentSlide + 1 : null}
+              />
+            )}
           </div>
         </ViewTransition>
       </div>
