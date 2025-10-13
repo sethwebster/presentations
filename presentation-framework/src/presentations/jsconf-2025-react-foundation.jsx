@@ -436,6 +436,18 @@ export const getSlides = (assetsPath) => {
       )
     },
     {
+      id: 'foundation',
+      className: 'slide-foundation',
+      notes: 'Well, that\'s the why behind the React Foundation. It\'s a new, independent home, in partnership with the Linux Foundation, designed to keep React open, community-driven, and built for everyone—for the next fifteen years and beyond.',
+      content: (
+        <>
+          <div className="logo-placeholder">🏛️</div>
+          <h1>The React Foundation</h1>
+          <h2>Independent • Open • For Everyone</h2>
+        </>
+      )
+    },
+    {
       id: 'partners-new',
       className: 'slide-partners',
       notes: 'Building together - partners slide redesign',

@@ -123,14 +123,25 @@ export function PresentationLoader() {
 
           {!loading && !error && (
             <div className="load-options">
-              <div className="load-option">
-                <h2>Load Presentation</h2>
-                <p>Add a query parameter to the URL with the presentation name:</p>
-                <code className="url-example">?presentation=jsconf-2025-react-foundation</code>
-                <p className="example-text">Example:</p>
-                <code className="url-example">
-                  {window.location.origin}/?presentation=jsconf-2025-react-foundation
-                </code>
+              <div className="presentations-list">
+                <h2>Available Presentations</h2>
+                <p>Click a presentation to load it:</p>
+                <div className="presentation-cards">
+                  {Object.keys(presentations).map((name) => (
+                    <button
+                      key={name}
+                      className="presentation-card"
+                      onClick={() => {
+                        const params = new URLSearchParams(window.location.search);
+                        params.set('presentation', name);
+                        window.location.search = params.toString();
+                      }}
+                    >
+                      <div className="card-title">{name}</div>
+                      <div className="card-action">Load →</div>
+                    </button>
+                  ))}
+                </div>
                 <p className="info-note">
                   Add your presentations to <code>src/presentations/</code> and register them in <code>index.js</code>
                 </p>
