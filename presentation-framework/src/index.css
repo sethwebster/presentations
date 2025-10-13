@@ -7,10 +7,19 @@
     /* Lume brand tokens */
     --lume-size: 64px;
     --lume-gap: 12px;
-    --lume-teal: #16c2c7;
-    --lume-magenta: #c84bd2;
-    --lume-orange: #ff6a3d;
-    --lume-text: #ececec;
+
+    /* Lume 5-color core palette */
+    --lume-primary: #16C2C7;      /* Lume Teal - signature brand */
+    --lume-accent: #C84BD2;       /* Lume Magenta - vibrant highlights */
+    --lume-ember: #FF6A3D;        /* Lume Ember - warm glow */
+    --lume-midnight: #0B1022;     /* Lume Midnight - deep navy glass */
+    --lume-mist: #ECECEC;         /* Lume Mist - clean neutral */
+
+    /* Legacy aliases for compatibility */
+    --lume-teal: var(--lume-primary);
+    --lume-magenta: var(--lume-accent);
+    --lume-orange: var(--lume-ember);
+    --lume-text: var(--lume-mist);
     --lume-text-dark: #141414;
 
     /* shadcn tokens */
@@ -86,8 +95,7 @@
   line-height: 1;
   display: inline-block;
   vertical-align: middle;
-  color: var(--lume-text);
-  background: linear-gradient(90deg, var(--lume-teal), var(--lume-magenta), var(--lume-orange));
+  background: linear-gradient(135deg, var(--lume-primary) 0%, var(--lume-accent) 50%, var(--lume-ember) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
