@@ -25,7 +25,7 @@ export function SlideQRCode({ currentSlide, nextSlide }) {
   if (!currentUrl) return null;
 
   return (
-    <div className="absolute bottom-4 right-4 p-2 rounded-lg backdrop-blur-md z-20"
+    <div className="absolute bottom-4 left-4 p-2 rounded-lg backdrop-blur-md z-20"
          style={{
            background: 'rgba(255, 255, 255, 0.9)',
          }}>
