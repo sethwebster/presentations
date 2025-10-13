@@ -88,8 +88,9 @@ export function Presentation({ slides, config = {} }) {
       </button>
       {!presenterWindowOpen && (
         <button
-          className="nav-button presenter-button"
+          className="presenter-button"
           onClick={openPresenterView}
+          aria-label="Open presenter view"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="6" cy="15" r="4"/>
@@ -97,7 +98,6 @@ export function Presentation({ slides, config = {} }) {
             <path d="M6 11h12"/>
             <path d="M2 15h2m16 0h2"/>
           </svg>
-          Presenter View
         </button>
       )}
       <button
