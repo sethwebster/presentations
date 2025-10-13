@@ -9,7 +9,7 @@ export function HomePage() {
     <div className="min-h-screen" style={{ background: 'var(--lume-midnight)', color: 'var(--lume-mist)' }}>
       <Header />
 
-      <main className="pt-40 px-8">
+      <main className="p-6 pt-28">
         <div className="max-w-3xl mx-auto">
           <h1 className="text-5xl font-light mb-16">Presentations</h1>
 
@@ -18,7 +18,7 @@ export function HomePage() {
               <div
                 key={name}
                 onClick={() => navigate(`/present/${name}`)}
-                className="group flex items-center justify-between py-6 px-8 cursor-pointer transition-all duration-200 border-b hover:pl-12"
+                className="pt-6 group flex items-center justify-between py-6 px-8 cursor-pointer transition-all duration-200 border-b hover:pl-12"
                 style={{
                   borderColor: 'rgba(236, 236, 236, 0.08)',
                 }}

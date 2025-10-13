@@ -14,7 +14,7 @@ export function Header() {
 
         {/* GitHub link integrated in header */}
         <a
-          href="https://github.com/sethwebster/lume"
+          href="https://github.com/sethwebster/presentations"
           target="_blank"
           rel="noopener noreferrer"
           className="absolute right-0 top-0 h-full flex items-center px-6 group"
