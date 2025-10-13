@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export function PresentationThumbnail({ slides, isHovered, assetsPath }) {
+export function PresentationThumbnail({ slides, isHovered, assetsPath, customStyles }) {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const handleMouseMove = (e) => {
