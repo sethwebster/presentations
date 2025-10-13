@@ -174,7 +174,6 @@ body {
   position: fixed;
   bottom: 2rem;
   left: 50%;
-  transform: translateX(-50%);
   background: rgba(97, 218, 251, 0.2);
   border: 1px solid rgba(97, 218, 251, 0.4);
   color: var(--text-color);
@@ -182,12 +181,12 @@ body {
   border-radius: 0.5rem;
   cursor: pointer;
   backdrop-filter: blur(10px);
-  transition: all 0.3s ease;
+  transition: transform 0.4s ease, background 0.3s ease;
   z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: nav-fade-in 1s ease-out forwards;
+  transform: translateX(-50%);
 }
 
 .presenter-button:hover {
@@ -197,6 +196,32 @@ body {
 .presenter-button svg {
   width: 1.25rem;
   height: 1.25rem;
+}
+
+/* Initial state - button appears then slides down */
+.presenter-button.initial {
+  animation: button-intro 1s ease-out forwards;
+}
+
+@keyframes button-intro {
+  0%, 50% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 150%);
+  }
+}
+
+/* Visible state - button slides up */
+.presenter-button.visible {
+  transform: translate(-50%, 0);
+}
+
+/* Hidden state - button slides down */
+.presenter-button.hidden {
+  transform: translate(-50%, 150%);
 }
 
 .navigation {

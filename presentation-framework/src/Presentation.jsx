@@ -99,7 +99,7 @@ export function Presentation({ slides, config = {} }) {
       </button>
       {!presenterWindowOpen && (
         <button
-          className="presenter-button"
+          className={`presenter-button ${!hasMouseMoved ? 'initial' : isIdle ? 'hidden' : 'visible'}`}
           onClick={openPresenterView}
           aria-label="Open presenter view"
         >
