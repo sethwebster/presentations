@@ -21,13 +21,22 @@ export function SlideQRCode({ currentSlide, totalSlides }) {
     return qrUrlCache.get(cacheKey);
   }, [currentSlide]);
 
-  // Pregenerate QR URLs for all slides in background
+  // Pregenerate QR URLs for ALL slides immediately on mount
   useEffect(() => {
     const baseUrl = window.location.origin + window.location.pathname;
     const params = new URLSearchParams(window.location.search);
 
-    // Start pregenerating from next slide onwards
-    const pregenerateUrls = () => {
+    // Check if all slides are already cached
+    let allCached = true;
+    for (let i = 0; i < totalSlides; i++) {
+      if (!qrUrlCache.has(`slide-${i}`)) {
+        allCached = false;
+        break;
+      }
+    }
+
+    // If not all cached, generate them all immediately
+    if (!allCached) {
       for (let i = 0; i < totalSlides; i++) {
         const cacheKey = `slide-${i}`;
         if (!qrUrlCache.has(cacheKey)) {
@@ -36,15 +45,9 @@ export function SlideQRCode({ currentSlide, totalSlides }) {
           qrUrlCache.set(cacheKey, `${baseUrl}?${slideParams.toString()}`);
         }
       }
-      setIsReady(true);
-    };
-
-    // Pregenerate in next tick to not block rendering
-    if (window.requestIdleCallback) {
-      window.requestIdleCallback(pregenerateUrls);
-    } else {
-      setTimeout(pregenerateUrls, 0);
     }
+
+    setIsReady(true);
   }, [totalSlides]);
 
   return (
