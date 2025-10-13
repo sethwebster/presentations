@@ -125,7 +125,7 @@ export const customStyles = `
     top: 50%;
   }
   to {
-    top: 15%;
+    top: 25%;
   }
 }
 
