@@ -102,7 +102,6 @@
 /* Bounce Animation */
 .reveal-bounce.hidden {
   opacity: 0;
-  transform: scale(0.3);
 }
 
 .reveal-bounce.revealed {
