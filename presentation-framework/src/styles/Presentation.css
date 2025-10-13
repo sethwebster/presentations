@@ -136,10 +136,10 @@ body {
 
 @keyframes arrow-intro-left {
   0% {
-    opacity: 0;
-    transform: translate(-100%, -50%);
+    opacity: 1;
+    transform: translate(0, -50%);
   }
-  30% {
+  70% {
     opacity: 1;
     transform: translate(0, -50%);
   }
@@ -151,10 +151,10 @@ body {
 
 @keyframes arrow-intro-right {
   0% {
-    opacity: 0;
-    transform: translate(100%, -50%);
+    opacity: 1;
+    transform: translate(0, -50%);
   }
-  30% {
+  70% {
     opacity: 1;
     transform: translate(0, -50%);
   }
