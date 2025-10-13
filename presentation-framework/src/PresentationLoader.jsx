@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Presentation } from './Presentation.jsx';
 import { loadPresentation, presentations } from './presentations/index.js';
+import { Button } from './components/ui/button';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './components/ui/card';
 import './styles/PresentationLoader.css';
 
 /**
@@ -122,30 +124,35 @@ export function PresentationLoader() {
           )}
 
           {!loading && !error && (
-            <div className="load-options">
-              <div className="presentations-list">
-                <h2>Available Presentations</h2>
-                <p>Click a presentation to load it:</p>
-                <div className="presentation-cards">
-                  {Object.keys(presentations).map((name) => (
-                    <button
-                      key={name}
-                      className="presentation-card"
-                      onClick={() => {
-                        const params = new URLSearchParams(window.location.search);
-                        params.set('presentation', name);
-                        window.location.search = params.toString();
-                      }}
-                    >
-                      <div className="card-title">{name}</div>
-                      <div className="card-action">Load →</div>
-                    </button>
-                  ))}
-                </div>
-                <p className="info-note">
-                  Add your presentations to <code>src/presentations/</code> and register them in <code>index.js</code>
-                </p>
+            <div className="max-w-4xl mx-auto">
+              <h2 className="text-3xl font-bold mb-2 text-white">Available Presentations</h2>
+              <p className="text-lg text-white/80 mb-8">Click a presentation to load it:</p>
+              <div className="grid grid-cols-1 gap-4">
+                {Object.keys(presentations).map((name) => (
+                  <Card
+                    key={name}
+                    className="bg-white/10 border-white/20 backdrop-blur-lg cursor-pointer hover:bg-white/15 hover:border-cyan-400/50 transition-all hover:translate-x-2"
+                    onClick={() => {
+                      const params = new URLSearchParams(window.location.search);
+                      params.set('presentation', name);
+                      window.location.search = params.toString();
+                    }}
+                  >
+                    <CardHeader>
+                      <CardTitle className="text-white flex items-center justify-between">
+                        <span className="text-xl">{name}</span>
+                        <span className="text-cyan-400">→</span>
+                      </CardTitle>
+                      <CardDescription className="text-white/70">
+                        Click to load presentation
+                      </CardDescription>
+                    </CardHeader>
+                  </Card>
+                ))}
               </div>
+              <p className="text-sm text-white/60 mt-6 text-center">
+                Add your presentations to <code className="bg-black/30 px-2 py-1 rounded">src/presentations/</code> and register them in <code className="bg-black/30 px-2 py-1 rounded">index.js</code>
+              </p>
             </div>
           )}
 
