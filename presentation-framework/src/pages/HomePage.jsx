@@ -18,7 +18,7 @@ export function HomePage() {
               <div
                 key={name}
                 onClick={() => navigate(`/present/${name}`)}
-                className="pt-6 group flex items-center justify-between py-6 px-8 cursor-pointer transition-all duration-200 border-b hover:pl-12"
+                className="group flex items-center justify-between py-6 px-8 cursor-pointer transition-all duration-200 border-b hover:pl-12"
                 style={{
                   borderColor: 'rgba(236, 236, 236, 0.08)',
                 }}
