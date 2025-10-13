@@ -1,6 +1,7 @@
 import './styles/Presentation.css';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ViewTransition } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { usePresentation } from './hooks/usePresentation';
 import { useKeyboardNavigation } from './hooks/useKeyboardNavigation';
 import { useWindowSync } from './hooks/useWindowSync';
@@ -18,11 +19,30 @@ import { PresenterView } from './components/PresenterView';
  */
 export function Presentation({ slides, config = {} }) {
   const [isPresenterMode, setIsPresenterMode] = useState(false);
+  const navigate = useNavigate();
+  const lastEscapeTime = useRef(0);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setIsPresenterMode(params.get('presenter') === 'true');
   }, []);
+
+  // Double-Escape to return to homepage
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        const now = Date.now();
+        if (now - lastEscapeTime.current < 500) {
+          // Double escape pressed within 500ms
+          navigate('/');
+        }
+        lastEscapeTime.current = now;
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [navigate]);
 
   const {
     currentSlide,
