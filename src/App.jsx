@@ -1,5 +1,6 @@
 import './App.css';
 import { useState, useEffect } from 'react';
+import { ViewTransition } from 'react';
 import { usePresentation } from './hooks/usePresentation';
 import { useKeyboardNavigation } from './hooks/useKeyboardNavigation';
 import { useWindowSync } from './hooks/useWindowSync';
@@ -26,13 +27,7 @@ function App() {
   } = usePresentation(slides.length);
 
   useKeyboardNavigation(nextSlide, prevSlide, goToSlide, slides.length);
-  const { openPresenterView, presenterWindowOpen } = useWindowSync(currentSlide, (index) => {
-    if (!document.startViewTransition) {
-      goToSlide(index);
-      return;
-    }
-    document.startViewTransition(() => goToSlide(index));
-  });
+  const { openPresenterView, presenterWindowOpen } = useWindowSync(currentSlide, goToSlide);
 
   if (isPresenterMode) {
     return (
@@ -51,13 +46,22 @@ function App() {
       <div className="progress-bar" style={{ width: `${progress}%` }} />
 
       <div className="slide-container">
-        <div className={`slide ${currentSlideData.className}`}>
-          {currentSlideData.content}
-          <img src={reactLogo} alt="React" className="react-logo" />
-          <div className="slide-number">
-            {currentSlide + 1} / {slides.length}
+        <ViewTransition>
+          <div key={currentSlideData.id} className={`slide ${currentSlideData.className}`}>
+            {currentSlideData.content}
+            {!currentSlideData.hasHeroLogo && (
+              <img
+                src={reactLogo}
+                alt="React"
+                className="react-logo"
+                style={{ viewTransitionName: 'react-brand-logo' }}
+              />
+            )}
+            <div className="slide-number">
+              {currentSlide + 1} / {slides.length}
+            </div>
           </div>
-        </div>
+        </ViewTransition>
       </div>
 
       <div className="navigation">

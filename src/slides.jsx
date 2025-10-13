@@ -1,10 +1,15 @@
+import reactLogo from './assets/react_logo_dark.svg';
+import { PartnersSlide } from './components/PartnersSlide';
+
 export const slides = [
   {
     id: 'opening',
     className: 'slide-opening',
+    hasHeroLogo: true,
     notes: 'You know, every so often, something comes along in software that changes not just how we build—but why we build. A shift so deep that it stops being about just syntax or syntactic sugar…and starts being about people. About how we think. About how we create together.',
     content: (
       <>
+        <img src={reactLogo} alt="React" className="hero-logo" />
         <h1>How We Build<br/><span className="highlight">Why We Build</span></h1>
       </>
     )
@@ -58,9 +63,23 @@ export const slides = [
     notes: 'As Robin shared, I am Seth Webster, and it\'s my privilege to be here with you today, at my first JSConf! I\'ve been the head of React at Meta for the past 5 years, and as of last week, I\'m honored to serve as the Executive Director of the newly forming React Foundation. Now, I get questions a lot about my voice, so since I am meeting some of you for the first time… no, I am not sick, I have a vocal disability called "Spasmodic dysphonia" — So that\'s why I sound so cool.',
     content: (
       <>
-        <div className="logo-placeholder">⚛️</div>
+        <img src={reactLogo} alt="React" className="logo-placeholder" />
         <h1>Seth Webster</h1>
         <h2>Executive Director<br/>React Foundation</h2>
+        <div className="social-handles">
+          <div className="social-handle">
+            <svg className="social-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+            </svg>
+            @sethwebster
+          </div>
+          <div className="social-handle">
+            <svg className="social-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+            </svg>
+            @sethwebsterphoto
+          </div>
+        </div>
       </>
     )
   },
@@ -92,7 +111,7 @@ export const slides = [
     notes: 'For the last six years, I\'ve had a front-row seat to something extraordinary: watching an open-source idea continue to evolve into one of the most influential technologies in software history. React is now part of millions of apps and sites. It\'s shaped the thinking of every major platform vendor—from Apple to Google to Amazon to Microsoft.',
     content: (
       <>
-        <h1>Six Years</h1>
+        <h1>Over a Decade</h1>
         <h2>Millions of Apps<br/>Every Major Platform</h2>
       </>
     )
@@ -135,21 +154,7 @@ export const slides = [
     id: 'partners',
     className: 'slide-partners',
     notes: 'It brings together partners like Meta, Microsoft, Amazon, Expo, Vercel, Callstack, and Software Mansion, working alongside the global developer community—not above it.',
-    content: (
-      <>
-        <h1>Building Together</h1>
-        <div className="partners-grid">
-          <div className="partner-logo">Meta</div>
-          <div className="partner-logo">Microsoft</div>
-          <div className="partner-logo">Amazon</div>
-          <div className="partner-logo">Expo</div>
-          <div className="partner-logo">Vercel</div>
-          <div className="partner-logo">Callstack</div>
-          <div className="partner-logo">Software Mansion</div>
-          <div className="partner-logo">+ You</div>
-        </div>
-      </>
-    )
+    content: <PartnersSlide />
   },
   {
     id: 'governance',
@@ -225,7 +230,7 @@ export const slides = [
       <>
         <h1>Thank You</h1>
         <h2 className="highlight">Let's Build the Next Chapter</h2>
-        <div className="logo-placeholder">⚛️</div>
+        <img src={reactLogo} alt="React" className="logo-placeholder" />
       </>
     )
   }
