@@ -111,18 +111,21 @@ export const customStyles = `
   position: relative;
 }
 
-.partners-title h1 {
-  margin-bottom: 0;
-  animation: title-move-up 0.8s ease-out forwards;
+.partners-title {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: title-move-to-top 0.8s ease-out forwards;
   animation-delay: 2s;
 }
 
-@keyframes title-move-up {
+@keyframes title-move-to-top {
   from {
-    transform: translateY(0);
+    top: 50%;
   }
   to {
-    transform: translateY(-10rem);
+    top: 15%;
   }
 }
 
@@ -131,8 +134,12 @@ export const customStyles = `
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 2rem;
-  margin-top: 3rem;
+  margin-top: 0;
   max-width: 85%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .partner-logo-box {
