@@ -111,7 +111,7 @@ export const customStyles = `
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 2rem;
-  margin-top: 3rem;
+  margin-top: 2rem;
   max-width: 85%;
 }
 
@@ -402,7 +402,9 @@ export const getSlides = (assetsPath) => {
       notes: 'It brings together partners like Meta, Microsoft, Amazon, Expo, Vercel, Callstack, and Software Mansion, working alongside the global developer community—not above it.',
       content: (
         <>
-          <h1>Building Together</h1>
+          <Reveal delay={0} animation="slide-up" duration={800}>
+            <h1>Building Together</h1>
+          </Reveal>
           <div className="partners-logo-grid">
             {partners.map((partner, index) => (
               <Reveal
