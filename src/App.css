@@ -415,7 +415,6 @@ body {
   opacity: 0;
   transform: scale(0.8);
   animation: partner-reveal 0.6s ease-out forwards;
-  overflow: hidden;
 }
 
 .partner-logo-box:nth-child(1) { animation-delay: 0.1s; }
@@ -442,59 +441,8 @@ body {
   }
 }
 
-/* Prismatic caustic reveal effect */
-.partner-logo-box::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(97, 218, 251, 0.4) 20%,
-    rgba(255, 107, 107, 0.4) 40%,
-    rgba(67, 233, 123, 0.4) 60%,
-    rgba(250, 112, 154, 0.4) 80%,
-    transparent
-  );
-  animation: caustic-sweep 1.2s ease-out;
-  animation-fill-mode: forwards;
-  pointer-events: none;
-  z-index: 10;
-  border-radius: 1.5rem;
-  overflow: hidden;
-}
-
-.partner-logo-box:nth-child(1)::before { animation-delay: 0.1s; }
-.partner-logo-box:nth-child(2)::before { animation-delay: 0.2s; }
-.partner-logo-box:nth-child(3)::before { animation-delay: 0.3s; }
-.partner-logo-box:nth-child(4)::before { animation-delay: 0.4s; }
-.partner-logo-box:nth-child(5)::before { animation-delay: 0.5s; }
-.partner-logo-box:nth-child(6)::before { animation-delay: 0.6s; }
-.partner-logo-box:nth-child(7)::before { animation-delay: 0.7s; }
-.partner-logo-box:nth-child(8)::before { animation-delay: 0.8s; }
-
-@keyframes caustic-sweep {
-  0% {
-    left: -100%;
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  90% {
-    opacity: 1;
-  }
-  100% {
-    left: 100%;
-    opacity: 0;
-  }
-}
-
 .partner-logo-box.community {
-  border: 2px solid rgba(97, 218, 251, 0.6);
+  background: transparent;
 }
 
 .logo-placeholder-text {
@@ -506,7 +454,29 @@ body {
 
 .partner-logo-box.community .logo-placeholder-text {
   color: var(--primary-color);
-  font-size: 2.2rem;
+  font-size: 2.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.plus-sign {
+  font-size: 3rem;
+  font-weight: 700;
+}
+
+.pointing-finger {
+  font-size: 3.5rem;
+  animation: point-bounce 0.8s ease-in-out infinite;
+}
+
+@keyframes point-bounce {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(10px);
+  }
 }
 
 .partner-logo-img {
@@ -524,10 +494,10 @@ body {
   opacity: 0.9;
 }
 
-/* Microsoft logo already has colors, just make it lighter */
+/* Microsoft logo - grayscale and inverted to white */
 [data-company="microsoft"] .partner-logo-img {
-  filter: brightness(2);
-  opacity: 0.95;
+  filter: grayscale(1) brightness(0) invert(1);
+  opacity: 0.9;
 }
 
 /* Callstack and Software Mansion logos are already white, no filter needed */

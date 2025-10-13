@@ -71,7 +71,12 @@ export function PartnersSlide() {
         ))}
         <div className="partner-logo-box community" data-company="community">
           <div className="logo-placeholder-text community-text">
-            {showCommunity ? '+ You' : '???'}
+            {showCommunity ? (
+              <>
+                <span className="plus-sign">+</span>
+                <span className="pointing-finger">🫵</span>
+              </>
+            ) : '???'}
           </div>
         </div>
       </div>
