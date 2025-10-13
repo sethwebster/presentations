@@ -1,46 +1,31 @@
 export function Header() {
   return (
-    <>
-      <header className="absolute top-0 left-0 right-0 border-b backdrop-blur-sm"
-              style={{
-                borderColor: 'rgba(236, 236, 236, 0.1)',
-                background: 'rgba(11, 16, 34, 0.8)',
-                zIndex: 40
-              }}>
-        <div className="px-6 py-4 flex items-center">
-          <div className="flex items-center gap-3">
-            <div className="lume-mark"></div>
-            <div className="lume-word">Lume</div>
-          </div>
+    <header className="absolute top-0 left-0 right-0 border-b backdrop-blur-sm"
+            style={{
+              borderColor: 'rgba(236, 236, 236, 0.1)',
+              background: 'rgba(11, 16, 34, 0.8)',
+              zIndex: 40
+            }}>
+      <div className="px-6 py-4 flex items-center relative">
+        <div className="flex items-center gap-3">
+          <div className="lume-mark"></div>
+          <div className="lume-word">Lume</div>
         </div>
-      </header>
 
-      {/* GitHub corner ribbon */}
-      <a
-        href="https://github.com/sethwebster/lume"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="github-corner"
-        style={{ zIndex: 200 }}
-        aria-label="View source on GitHub"
-      >
-        <svg width="70" height="70" viewBox="0 0 250 250" style={{ fill: 'var(--lume-primary)', color: 'var(--lume-midnight)', position: 'absolute', top: 0, border: 0, right: 0 }} aria-hidden="true">
-          <path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path>
-          <path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style={{ transformOrigin: '130px 106px' }} className="octo-arm"></path>
-          <path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" className="octo-body"></path>
-        </svg>
-      </a>
-
-      <style>{`
-        .github-corner:hover .octo-arm {
-          animation: octocat-wave 560ms ease-in-out;
-        }
-        @keyframes octocat-wave {
-          0%, 100% { transform: rotate(0); }
-          20%, 60% { transform: rotate(-25deg); }
-          40%, 80% { transform: rotate(10deg); }
-        }
-      `}</style>
-    </>
+        {/* GitHub link integrated in header */}
+        <a
+          href="https://github.com/sethwebster/lume"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute right-0 top-0 h-full flex items-center px-6 group"
+          aria-label="View source on GitHub"
+          style={{ zIndex: 50 }}
+        >
+          <svg className="w-6 h-6 transition-transform group-hover:scale-110" viewBox="0 0 24 24" fill="currentColor" style={{ color: 'var(--lume-primary)' }}>
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+        </a>
+      </div>
+    </header>
   );
 }
