@@ -11,6 +11,26 @@ export function HomePage() {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [loadedPresentations, setLoadedPresentations] = useState({});
 
+  // Preload all presentations on mount
+  useEffect(() => {
+    const loadAllPresentations = async () => {
+      const loaded = {};
+      for (const name of Object.keys(presentations)) {
+        try {
+          const module = await presentations[name]();
+          const assetsDir = `/presentations/${name}-assets`;
+          const slides = module.getSlides(assetsDir);
+          loaded[name] = { slides, assetsPath: assetsDir };
+        } catch (err) {
+          console.error(`Failed to load ${name}:`, err);
+        }
+      }
+      setLoadedPresentations(loaded);
+    };
+
+    loadAllPresentations();
+  }, []);
+
   return (
     <div className="min-h-screen" style={{ background: 'var(--lume-midnight)', color: 'var(--lume-mist)' }}>
       <Header />
