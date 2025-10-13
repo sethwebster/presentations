@@ -20,7 +20,8 @@ export function Reveal({
   animation = 'fade',
   duration = 600,
   className = '',
-  style = {}
+  style = {},
+  ...otherProps
 }) {
   const [isRevealed, setIsRevealed] = useState(delay === 0);
 
@@ -36,6 +37,7 @@ export function Reveal({
 
   return (
     <div
+      {...otherProps}
       className={`reveal ${isRevealed ? 'revealed' : 'hidden'} reveal-${animation} ${className}`}
       style={{
         ...style,

@@ -6,7 +6,7 @@
  * Place accompanying assets in a folder named "jsconf-2025-react-foundation-assets/"
  */
 
-import { useState, useEffect } from 'react';
+import { Reveal } from '../components/Reveal.jsx';
 
 // ============================================================================
 // CONFIGURATION
@@ -405,16 +405,13 @@ export const getSlides = (assetsPath) => {
           <h1>Building Together</h1>
           <div className="partners-logo-grid">
             {partners.map((partner, index) => (
-              <div
+              <Reveal
                 key={partner.id}
+                delay={100 * (index + 1)}
+                animation="scale"
+                duration={600}
                 className="partner-logo-box"
                 data-company={partner.id}
-                style={{
-                  opacity: 0,
-                  transform: 'scale(0.8)',
-                  animation: `partner-reveal 0.6s ease-out forwards`,
-                  animationDelay: `${0.1 * (index + 1)}s`
-                }}
               >
                 <img
                   src={partner.logo.startsWith('http') ? partner.logo : `${assetsPath}/${partner.logo}`}
@@ -422,23 +419,23 @@ export const getSlides = (assetsPath) => {
                   className="partner-logo-img"
                   style={partner.scale ? { transform: `scale(${partner.scale})` } : {}}
                 />
-              </div>
+              </Reveal>
             ))}
-            <div
+            <Reveal
+              delay={800}
+              animation="bounce"
+              duration={800}
               className="partner-logo-box community"
               data-company="community"
-              style={{
-                opacity: 0,
-                transform: 'scale(0.8)',
-                animation: `partner-reveal 0.6s ease-out forwards`,
-                animationDelay: `0.8s`
-              }}
+              placeholder={
+                <div className="logo-placeholder-text">???</div>
+              }
             >
               <div className="logo-placeholder-text community-text">
                 <span className="plus-sign">+</span>
                 <span className="pointing-finger">🫵</span>
               </div>
-            </div>
+            </Reveal>
           </div>
         </>
       )
