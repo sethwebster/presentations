@@ -219,7 +219,8 @@ const partners = [
   {
     id: 'expo',
     name: 'Expo',
-    logo: 'expo-logo-wordmark.svg'
+    logo: 'expo-logo-wordmark.svg',
+    scale: 1.25
   },
   {
     id: 'vercel',
@@ -418,6 +419,7 @@ export const getSlides = (assetsPath) => {
                   src={partner.logo.startsWith('http') ? partner.logo : `${assetsPath}/${partner.logo}`}
                   alt={partner.name}
                   className="partner-logo-img"
+                  style={partner.scale ? { transform: `scale(${partner.scale})` } : {}}
                 />
               </div>
             ))}
