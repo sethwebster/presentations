@@ -221,7 +221,7 @@ const partners = [
     id: 'expo',
     name: 'Expo',
     logo: 'expo-logo-wordmark.svg',
-    scale: 1.5625
+    scale: 1.75
   },
   {
     id: 'vercel',
