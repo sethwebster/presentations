@@ -105,11 +105,12 @@ export function PresentationLoader() {
   if (!presentationModule) {
     return (
       <div className="presentation-loader">
+        <header className="fixed top-0 left-0 right-0 p-6 flex items-center gap-3">
+          <div className="lume-mark"></div>
+          <div className="lume-word">Lume</div>
+        </header>
         <div className="loader-container">
-          <div className="flex items-center justify-center mb-8 lume--xl">
-            <div className="lume-lockup"></div>
-          </div>
-          <p className="subtitle">Presentation Framework</p>
+          <p className="text-2xl font-light text-white/60 mb-8">Presentation Framework</p>
 
           {loading && (
             <div className="loading-indicator">
