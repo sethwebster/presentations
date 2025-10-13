@@ -201,7 +201,7 @@ export const customStyles = `
 
 .partner-logo-img {
   max-width: 100%;
-  max-height: 80px;
+  max-height: 120px;
   object-fit: contain;
 }
 
