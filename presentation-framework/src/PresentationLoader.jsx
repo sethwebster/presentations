@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Presentation } from './Presentation.jsx';
 import { loadPresentation, presentations } from './presentations/index.js';
-import { Button } from './components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './components/ui/card';
+import { Header } from './components/Header';
+import { Card, CardHeader, CardTitle, CardDescription } from './components/ui/card';
 import './styles/PresentationLoader.css';
 
 /**
@@ -105,10 +105,7 @@ export function PresentationLoader() {
   if (!presentationModule) {
     return (
       <div className="presentation-loader">
-        <header className="fixed top-0 left-0 right-0 p-6 flex items-center gap-3">
-          <div className="lume-mark"></div>
-          <div className="lume-word">Lume</div>
-        </header>
+        <Header />
         <div className="loader-container">
           <p className="text-2xl font-light text-white/60 mb-8">Presentation Framework</p>
 
