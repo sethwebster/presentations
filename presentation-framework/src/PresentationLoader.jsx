@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Presentation } from './Presentation.jsx';
-import { loadPresentation } from './presentations/index.js';
+import { loadPresentation, presentations } from './presentations/index.js';
 import './styles/PresentationLoader.css';
 
 /**
