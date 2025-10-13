@@ -94,13 +94,15 @@ body {
   transform: translateY(-50%);
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.15);
   font-size: 4rem;
   cursor: pointer;
   padding: 2rem 1rem;
-  transition: color 0.5s ease;
+  transition: color 0.3s ease;
   z-index: 1000;
-  animation: nav-fade-in 1s ease-out forwards;
+  opacity: 0;
+  animation: nav-fade-in 0.8s ease-out forwards;
+  animation-delay: 0.3s;
 }
 
 @keyframes nav-fade-in {
@@ -113,7 +115,7 @@ body {
 }
 
 .nav-arrow:hover {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .nav-arrow:disabled {
