@@ -1,6 +1,6 @@
 export function Header() {
   return (
-    <header className="absolute top-0 left-0 right-0 border-b backdrop-blur-sm"
+    <header className="fixed top-0 left-0 right-0 border-b backdrop-blur-sm"
             style={{
               borderColor: 'rgba(236, 236, 236, 0.1)',
               background: 'rgba(11, 16, 34, 0.8)',
