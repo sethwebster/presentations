@@ -140,6 +140,18 @@ export const customStyles = `
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  opacity: 0;
+  animation: grid-fade-in 0.3s ease-out forwards;
+  animation-delay: 2s;
+}
+
+@keyframes grid-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .partner-logo-box {
