@@ -1,10 +1,11 @@
 export function Header() {
   return (
     <>
-      <header className="absolute top-0 left-0 right-0 z-40 border-b backdrop-blur-sm"
+      <header className="absolute top-0 left-0 right-0 border-b backdrop-blur-sm"
               style={{
                 borderColor: 'rgba(236, 236, 236, 0.1)',
-                background: 'rgba(11, 16, 34, 0.8)'
+                background: 'rgba(11, 16, 34, 0.8)',
+                zIndex: 40
               }}>
         <div className="px-6 py-4 flex items-center">
           <div className="flex items-center gap-3">
