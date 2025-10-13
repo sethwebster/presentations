@@ -9,7 +9,7 @@ export function HomePage() {
     <div className="min-h-screen" style={{ background: 'var(--lume-midnight)', color: 'var(--lume-mist)' }}>
       <Header />
 
-      <main className="p-6 pt-28">
+      <main className="pt-28 px-8 pb-12">
         <div className="max-w-3xl mx-auto">
           <h1 className="text-5xl font-light mb-16">Presentations</h1>
 
