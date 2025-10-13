@@ -1,38 +1,30 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 
 export function PresentationThumbnail({ slides, isHovered, assetsPath }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const intervalRef = useRef(null);
 
-  useEffect(() => {
-    if (isHovered && slides.length > 1) {
-      // Auto-advance slides every 500ms (2 slides/second)
-      intervalRef.current = setInterval(() => {
-        setCurrentIndex((prev) => (prev + 1) % slides.length);
-      }, 500);
-    } else {
-      // Reset to first slide when not hovered
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-      setCurrentIndex(0);
-    }
+  const handleMouseMove = (e) => {
+    if (!isHovered || slides.length <= 1) return;
 
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [isHovered, slides.length]);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percentage = x / rect.width;
+    const index = Math.floor(percentage * slides.length);
+    const clampedIndex = Math.max(0, Math.min(slides.length - 1, index));
+
+    setCurrentIndex(clampedIndex);
+  };
 
   const currentSlide = slides[currentIndex];
 
   return (
     <div
-      className="relative w-full aspect-video rounded-lg overflow-hidden"
+      className="relative w-full aspect-video rounded-t-lg overflow-hidden"
       style={{
         background: currentSlide.className ? 'var(--lume-midnight)' : 'rgba(255, 255, 255, 0.03)',
       }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => setCurrentIndex(0)}
     >
       <div
         className={`w-full h-full flex items-center justify-center p-4 text-center ${currentSlide.className || ''}`}
@@ -45,12 +37,23 @@ export function PresentationThumbnail({ slides, isHovered, assetsPath }) {
         {currentSlide.content}
       </div>
 
-      {/* Slide indicator */}
+      {/* Slide indicator and scrub bar */}
       {isHovered && slides.length > 1 && (
-        <div className="absolute bottom-2 right-2 text-xs opacity-60 px-2 py-1 rounded"
-             style={{ background: 'rgba(0, 0, 0, 0.5)', color: 'var(--lume-mist)' }}>
-          {currentIndex + 1}/{slides.length}
-        </div>
+        <>
+          <div className="absolute bottom-0 left-0 right-0 h-1" style={{ background: 'rgba(0, 0, 0, 0.3)' }}>
+            <div
+              className="h-full transition-all duration-100"
+              style={{
+                background: 'var(--lume-primary)',
+                width: `${((currentIndex + 1) / slides.length) * 100}%`
+              }}
+            />
+          </div>
+          <div className="absolute bottom-2 right-2 text-xs font-medium px-2 py-1 rounded"
+               style={{ background: 'rgba(0, 0, 0, 0.7)', color: 'var(--lume-mist)' }}>
+            {currentIndex + 1}/{slides.length}
+          </div>
+        </>
       )}
     </div>
   );
