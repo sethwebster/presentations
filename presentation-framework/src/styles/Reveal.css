@@ -2,6 +2,7 @@
 
 .reveal {
   --reveal-duration: 600ms;
+  will-change: opacity, transform;
 }
 
 .reveal.hidden {
