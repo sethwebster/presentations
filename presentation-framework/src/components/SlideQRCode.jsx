@@ -40,7 +40,11 @@ export function SlideQRCode({ currentSlide, totalSlides }) {
     };
 
     // Pregenerate in next tick to not block rendering
-    requestIdleCallback ? requestIdleCallback(pregenerateUrls) : setTimeout(pregenerateUrls, 0);
+    if (window.requestIdleCallback) {
+      window.requestIdleCallback(pregenerateUrls);
+    } else {
+      setTimeout(pregenerateUrls, 0);
+    }
   }, [totalSlides]);
 
   return (

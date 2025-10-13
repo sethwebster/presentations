@@ -1,5 +1,3 @@
-Love it. Here’s a clean, Vercel-friendly way to do live slide sync + floating emoji reactions with SSE (no sockets).
-
 Architecture (simple & fast)
 	•	Publish: the presenter hits a control API to publish {slide, ts} updates; viewers POST {emoji} for reactions.
 	•	Fan-out: an SSE stream per viewer relays events (slides + reactions).
