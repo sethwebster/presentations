@@ -122,24 +122,16 @@ body {
 }
 
 /* Initial state - arrows appear then slide out */
-.nav-arrow.initial {
-  animation: arrow-intro 2s ease-out forwards;
-}
-
 .nav-arrow-left.initial {
-  animation: arrow-intro-left 2s ease-out forwards;
+  animation: arrow-intro-left 1s ease-out forwards;
 }
 
 .nav-arrow-right.initial {
-  animation: arrow-intro-right 2s ease-out forwards;
+  animation: arrow-intro-right 1s ease-out forwards;
 }
 
 @keyframes arrow-intro-left {
-  0% {
-    opacity: 1;
-    transform: translate(0, -50%);
-  }
-  70% {
+  0%, 50% {
     opacity: 1;
     transform: translate(0, -50%);
   }
@@ -150,11 +142,7 @@ body {
 }
 
 @keyframes arrow-intro-right {
-  0% {
-    opacity: 1;
-    transform: translate(0, -50%);
-  }
-  70% {
+  0%, 50% {
     opacity: 1;
     transform: translate(0, -50%);
   }
