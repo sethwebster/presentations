@@ -1,32 +1,23 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import '../styles/Presentation.css';
 
 export function PresentationThumbnail({ slides, isHovered, assetsPath }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const intervalRef = useRef(null);
 
-  useEffect(() => {
-    if (isHovered && slides.length > 1) {
-      // Auto-advance slides every 500ms (2 slides/second)
-      intervalRef.current = setInterval(() => {
-        setCurrentIndex((prev) => (prev + 1) % slides.length);
-      }, 500);
-    } else {
-      // Reset to first slide when not hovered
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-      setCurrentIndex(0);
-    }
+  const handleMouseMove = (e) => {
+    if (slides.length <= 1) return;
 
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [isHovered, slides.length]);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percentage = x / rect.width;
+    const index = Math.floor(percentage * slides.length);
+    const clampedIndex = Math.max(0, Math.min(slides.length - 1, index));
+
+    setCurrentIndex(clampedIndex);
+  };
 
   const currentSlide = slides[currentIndex];
+  const progress = ((currentIndex + 1) / slides.length) * 100;
 
   return (
     <div
@@ -34,7 +25,22 @@ export function PresentationThumbnail({ slides, isHovered, assetsPath }) {
       style={{
         background: 'var(--lume-midnight)',
       }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => setCurrentIndex(0)}
     >
+      {/* Progress bar */}
+      {slides.length > 1 && (
+        <div className="absolute top-0 left-0 right-0 h-1 z-10" style={{ background: 'rgba(0, 0, 0, 0.3)' }}>
+          <div
+            className="h-full transition-all duration-100"
+            style={{
+              width: `${progress}%`,
+              background: 'linear-gradient(90deg, var(--lume-primary), var(--lume-accent))'
+            }}
+          />
+        </div>
+      )}
+
       <div
         className={`slide ${currentSlide.className || ''}`}
         style={{
@@ -51,9 +57,9 @@ export function PresentationThumbnail({ slides, isHovered, assetsPath }) {
       </div>
 
       {/* Slide indicator */}
-      {isHovered && slides.length > 1 && (
-        <div className="absolute bottom-2 right-2 text-xs opacity-60 px-2 py-1 rounded"
-             style={{ background: 'rgba(0, 0, 0, 0.5)', color: 'var(--lume-mist)' }}>
+      {slides.length > 1 && (
+        <div className="absolute bottom-2 right-2 text-xs font-medium px-2 py-1 rounded z-10"
+             style={{ background: 'rgba(0, 0, 0, 0.7)', color: 'var(--lume-mist)' }}>
           {currentIndex + 1}/{slides.length}
         </div>
       )}
