@@ -163,12 +163,13 @@ export const customStyles = `
 
 .pointing-finger {
   font-size: 3.5rem;
-  animation: point-bounce 0.8s ease-in-out infinite;
+  animation: point-at-you 1s ease-in-out infinite;
+  transform-origin: center;
 }
 
-@keyframes point-bounce {
-  0%, 100% { transform: translateX(0); }
-  50% { transform: translateX(10px); }
+@keyframes point-at-you {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
 }
 
 .partner-logo-img {
