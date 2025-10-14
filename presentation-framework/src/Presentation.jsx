@@ -96,12 +96,17 @@ export function Presentation({ slides, config = {} }) {
     isPresenter
   );
 
-  // Publish slide changes when presenter navigates
+  // Publish slide changes when presenter navigates (debounced to prevent spam)
   useEffect(() => {
-    if (isPresenter) {
-      console.log('Publishing slide change:', currentSlide, 'to deck:', deckId);
+    if (!isPresenter) return;
+
+    console.log('Publishing slide change:', currentSlide, 'to deck:', deckId);
+
+    const timeoutId = setTimeout(() => {
       publishSlideChange(currentSlide);
-    }
+    }, 50); // 50ms debounce to batch rapid changes
+
+    return () => clearTimeout(timeoutId);
   }, [currentSlide, isPresenter, publishSlideChange, deckId]);
 
   // Debug logging
