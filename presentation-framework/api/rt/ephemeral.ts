@@ -1,4 +1,4 @@
-export const config = { runtime: 'edge' as const };
+export const config = { runtime: 'edge' };
 
 // Type definitions
 interface RequestBody {

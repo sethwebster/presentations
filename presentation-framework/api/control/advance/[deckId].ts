@@ -2,7 +2,7 @@ import { kv } from '@vercel/kv';
 import { Redis } from '@upstash/redis';
 
 export const config = {
-  runtime: 'edge' as const,
+  runtime: 'edge',
 };
 
 // Edge-compatible Redis client for pub/sub

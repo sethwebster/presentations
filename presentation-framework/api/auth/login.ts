@@ -1,7 +1,7 @@
 import { kv } from '@vercel/kv';
 
 export const config = {
-  runtime: 'edge' as const,
+  runtime: 'edge',
 };
 
 interface LoginRequestBody {
