@@ -55,17 +55,22 @@ export async function GET(req) {
                 console.log('Slide changed:', currentSlide);
               }
 
-              // Check for new reactions
+              // Check for new reactions (only from last 10 seconds)
               const reactions = await kv.lrange(`deck:${deckId}:reactions`, 0, -1) || [];
+              const now = Date.now();
+
               for (const reactionStr of reactions) {
                 try {
                   const reaction = typeof reactionStr === 'string' ? JSON.parse(reactionStr) : reactionStr;
-                  if (!processedReactionIds.has(reaction.id)) {
+
+                  // Only send reactions from last 10 seconds and not yet processed
+                  const age = now - reaction.ts;
+                  if (age < 10000 && !processedReactionIds.has(reaction.id)) {
                     const reactionJson = typeof reactionStr === 'string' ? reactionStr : JSON.stringify(reaction);
                     controller.enqueue(encoder.encode(`data: ${reactionJson}\n\n`));
                     processedReactionIds.add(reaction.id);
                     hasChanges = true;
-                    console.log('Sent reaction:', reaction.emoji);
+                    console.log('Sent reaction:', reaction.emoji, 'age:', age, 'ms');
                   }
                 } catch (parseErr) {
                   console.error('Failed to parse reaction:', reactionStr, parseErr);
