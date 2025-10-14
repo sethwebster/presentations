@@ -68,12 +68,23 @@ export function useRealtimeSpeech() {
           }
 
           // Handle different event types
-          if (message.type === 'response.function_call_arguments.delta') {
+          if (message.type === 'response.output_item.added') {
+            // Start of a new function call - capture the name
+            const itemId = message.item?.id;
+            const functionName = message.item?.name;
+            if (itemId && functionName) {
+              functionCallArgsRef.current[itemId] = {
+                name: functionName,
+                arguments: '',
+              };
+              console.log('📝 Starting function call:', functionName);
+            }
+          } else if (message.type === 'response.function_call_arguments.delta') {
             // Accumulate function arguments
             const itemId = message.item_id;
             if (!functionCallArgsRef.current[itemId]) {
               functionCallArgsRef.current[itemId] = {
-                name: message.name,
+                name: message.name || 'unknown',
                 arguments: '',
               };
             }
