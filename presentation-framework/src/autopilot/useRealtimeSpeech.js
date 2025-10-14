@@ -70,6 +70,7 @@ export function useRealtimeSpeech() {
           // Handle different event types
           if (message.type === 'response.output_item.added') {
             // Start of a new function call - capture the name
+            console.log('📝 output_item.added:', message);
             const itemId = message.item?.id;
             const functionName = message.item?.name;
             if (itemId && functionName) {
@@ -77,7 +78,9 @@ export function useRealtimeSpeech() {
                 name: functionName,
                 arguments: '',
               };
-              console.log('📝 Starting function call:', functionName);
+              console.log('✅ Captured function name:', functionName, 'for item:', itemId);
+            } else {
+              console.warn('⚠️ Missing function name or item ID:', { itemId, functionName, item: message.item });
             }
           } else if (message.type === 'response.function_call_arguments.delta') {
             // Accumulate function arguments
