@@ -91,6 +91,21 @@ export function AutopilotHUD({
                   />
                 </div>
               </div>
+
+              <div className="threshold-control">
+                <label className="threshold-label">
+                  Threshold: {thresholdPercentage}%
+                </label>
+                <input
+                  type="range"
+                  min="30"
+                  max="80"
+                  step="5"
+                  value={thresholdPercentage}
+                  onChange={(e) => onThresholdChange(parseInt(e.target.value) / 100)}
+                  className="threshold-slider"
+                />
+              </div>
             </>
           )}
 
