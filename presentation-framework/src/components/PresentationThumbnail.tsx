@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react';
+import { SlideData } from '../types/presentation';
 import '../styles/Presentation.css';
 
-export function PresentationThumbnail({ slides, isHovered, assetsPath, customStyles }) {
-  const [currentIndex, setCurrentIndex] = useState(0);
+interface PresentationThumbnailProps {
+  slides: SlideData[];
+  isHovered: boolean;
+  assetsPath: string;
+  customStyles?: string;
+}
 
-  // Inject custom styles
+/**
+ * Custom hook to manage custom styles injection
+ */
+function useCustomStyles(customStyles?: string) {
   useEffect(() => {
     if (customStyles) {
       const styleId = 'presentation-custom-styles';
@@ -19,8 +27,18 @@ export function PresentationThumbnail({ slides, isHovered, assetsPath, customSty
       styleElement.textContent = customStyles;
     }
   }, [customStyles]);
+}
 
-  const handleMouseMove = (e) => {
+export function PresentationThumbnail({
+  slides,
+  isHovered,
+  customStyles
+}: PresentationThumbnailProps) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useCustomStyles(customStyles);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (slides.length <= 1) return;
 
     const rect = e.currentTarget.getBoundingClientRect();

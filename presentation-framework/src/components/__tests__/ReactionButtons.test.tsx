@@ -30,8 +30,8 @@ describe('ReactionButtons', () => {
   it('checks rate limiting via service', () => {
     const onReact = vi.fn();
 
-    // Pre-set the rate limit in the service
-    reactionService.lastReactionTime = Date.now();
+    // Pre-set the rate limit in the service (type assertion for testing)
+    (reactionService as any).lastReactionTime = Date.now();
 
     render(<ReactionButtons onReact={onReact} isVisible={true} />);
 
@@ -61,7 +61,7 @@ describe('ReactionButtons', () => {
 
   it('shows visual feedback on click', () => {
     const onReact = vi.fn();
-    const { container } = render(<ReactionButtons onReact={onReact} isVisible={true} />);
+    render(<ReactionButtons onReact={onReact} isVisible={true} />);
 
     const button = screen.getAllByRole('button')[0];
     fireEvent.click(button);
@@ -86,7 +86,9 @@ describe('ReactionButtons', () => {
 
     const reactionsContainer = container.querySelector('.fixed.bottom-20');
 
-    fireEvent.mouseEnter(reactionsContainer);
+    if (reactionsContainer) {
+      fireEvent.mouseEnter(reactionsContainer);
+    }
 
     // Expansion state changes (affects opacity)
     // Visual state is tested via implementation

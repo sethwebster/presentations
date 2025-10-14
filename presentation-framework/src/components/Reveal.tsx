@@ -1,17 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, CSSProperties } from 'react';
 import '../styles/Reveal.css';
+
+type AnimationType = 'fade' | 'slide-up' | 'slide-down' | 'scale' | 'bounce';
+
+interface RevealProps {
+  /** Content to reveal */
+  children: React.ReactNode;
+  /** Delay in milliseconds before revealing (default: 0) */
+  delay?: number;
+  /** Content to show before reveal (optional) */
+  placeholder?: React.ReactNode;
+  /** Animation type (default: 'fade') */
+  animation?: AnimationType;
+  /** Animation duration in ms (default: 600) */
+  duration?: number;
+  /** Additional CSS class (optional) */
+  className?: string;
+  /** Additional inline styles (optional) */
+  style?: CSSProperties;
+  /** Any other HTML div attributes */
+  [key: string]: any;
+}
 
 /**
  * Reveal component - Shows content after a configurable delay with animations
- *
- * @param {Object} props
- * @param {number} props.delay - Delay in milliseconds before revealing (default: 0)
- * @param {ReactNode} props.children - Content to reveal
- * @param {ReactNode} props.placeholder - Content to show before reveal (optional)
- * @param {string} props.animation - Animation type: 'fade', 'slide-up', 'slide-down', 'scale', 'bounce' (default: 'fade')
- * @param {number} props.duration - Animation duration in ms (default: 600)
- * @param {string} props.className - Additional CSS class (optional)
- * @param {Object} props.style - Additional inline styles (optional)
  */
 export function Reveal({
   delay = 0,
@@ -22,7 +34,7 @@ export function Reveal({
   className = '',
   style = {},
   ...otherProps
-}) {
+}: RevealProps) {
   const [isRevealed, setIsRevealed] = useState(delay === 0);
 
   useEffect(() => {
@@ -42,7 +54,7 @@ export function Reveal({
       style={{
         ...style,
         '--reveal-duration': `${duration}ms`
-      }}
+      } as CSSProperties}
     >
       {isRevealed ? children : placeholder}
     </div>

@@ -6,14 +6,15 @@
  * Place accompanying assets in a folder named "jsconf-2025-react-foundation-assets/"
  */
 
-import { Reveal } from "../components/Reveal.jsx";
-import { FadeOut } from "../components/FadeOut.jsx";
+import { Reveal } from "../components/Reveal.tsx";
+import { FadeOut } from "../components/FadeOut.tsx";
+import type { SlideData, PresentationConfig } from "../types/presentation";
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
 
-export const presentationConfig = {
+export const presentationConfig: PresentationConfig = {
   title: "React Foundation Keynote",
   author: "Seth Webster",
   event: "JSConf 2025",
@@ -239,7 +240,14 @@ export const customStyles = `
 // DATA
 // ============================================================================
 
-const partners = [
+interface Partner {
+  id: string;
+  name: string;
+  logo: string;
+  scale?: number;
+}
+
+const partners: Partner[] = [
   {
     id: "meta",
     name: "Meta",
@@ -282,7 +290,7 @@ const partners = [
 // SLIDES
 // ============================================================================
 
-export const getSlides = (assetsPath) => {
+export const getSlides = (assetsPath: string): SlideData[] => {
   const reactLogo = `${assetsPath}/react_logo_dark.svg`;
 
   return [
@@ -655,7 +663,7 @@ export const getSlides = (assetsPath) => {
 // BRAND LOGO COMPONENT
 // ============================================================================
 
-export const getBrandLogo = (assetsPath) => {
+export const getBrandLogo = (assetsPath: string): React.ReactNode => {
   return (
     <img
       src={`${assetsPath}/react_logo_dark.svg`}

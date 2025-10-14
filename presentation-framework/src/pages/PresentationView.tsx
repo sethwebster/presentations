@@ -1,13 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Presentation } from '../Presentation.jsx';
+import { Presentation } from '../Presentation';
 import { loadPresentation } from '../presentations/index.js';
+import { PresentationModule } from '../types/presentation';
+
+interface PresentationModuleState {
+  module: PresentationModule;
+  assetsPath: string;
+}
 
 export function PresentationView() {
-  const { presentationName } = useParams();
-  const [presentationModule, setPresentationModule] = useState(null);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { presentationName } = useParams<{ presentationName: string }>();
+  const [presentationModule, setPresentationModule] = useState<PresentationModuleState | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const loadPres = async () => {
@@ -16,7 +22,8 @@ export function PresentationView() {
         const assetsDir = `/presentations/${presentationName}-assets`;
         setPresentationModule({ module, assetsPath: assetsDir });
       } catch (err) {
-        setError(`Failed to load presentation: ${err.message}`);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        setError(`Failed to load presentation: ${errorMessage}`);
         console.error('Presentation load error:', err);
       } finally {
         setLoading(false);

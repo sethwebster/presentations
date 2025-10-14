@@ -1,6 +1,5 @@
 import './styles/Presentation.css';
-import { useState, useEffect, useRef } from 'react';
-import { ViewTransition } from 'react';
+import { useState, useEffect, FormEvent, MouseEvent, ChangeEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { usePresentation } from './hooks/usePresentation';
 import { useKeyboardNavigation } from './hooks/useKeyboardNavigation';
@@ -18,25 +17,36 @@ import { ReactionButtons } from './components/ReactionButtons';
 import { WelcomeToast } from './components/WelcomeToast';
 import { AutopilotHUD } from './autopilot/ui/AutopilotHUD';
 import { useAutopilot } from './autopilot/useAutopilot';
+import type { SlideData, PresentationConfig } from './types/presentation';
+
+interface PresentationProps {
+  slides: SlideData[];
+  config?: PresentationConfig;
+}
+
+interface AutopilotProps {
+  connected: boolean;
+  enabled: boolean;
+  currentScore: number;
+  threshold: number;
+  error: string | null;
+  countdown: any;
+  onToggle: () => Promise<{ enabled: boolean; error?: string }>;
+  onCancelCountdown: () => void;
+  onThresholdChange: (threshold: number) => void;
+}
 
 /**
  * Main Presentation component - framework core
- * @param {Object} props
- * @param {Array} props.slides - Array of slide objects with id, className, notes, and content
- * @param {Object} props.config - Configuration object
- * @param {string} props.config.brandLogo - Optional brand logo component or image
- * @param {Function} props.config.renderSlideNumber - Optional custom slide number renderer
- * @param {Function} props.config.renderNavigation - Optional custom navigation renderer
- * @param {string} props.config.customStyles - Optional path to additional custom styles
  */
-export function Presentation({ slides, config = {} }) {
-  const [isPresenterMode, setIsPresenterMode] = useState(false);
-  const [searchParams, setSearchParams] = useSearchParams();
+export function Presentation({ slides, config = {} }: PresentationProps): React.ReactElement {
+  const [isPresenterMode, setIsPresenterMode] = useState<boolean>(false);
+  const [, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
-  const [passwordInput, setPasswordInput] = useState('');
-  const [passwordError, setPasswordError] = useState(false);
-  const [rememberKey, setRememberKey] = useState(true);
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState<boolean>(false);
+  const [passwordInput, setPasswordInput] = useState<string>('');
+  const [passwordError, setPasswordError] = useState<boolean>(false);
+  const [rememberKey, setRememberKey] = useState<boolean>(true);
 
   // Get deckId from NavigationService
   const deckId = navigationService.getDeckId();
@@ -53,7 +63,7 @@ export function Presentation({ slides, config = {} }) {
   const isViewer = !auth.isAuthenticated;
 
   // Handle password submission (delegates to AuthService)
-  const handlePasswordSubmit = async (e) => {
+  const handlePasswordSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     if (passwordInput.trim()) {
       const result = await auth.login(passwordInput.trim(), rememberKey);
@@ -82,7 +92,7 @@ export function Presentation({ slides, config = {} }) {
 
   // Handle escape key
   useEffect(() => {
-    const handleEscape = (e) => {
+    const handleEscape = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         // Close password prompt if open
         if (showPasswordPrompt) {
@@ -176,7 +186,7 @@ export function Presentation({ slides, config = {} }) {
   });
 
   // Prepare autopilot props for PresenterView and HUD
-  const autopilotProps = canUseAutopilot ? {
+  const autopilotProps: AutopilotProps | null = canUseAutopilot ? {
     connected: autopilot.connected,
     enabled: autopilot.enabled,
     currentScore: autopilot.currentScore,
@@ -203,20 +213,20 @@ export function Presentation({ slides, config = {} }) {
   const currentSlideData = slides[currentSlide];
 
   // Default slide number renderer
-  const defaultSlideNumberRenderer = () => (
+  const defaultSlideNumberRenderer = (): React.ReactElement => (
     <div className="slide-number">
       {currentSlide + 1} / {slides.length}
     </div>
   );
 
   // Logout (delegates to AuthService)
-  const handleLogout = () => {
+  const handleLogout = (): void => {
     auth.logout();
     window.location.reload();
   };
 
   // Default navigation renderer
-  const defaultNavigationRenderer = () => {
+  const defaultNavigationRenderer = (): React.ReactElement => {
     // For viewers, show a "Become Presenter" button
     if (isViewer && deckId) {
       return (
@@ -301,8 +311,7 @@ export function Presentation({ slides, config = {} }) {
       <WelcomeToast isPresenterMode={isPresenterMode} />
 
       <div className="slide-container">
-        <ViewTransition>
-          <div key={currentSlideData.id} className={`slide ${currentSlideData.className || ''}`}>
+        <div key={currentSlideData.id} className={`slide ${currentSlideData.className || ''}`}>
             {currentSlideData.content}
             {config.brandLogo && !currentSlideData.hideBrandLogo && (
               <div className="brand-logo">
@@ -319,7 +328,6 @@ export function Presentation({ slides, config = {} }) {
               />
             )}
           </div>
-        </ViewTransition>
       </div>
 
       {renderNavigation()}
@@ -355,7 +363,7 @@ export function Presentation({ slides, config = {} }) {
         >
           <div
             className="password-modal"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}
             style={{
               backgroundColor: 'var(--lume-midnight, #1a1a2e)',
               padding: '32px',
@@ -389,7 +397,7 @@ export function Presentation({ slides, config = {} }) {
               <input
                 type="password"
                 value={passwordInput}
-                onChange={(e) => {
+                onChange={(e: ChangeEvent<HTMLInputElement>) => {
                   setPasswordInput(e.target.value);
                   setPasswordError(false);
                 }}
@@ -419,7 +427,7 @@ export function Presentation({ slides, config = {} }) {
                 <input
                   type="checkbox"
                   checked={rememberKey}
-                  onChange={(e) => setRememberKey(e.target.checked)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setRememberKey(e.target.checked)}
                   style={{
                     width: '18px',
                     height: '18px',

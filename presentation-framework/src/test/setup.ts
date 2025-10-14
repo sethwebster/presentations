@@ -3,7 +3,7 @@ import '@testing-library/jest-dom';
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
-  value: (query) => ({
+  value: (query: string) => ({
     matches: false,
     media: query,
     onchange: null,
@@ -16,8 +16,11 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 // Mock EventSource for SSE tests
-global.EventSource = class EventSource {
-  constructor(url) {
+class MockEventSource {
+  url: string;
+  readyState: number;
+
+  constructor(url: string) {
     this.url = url;
     this.readyState = 0;
   }
@@ -25,14 +28,20 @@ global.EventSource = class EventSource {
   addEventListener() {}
   removeEventListener() {}
   close() {}
-};
+}
+
+(global as any).EventSource = MockEventSource;
 
 // Mock BroadcastChannel for window sync tests
-global.BroadcastChannel = class BroadcastChannel {
-  constructor(name) {
+class MockBroadcastChannel {
+  name: string;
+
+  constructor(name: string) {
     this.name = name;
   }
 
   postMessage() {}
   close() {}
-};
+}
+
+(global as any).BroadcastChannel = MockBroadcastChannel;

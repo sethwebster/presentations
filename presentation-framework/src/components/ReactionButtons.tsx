@@ -1,13 +1,18 @@
 import { useState } from 'react';
 import { reactionService } from '../services/ReactionService';
 
-const REACTIONS = ['👏', '❤️', '🔥', '🎉', '👍', '🤯'];
+const REACTIONS = ['👏', '❤️', '🔥', '🎉', '👍', '🤯'] as const;
 
-export function ReactionButtons({ onReact, isVisible }) {
+interface ReactionButtonsProps {
+  onReact: (emoji: string) => void;
+  isVisible: boolean;
+}
+
+export function ReactionButtons({ onReact, isVisible }: ReactionButtonsProps) {
   const [expanded, setExpanded] = useState(false);
-  const [activeButton, setActiveButton] = useState(null);
+  const [activeButton, setActiveButton] = useState<string | null>(null);
 
-  const handleReact = (emoji) => {
+  const handleReact = (emoji: string) => {
     // Check rate limit via service
     if (reactionService.isRateLimited()) {
       console.log('Rate limited - too fast!');

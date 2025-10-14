@@ -30,8 +30,9 @@ describe('SlideQRCode', () => {
     const { container } = render(<SlideQRCode currentSlide={0} totalSlides={10} />);
 
     const link = container.querySelector('a');
-    expect(link.getAttribute('target')).toBe('_blank');
-    expect(link.getAttribute('rel')).toContain('noopener');
+    expect(link).not.toBeNull();
+    expect(link!.getAttribute('target')).toBe('_blank');
+    expect(link!.getAttribute('rel')).toContain('noopener');
   });
 
   it('prevents slide navigation when clicked', () => {
@@ -39,9 +40,14 @@ describe('SlideQRCode', () => {
 
     const link = container.querySelector('a');
     const clickEvent = new Event('click', { bubbles: true });
-    const stopPropagationSpy = vi.spyOn(clickEvent, 'stopPropagation');
+    vi.spyOn(clickEvent, 'stopPropagation');
 
-    link.querySelector('.qr-code-inner').dispatchEvent(clickEvent);
+    if (link) {
+      const qrInner = link.querySelector('.qr-code-inner');
+      if (qrInner) {
+        qrInner.dispatchEvent(clickEvent);
+      }
+    }
 
     // stopPropagation should be called to prevent slide navigation
     // (This is an implementation detail test)

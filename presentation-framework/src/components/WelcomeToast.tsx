@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react';
 import { authService } from '../services/AuthService';
+import type { AuthEvent } from '../types/services';
+
+interface WelcomeToastProps {
+  isPresenterMode: boolean;
+}
 
 /**
  * WelcomeToast - Displays welcome message when user becomes a presenter
  * Subscribes to auth state changes from AuthService
  */
-export function WelcomeToast({ isPresenterMode }) {
+export function WelcomeToast({ isPresenterMode }: WelcomeToastProps): React.ReactElement | null {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -13,7 +18,7 @@ export function WelcomeToast({ isPresenterMode }) {
     if (isPresenterMode) return;
 
     // Subscribe to auth events
-    const unsubscribe = authService.onAuthStateChange((event) => {
+    const unsubscribe = authService.onAuthStateChange((event: AuthEvent) => {
       if (event.type === 'authenticated') {
         // Show toast
         setVisible(true);

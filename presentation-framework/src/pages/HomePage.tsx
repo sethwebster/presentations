@@ -5,18 +5,18 @@ import { presentations } from '../presentations/index.js';
 import { presentationLoaderService } from '../services/PresentationLoaderService';
 import { PresentationThumbnail } from '../components/PresentationThumbnail';
 import { Card, CardContent } from '../components/ui/card';
-import { Separator } from '../components/ui/separator';
+import { LoadedPresentation } from '../types/presentation';
 
 export function HomePage() {
   const navigate = useNavigate();
-  const [hoveredCard, setHoveredCard] = useState(null);
-  const [loadedPresentations, setLoadedPresentations] = useState({});
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [loadedPresentations, setLoadedPresentations] = useState<Record<string, LoadedPresentation>>({});
 
   // Preload all presentations on mount (delegate to PresentationLoaderService)
   useEffect(() => {
     presentationLoaderService.preloadAll(presentations).then(() => {
       // Update state with cached presentations
-      const loaded = {};
+      const loaded: Record<string, LoadedPresentation> = {};
       Object.keys(presentations).forEach(name => {
         const cached = presentationLoaderService.getCached(name);
         if (cached) {

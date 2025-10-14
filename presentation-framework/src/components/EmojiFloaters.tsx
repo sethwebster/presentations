@@ -1,9 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
+import { ReactionData } from '../types/services';
 import '../styles/EmojiFloaters.css';
 
-export function EmojiFloaters({ reactions }) {
-  const [activeFloaters, setActiveFloaters] = useState([]);
-  const processedIdsRef = useRef(new Set());
+interface EmojiFloatersProps {
+  reactions: ReactionData[];
+}
+
+interface Floater {
+  id: string;
+  emoji: string;
+  x: number;
+  duration: number;
+  size: number;
+  distance: number;
+}
+
+export function EmojiFloaters({ reactions }: EmojiFloatersProps) {
+  const [activeFloaters, setActiveFloaters] = useState<Floater[]>([]);
+  const processedIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     console.log('EmojiFloaters received reactions:', reactions.length);
@@ -18,7 +32,7 @@ export function EmojiFloaters({ reactions }) {
       processedIdsRef.current.add(reaction.id);
 
       // Add floater with randomization
-      const floater = {
+      const floater: Floater = {
         id: reaction.id,
         emoji: reaction.emoji,
         x: Math.random() * 80 + 10, // 10-90% of screen width
@@ -49,7 +63,7 @@ export function EmojiFloaters({ reactions }) {
             fontSize: `${floater.size}px`,
             animationDuration: `${floater.duration}ms`,
             '--rise-distance': `${floater.distance}px`,
-          }}
+          } as React.CSSProperties}
         >
           {floater.emoji}
         </span>
@@ -57,4 +71,3 @@ export function EmojiFloaters({ reactions }) {
     </div>
   );
 }
-

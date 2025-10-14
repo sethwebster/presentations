@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react';
 
+interface StaggeredRevealProps {
+  /** Content to reveal (can be single element or array) */
+  children: React.ReactNode;
+  /** Delay between each child reveal in ms (default: 100) */
+  staggerDelay?: number;
+  /** Initial delay before first reveal in ms (default: 0) */
+  initialDelay?: number;
+  /** CSS class applied to wrapper */
+  className?: string;
+  /** CSS class applied to each item */
+  itemClassName?: string;
+}
+
 /**
  * StaggeredReveal component - Reveals children sequentially with staggered delays
- *
- * @param {Object} props
- * @param {number} props.staggerDelay - Delay between each child reveal in ms (default: 100)
- * @param {number} props.initialDelay - Initial delay before first reveal in ms (default: 0)
- * @param {Array} props.children - Array of React elements to reveal
- * @param {string} props.className - CSS class applied to wrapper
- * @param {string} props.itemClassName - CSS class applied to each item
  */
 export function StaggeredReveal({
   staggerDelay = 100,
@@ -16,7 +22,7 @@ export function StaggeredReveal({
   children,
   className = '',
   itemClassName = ''
-}) {
+}: StaggeredRevealProps) {
   const childArray = Array.isArray(children) ? children : [children];
   const [revealedCount, setRevealedCount] = useState(0);
 

@@ -2,11 +2,21 @@ import { kv } from '@vercel/kv';
 import Redis from 'ioredis';
 
 export const config = {
-  runtime: 'nodejs',
+  runtime: 'nodejs' as const,
   // maxDuration: 300, // Remove limit - let connections stay open
 };
 
-export async function GET(req) {
+// Type definitions
+interface DeckState {
+  slide?: number;
+  [key: string]: unknown;
+}
+
+interface InitEvent {
+  slide: number;
+}
+
+export async function GET(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const pathParts = url.pathname.split('/');
   const deckId = pathParts[pathParts.length - 1];
@@ -14,28 +24,28 @@ export async function GET(req) {
   console.log('SSE connection request for deck:', deckId);
 
   // Create Redis subscriber (ioredis for pub/sub)
-  const subscriber = new Redis(process.env.KV_URL);
+  const subscriber = new Redis(process.env.KV_URL as string);
   const channelName = `deck:${deckId}:channel`;
 
   const encoder = new TextEncoder();
-  let pingInterval;
+  let pingInterval: NodeJS.Timeout;
 
   const stream = new ReadableStream({
     async start(controller) {
       try {
         // Send current state first
         console.log('Fetching initial state for deck:', deckId);
-        const current = await kv.hgetall(`deck:${deckId}:state`) || {};
-        const initData = JSON.stringify({ slide: current.slide ?? 0 });
-        controller.enqueue(encoder.encode(`event: init\ndata: ${initData}\n\n`));
-        console.log('Sent init event:', initData);
+        const current = await kv.hgetall<DeckState>(`deck:${deckId}:state`) || {};
+        const initData: InitEvent = { slide: current.slide ?? 0 };
+        controller.enqueue(encoder.encode(`event: init\ndata: ${JSON.stringify(initData)}\n\n`));
+        console.log('Sent init event:', JSON.stringify(initData));
 
         // Subscribe to the Redis channel
         await subscriber.subscribe(channelName);
         console.log('Subscribed to channel:', channelName);
 
         // Handle messages from Redis pub/sub
-        subscriber.on('message', (channel, message) => {
+        subscriber.on('message', (channel: string, message: string) => {
           if (channel === channelName) {
             try {
               console.log('Received pub/sub message:', message);
@@ -47,7 +57,7 @@ export async function GET(req) {
         });
 
         // Handle Redis errors
-        subscriber.on('error', (err) => {
+        subscriber.on('error', (err: Error) => {
           console.error('Redis subscriber error:', err);
         });
 
@@ -75,7 +85,7 @@ export async function GET(req) {
 
       } catch (err) {
         console.error('SSE stream error:', err);
-        if (pingInterval) clearInterval(pingInterval);
+        if (pingInterval!) clearInterval(pingInterval);
         await subscriber.quit();
         try {
           controller.error(err);

@@ -1,4 +1,17 @@
+import { CountdownState } from '../../types/services';
 import './AutopilotHUD.css';
+
+interface AutopilotHUDProps {
+  connected: boolean;
+  enabled: boolean;
+  currentScore: number;
+  threshold: number;
+  error: string | null;
+  countdown: CountdownState | null;
+  onToggle: () => void;
+  onCancelCountdown: () => void;
+  onThresholdChange: (threshold: number) => void;
+}
 
 /**
  * Autopilot HUD - Status display and controls for voice-driven auto-advance
@@ -9,11 +22,11 @@ export function AutopilotHUD({
   currentScore,
   threshold = 0.50,
   error,
-  countdown = null,
+  countdown: _countdown = null, // Used by parent component
   onToggle,
-  onCancelCountdown,
+  onCancelCountdown: _onCancelCountdown, // Used by parent component
   onThresholdChange,
-}) {
+}: AutopilotHUDProps) {
   const progressPercentage = Math.round(currentScore * 100);
   const thresholdPercentage = Math.round(threshold * 100);
   const isReadyToAdvance = currentScore >= threshold;

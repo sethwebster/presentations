@@ -1,11 +1,12 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { WelcomeToast } from '../WelcomeToast';
 import { authService } from '../../services/AuthService';
 
 describe('WelcomeToast', () => {
   beforeEach(() => {
-    authService.authStateListeners.clear();
+    // Access private field for testing using type assertion
+    (authService as any).authStateListeners.clear();
   });
 
   it('does not render initially', () => {
@@ -58,10 +59,10 @@ describe('WelcomeToast', () => {
   it('cleans up subscription on unmount', () => {
     const { unmount } = render(<WelcomeToast isPresenterMode={false} />);
 
-    expect(authService.authStateListeners.size).toBe(1);
+    expect((authService as any).authStateListeners.size).toBe(1);
 
     unmount();
 
-    expect(authService.authStateListeners.size).toBe(0);
+    expect((authService as any).authStateListeners.size).toBe(0);
   });
 });

@@ -99,7 +99,7 @@ EXAMPLES
    * Initialize autopilot for presentation
    */
   initialize(deckId: string, slides: SlideData[]): void {
-    this.deckId = deckId;
+    this._deckId = deckId;
     this.notesBySlide = extractSpeakerNotes(slides);
     console.log('Autopilot initialized for deck:', deckId);
   }
@@ -153,7 +153,7 @@ EXAMPLES
    * Update context when slide changes
    */
   updateSlideContext(slideIndex: number): void {
-    this.currentSlide = slideIndex;
+    this._currentSlide = slideIndex;
 
     if (!this.enabled) return;
 

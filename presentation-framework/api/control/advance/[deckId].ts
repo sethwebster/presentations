@@ -2,13 +2,35 @@ import { kv } from '@vercel/kv';
 import { Redis } from '@upstash/redis';
 
 export const config = {
-  runtime: 'edge',
+  runtime: 'edge' as const,
 };
 
 // Edge-compatible Redis client for pub/sub
 const redis = Redis.fromEnv();
 
-export async function POST(req) {
+// Type definitions
+interface AdvanceRequestBody {
+  slide: number;
+}
+
+interface TokenData {
+  valid: boolean;
+  createdAt?: number;
+  expiresAt?: number;
+}
+
+// DeckState type (used for KV storage)
+// interface DeckState {
+//   slide: number;
+// }
+
+interface SlideEvent {
+  type: 'slide';
+  slide: number;
+  ts: number;
+}
+
+export async function POST(req: Request): Promise<Response> {
   // Extract deckId from URL path
   const url = new URL(req.url);
   const pathParts = url.pathname.split('/');
@@ -30,7 +52,7 @@ export async function POST(req) {
     const token = auth.substring(7); // Remove 'Bearer '
 
     // Validate token from KV store
-    const tokenData = await kv.get(`presenter-token:${token}`);
+    const tokenData = await kv.get<TokenData>(`presenter-token:${token}`);
 
     if (tokenData && tokenData.valid) {
       console.log('Auth: Token validated');
@@ -45,7 +67,7 @@ export async function POST(req) {
     return new Response('Unauthorized', { status: 401 });
   }
   try {
-    const { slide } = await req.json();
+    const { slide }: AdvanceRequestBody = await req.json();
     console.log('Updating deck state:', deckId, 'slide:', slide);
 
     // Update current state in KV (for initial sync)
@@ -54,14 +76,14 @@ export async function POST(req) {
 
     // Publish slide change to Redis channel (instant delivery to all subscribers)
     const channelName = `deck:${deckId}:channel`;
-    const evt = JSON.stringify({
+    const evt: SlideEvent = {
       type: 'slide',
       slide,
       ts: Date.now()
-    });
+    };
 
-    await redis.publish(channelName, evt);
-    console.log('Published slide event to channel:', channelName, evt);
+    await redis.publish(channelName, JSON.stringify(evt));
+    console.log('Published slide event to channel:', channelName, JSON.stringify(evt));
 
     return new Response('ok', {
       headers: {
@@ -70,8 +92,9 @@ export async function POST(req) {
       },
     });
   } catch (err) {
-    console.error('Control API error:', err, err.stack);
-    return new Response(JSON.stringify({ error: err.message, stack: err.stack }), {
+    const error = err as Error;
+    console.error('Control API error:', error, error.stack);
+    return new Response(JSON.stringify({ error: error.message, stack: error.stack }), {
       status: 500,
       headers: {
         'Content-Type': 'application/json',

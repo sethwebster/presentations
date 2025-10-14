@@ -1,9 +1,32 @@
 import { useState, useEffect } from 'react';
-import { Presentation } from './Presentation.jsx';
+import { Presentation } from './Presentation';
 import { loadPresentation, presentations } from './presentations/index.js';
 import { Header } from './components/Header';
 import { Card, CardHeader, CardTitle, CardDescription } from './components/ui/card';
 import './styles/PresentationLoader.css';
+
+interface PresentationModule {
+  getSlides: (assetsPath: string) => Slide[];
+  getBrandLogo?: (assetsPath: string) => React.ReactNode;
+  presentationConfig?: PresentationConfig;
+  customStyles?: string;
+}
+
+interface Slide {
+  id: string | number;
+  className?: string;
+  notes?: string;
+  content: React.ReactNode;
+  hideBrandLogo?: boolean;
+  hideQRCode?: boolean;
+}
+
+interface PresentationConfig {
+  brandLogo?: React.ReactNode;
+  renderSlideNumber?: () => React.ReactNode;
+  renderNavigation?: () => React.ReactNode;
+  customStyles?: string;
+}
 
 /**
  * PresentationLoader component - Loads presentation packages dynamically
@@ -14,10 +37,10 @@ import './styles/PresentationLoader.css';
  * 3. From a zip file containing the .tsx and assets
  */
 export function PresentationLoader() {
-  const [presentationModule, setPresentationModule] = useState(null);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [assetsPath, setAssetsPath] = useState('');
+  const [presentationModule, setPresentationModule] = useState<PresentationModule | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [assetsPath, setAssetsPath] = useState<string>('');
 
   // Check URL for presentation parameter on mount
   useEffect(() => {
@@ -43,7 +66,7 @@ export function PresentationLoader() {
     }
   }, [presentationModule]);
 
-  const loadPresentationFromPath = async (presentationName) => {
+  const loadPresentationFromPath = async (presentationName: string): Promise<void> => {
     setLoading(true);
     setError(null);
 
@@ -59,17 +82,18 @@ export function PresentationLoader() {
       const assetsDir = `/presentations/${presentationName}-assets`;
 
       setAssetsPath(assetsDir);
-      setPresentationModule(module);
+      setPresentationModule(module as PresentationModule);
     } catch (err) {
-      setError(`Failed to load presentation: ${err.message}`);
-      console.error('Presentation load error:', err, err.stack);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(`Failed to load presentation: ${errorMessage}`);
+      console.error('Presentation load error:', err, err instanceof Error ? err.stack : '');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const file = event.target.files?.[0];
     if (!file) return;
 
     setLoading(true);
@@ -89,12 +113,13 @@ export function PresentationLoader() {
       // Assume assets are in a folder with same name as file (minus extension)
       const fileName = file.name.substring(0, file.name.lastIndexOf('.'));
       setAssetsPath(`./${fileName}-assets`);
-      setPresentationModule(module);
+      setPresentationModule(module as PresentationModule);
 
       // Clean up the URL
       URL.revokeObjectURL(url);
     } catch (err) {
-      setError(`Failed to load presentation file: ${err.message}`);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(`Failed to load presentation file: ${errorMessage}`);
       console.error('File upload error:', err);
     } finally {
       setLoading(false);
@@ -187,7 +212,7 @@ export function PresentationLoader() {
   const { getSlides, getBrandLogo, presentationConfig } = presentationModule;
 
   const slides = getSlides(assetsPath);
-  const config = {
+  const config: PresentationConfig = {
     brandLogo: getBrandLogo ? getBrandLogo(assetsPath) : null,
     ...presentationConfig,
   };

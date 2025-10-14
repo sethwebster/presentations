@@ -1,14 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, CSSProperties } from 'react';
+
+interface FadeOutProps {
+  /** Content to fade out */
+  children: React.ReactNode;
+  /** Delay in milliseconds before fading out (default: 1000) */
+  delay?: number;
+  /** Fade duration in ms (default: 600) */
+  duration?: number;
+  /** Additional CSS class (optional) */
+  className?: string;
+  /** Additional inline styles (optional) */
+  style?: CSSProperties;
+  /** Any other HTML div attributes */
+  [key: string]: any;
+}
 
 /**
  * FadeOut component - Shows content initially, then fades out after delay
- *
- * @param {Object} props
- * @param {number} props.delay - Delay in milliseconds before fading out (default: 1000)
- * @param {number} props.duration - Fade duration in ms (default: 600)
- * @param {ReactNode} props.children - Content to fade out
- * @param {string} props.className - Additional CSS class (optional)
- * @param {Object} props.style - Additional inline styles (optional)
  */
 export function FadeOut({
   delay = 1000,
@@ -17,7 +25,7 @@ export function FadeOut({
   className = '',
   style = {},
   ...otherProps
-}) {
+}: FadeOutProps) {
   const [opacity, setOpacity] = useState(1);
 
   useEffect(() => {

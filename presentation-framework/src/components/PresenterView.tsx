@@ -6,22 +6,45 @@ import { keyboardService } from '../services/KeyboardService';
 import '../styles/PresenterView.css';
 import { AutopilotHUD } from '../autopilot/ui/AutopilotHUD';
 import { EmojiFloaters } from './EmojiFloaters';
+import { SlideData } from '../types/presentation';
+import { ReactionData, CountdownState } from '../types/services';
+
+interface AutopilotProps {
+  connected: boolean;
+  enabled: boolean;
+  currentScore: number | null;
+  threshold: number;
+  error: string | null;
+  countdown: CountdownState | null;
+  onToggle: () => void;
+  onCancelCountdown: () => void;
+  onThresholdChange: (threshold: number) => void;
+}
+
+interface PresenterViewProps {
+  currentSlide: number;
+  nextSlide: SlideData | undefined;
+  slides: SlideData[];
+  onSlideClick?: (index: number) => void;
+  autopilot?: AutopilotProps | null;
+  reactions?: ReactionData[];
+}
 
 export function PresenterView({
   currentSlide,
-  nextSlide,
+  nextSlide: _nextSlide, // Provided by parent but not used here
   slides,
-  onSlideClick,
+  onSlideClick: _onSlideClick, // Provided by parent but not used here
   // Autopilot props
   autopilot = null,
   // Reactions
   reactions = [],
-}) {
-  const [reactionCount, setReactionCount] = useState(0);
-  const [recentReactions, setRecentReactions] = useState([]);
+}: PresenterViewProps) {
+  const [reactionCount, setReactionCount] = useState<number>(0);
+  const [recentReactions, setRecentReactions] = useState<ReactionData[]>([]);
   const current = slides[currentSlide];
   const next = currentSlide < slides.length - 1 ? slides[currentSlide + 1] : null;
-  const navigate = useNavigate();
+  const _navigate = useNavigate(); // Available but not currently used
 
   // Subscribe to double-escape events from KeyboardService
   useEffect(() => {
@@ -34,7 +57,7 @@ export function PresenterView({
 
   // Handle escape key presses
   useEffect(() => {
-    const handleEscape = (e) => {
+    const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         keyboardService.checkDoubleEscape();
       }
@@ -44,7 +67,7 @@ export function PresenterView({
     return () => window.removeEventListener('keydown', handleEscape);
   }, []);
 
-  const handleSlideClick = (index) => {
+  const handleSlideClick = (index: number) => {
     // Delegate to WindowSyncService
     windowSyncService.broadcastSlideChange(index);
   };

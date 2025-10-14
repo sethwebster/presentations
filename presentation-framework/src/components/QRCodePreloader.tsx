@@ -1,11 +1,16 @@
 import { useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 
+interface QRCodePreloaderProps {
+  currentSlide: number;
+  totalSlides: number;
+}
+
 /**
  * Preloads QR codes for next slide only
  * Renders hidden so it's ready instantly
  */
-export function QRCodePreloader({ currentSlide, totalSlides }) {
+export function QRCodePreloader({ currentSlide, totalSlides }: QRCodePreloaderProps) {
   const nextSlideUrl = useMemo(() => {
     const nextIndex = currentSlide + 1;
     if (nextIndex >= totalSlides) return null;

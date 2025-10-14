@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { extractSpeakerNotes } from '../extractSpeakerNotes';
+import type { SlideData } from '../../types/presentation';
 
 describe('extractSpeakerNotes', () => {
   it('extracts notes from slides array', () => {
-    const slides = [
-      { id: 'slide-1', notes: 'First slide notes' },
-      { id: 'slide-2', notes: 'Second slide notes' },
-      { id: 'slide-3', notes: 'Third slide notes' },
+    const slides: SlideData[] = [
+      { id: 'slide-1', notes: 'First slide notes', content: null },
+      { id: 'slide-2', notes: 'Second slide notes', content: null },
+      { id: 'slide-3', notes: 'Third slide notes', content: null },
     ];
 
     const result = extractSpeakerNotes(slides);
@@ -17,10 +18,10 @@ describe('extractSpeakerNotes', () => {
   });
 
   it('handles slides without notes', () => {
-    const slides = [
-      { id: 'slide-1', notes: 'Has notes' },
-      { id: 'slide-2' }, // No notes
-      { id: 'slide-3', notes: null }, // Null notes
+    const slides: SlideData[] = [
+      { id: 'slide-1', notes: 'Has notes', content: null },
+      { id: 'slide-2', content: null }, // No notes
+      { id: 'slide-3', notes: undefined, content: null }, // Undefined notes
     ];
 
     const result = extractSpeakerNotes(slides);
@@ -32,11 +33,11 @@ describe('extractSpeakerNotes', () => {
   });
 
   it('preserves slide order', () => {
-    const slides = [
-      { id: 'slide-1', notes: 'First' },
-      { id: 'slide-2', notes: 'Second' },
-      { id: 'slide-3', notes: 'Third' },
-      { id: 'slide-4', notes: 'Fourth' },
+    const slides: SlideData[] = [
+      { id: 'slide-1', notes: 'First', content: null },
+      { id: 'slide-2', notes: 'Second', content: null },
+      { id: 'slide-3', notes: 'Third', content: null },
+      { id: 'slide-4', notes: 'Fourth', content: null },
     ];
 
     const result = extractSpeakerNotes(slides);
