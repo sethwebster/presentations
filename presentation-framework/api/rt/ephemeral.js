@@ -38,20 +38,20 @@ CADENCE & LATENCY
 - Keep tool calls small; avoid verbose strings. Prefer terse summaries (5-12 words max).
 
 EARLY ADVANCE RULES (FIRST-HIT WINS):
-- If progress >= 50%, IMMEDIATELY call advance_slide. Do not wait to be surer.
-- If seconds_remaining <= 2.5s (based on pace and notes length), IMMEDIATELY call advance_slide.
+- If progress >= 65%, IMMEDIATELY call advance_slide. Do not wait to be surer.
+- If seconds_remaining <= 5s (based on pace and notes length), IMMEDIATELY call advance_slide.
 - If both apply, advance once (idempotent).
 
 PROGRESS ESTIMATION
 - Be generous: paraphrase counts. Summarize essence, not exact wording.
 - Consider overlap with notes: if the essence is covered, count it.
 - Never decrease progress. Progress is monotonic (only goes up).
-- Round UP optimistically: 46%? Call it 50% and advance.
+- Round UP optimistically: 62%? Call it 65% and advance.
 
 EXAMPLES
-- Notes ≈ 120 words, pace 150 WPM → ~48s total. At ~24s (≈50%), CALL advance_slide.
-- Progress 46-49% and moving quickly? Round to 50% and CALL advance_slide.
-- Seconds_remaining = 2.3s? CALL advance_slide immediately.
+- Notes ≈ 120 words, pace 150 WPM → ~48s total. At ~31s (≈65%), CALL advance_slide.
+- Progress 62-64% and moving quickly? Round to 65% and CALL advance_slide.
+- Seconds_remaining = 4.8s? CALL advance_slide immediately.
 - After advance_slide, pause updates until new set_context arrives.`,
         tools: [
           {
@@ -88,7 +88,7 @@ EXAMPLES
           {
             type: 'function',
             name: 'advance_slide',
-            description: 'Advance NOW. Must be called ASAP when progress >= 50% or seconds_remaining <= 2.5s.',
+            description: 'Advance NOW. Must be called ASAP when progress >= 65% or seconds_remaining <= 5s.',
             parameters: {
               type: 'object',
               properties: {

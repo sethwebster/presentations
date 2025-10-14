@@ -12,7 +12,7 @@ export function useAutoAdvance(options) {
     transcript,
     notesBySlide,
     bearer,
-    threshold = 0.40, // Very low - advance early is better than late
+    threshold = 0.55, // Balanced - not too early, not too late
     minChars = 50, // Very low - don't require much text
     cooldownMs = 2500, // Reduced from 3s to 2.5s
     enabled = true,
@@ -221,8 +221,8 @@ export function useAutoAdvance(options) {
       const estimatedTotalSeconds = (notesWordCount / targetWPM) * 60;
       const secondsRemaining = estimatedTotalSeconds - elapsedSeconds;
 
-      // Local deadline: if 2.5s or less remaining, advance now
-      if (secondsRemaining <= 2.5 && secondsRemaining > 0) {
+      // Local deadline: if 5s or less remaining, advance now
+      if (secondsRemaining <= 5 && secondsRemaining > 0) {
         console.log('⏰ [LOCAL DEADLINE] Only', secondsRemaining.toFixed(1), 's remaining - triggering advance');
         startCountdown('local_deadline', `${secondsRemaining.toFixed(1)}s left`);
       }
