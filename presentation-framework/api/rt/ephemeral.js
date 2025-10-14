@@ -36,9 +36,9 @@ export default async function handler() {
 Listen to the speaker and compare what they say to the slide notes provided via session updates.
 
 CRITICAL INSTRUCTIONS:
-1. Call update_progress periodically (every 3-5 seconds) to report your assessment of slide completion (0-100%)
+1. Call update_progress VERY FREQUENTLY (after every sentence or thought, roughly every 2-3 seconds) with your assessment of slide completion (0-100%)
 2. When progress reaches 80% or the speaker has covered the key points, call advance_slide
-3. Be lenient - they don't need to say everything word-for-word, but should cover main ideas
+3. Be lenient - they may paraphrase, skip details, or add their own thoughts
 4. Wait for natural pauses or transitions before calling advance_slide
 
 Focus on: Have they covered the main ideas? Have they finished the thought? Would it make sense to advance now?`,
