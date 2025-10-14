@@ -5,7 +5,6 @@ export const config = {
 };
 
 export default async function handler(req) {
-  // Extract deckId from URL path
   const url = new URL(req.url);
   const pathParts = url.pathname.split('/');
   const deckId = pathParts[pathParts.length - 1];
@@ -22,18 +21,13 @@ export default async function handler(req) {
         controller.enqueue(encoder.encode(`event: init\ndata: ${initData}\n\n`));
         console.log('Sent init event:', initData);
 
-        // Subscribe to Pub/Sub - CRITICAL: This needs proper KV setup
+        // Subscribe to Pub/Sub
         const channelName = `deck:${deckId}:events`;
 
-        // Vercel KV subscribe returns async iterator
-        const subscriber = kv.subscribe(channelName);
-
-        // Process messages
-        (async () => {
-          for await (const message of subscriber) {
-            controller.enqueue(encoder.encode(`data: ${message}\n\n`));
-          }
-        })();
+        // Process messages from KV subscribe
+        for await (const message of kv.subscribe(channelName)) {
+          controller.enqueue(encoder.encode(`data: ${message}\n\n`));
+        }
 
         // Heartbeat
         const ping = setInterval(() => {
