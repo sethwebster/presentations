@@ -437,7 +437,7 @@ export const getSlides = (assetsPath) => {
       id: "journey",
       className: "slide-journey",
       notes:
-        "For the last six years, I've had a front-row seat to something extraordinary: watching an open-source idea continue to evolve into one of the most influential technologies in software history. React is now part of millions of apps and sites. It's shaped the thinking of every major platform vendor—from Apple to Google to Amazon to Microsoft.",
+        "For the last DECADE+ React has had a heck of a run, and for the last six years, I've had a front-row seat to something extraordinary: watching an open-source idea continue to evolve into one of the most influential technologies in software history. React is now part of millions of apps and sites. It's shaped the thinking of every major platform vendor—from Apple to Google to Amazon to Microsoft.",
       content: (
         <>
           <h1>Over a Decade</h1>
