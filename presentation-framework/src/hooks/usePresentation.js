@@ -28,9 +28,10 @@ export const usePresentation = (totalSlides) => {
   const navigateWithTransition = useCallback((newSlideIndex) => {
     if (newSlideIndex < 0 || newSlideIndex >= totalSlides) return;
 
-    // Use direct setState instead of transition for instant response
-    setCurrentSlide(newSlideIndex);
-  }, [totalSlides]);
+    startTransition(() => {
+      setCurrentSlide(newSlideIndex);
+    });
+  }, [totalSlides, startTransition]);
 
   const nextSlide = useCallback(() => {
     navigateWithTransition(currentSlide + 1);
