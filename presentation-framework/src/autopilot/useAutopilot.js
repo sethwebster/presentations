@@ -103,15 +103,30 @@ EXAMPLES
     threshold: Math.round(threshold * 100) + '%',
   });
 
-  // Trigger advance when score (AI or deterministic) exceeds threshold
+  // Trigger advance when AI progress exceeds threshold (fallback if AI doesn't call advance_slide)
+  const lastTriggeredProgressRef = useRef(0);
   useEffect(() => {
     if (!autopilotEnabled || !enabled) return;
-    if (currentScore >= threshold && currentScore > 0) {
-      console.log('🎯 Score threshold reached:', (currentScore * 100).toFixed(0) + '% >=', (threshold * 100) + '%');
-      cancelCountdown(); // Cancel any existing countdown
-      // Trigger will happen in useAutoAdvance hook
+
+    const aiProgressValue = speech.aiProgress;
+    const thresholdValue = threshold * 100;
+
+    // Only trigger once per threshold crossing
+    if (aiProgressValue >= thresholdValue && aiProgressValue > lastTriggeredProgressRef.current) {
+      lastTriggeredProgressRef.current = aiProgressValue;
+      console.log('🎯 AI Progress threshold reached:', aiProgressValue + '% >=', thresholdValue + '% - triggering advance');
+
+      // Manually trigger the advance event (AI should have done this but didn't)
+      window.dispatchEvent(new CustomEvent('lume-autopilot-advance', {
+        detail: { source: 'progress_threshold', reason: `AI: ${aiProgressValue}%` }
+      }));
     }
-  }, [currentScore, threshold, autopilotEnabled, enabled, cancelCountdown]);
+  }, [speech.aiProgress, threshold, autopilotEnabled, enabled]);
+
+  // Reset trigger ref on slide change
+  useEffect(() => {
+    lastTriggeredProgressRef.current = 0;
+  }, [currentSlide]);
 
   // Update slide context when slide changes
   useSlideContextUpdate({
