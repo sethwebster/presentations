@@ -29,8 +29,19 @@ export function Presentation({ slides, config = {} }) {
   const navigate = useNavigate();
   const lastEscapeTime = useRef(0);
 
-  const deckId = searchParams.get('deckId');
+  // Get deckId from URL, or generate one based on presentation name
+  let deckId = searchParams.get('deckId');
   const isViewer = searchParams.get('viewer') === 'true';
+
+  // If no deckId provided, generate from URL path (for simple single-presenter mode)
+  if (!deckId && typeof window !== 'undefined') {
+    const pathParts = window.location.pathname.split('/');
+    const presentationName = pathParts[pathParts.length - 1];
+    if (presentationName) {
+      deckId = `default-${presentationName}`;
+      console.log('Generated deckId:', deckId);
+    }
+  }
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
