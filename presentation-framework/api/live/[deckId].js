@@ -34,10 +34,12 @@ export async function GET(req) {
             }
           }, 15000);
 
-          // Poll for state changes every 100ms
+          // Poll for state changes with adaptive interval
           let lastSlide = current.slide ?? 0;
+          let pollDelay = 500; // Start at 500ms
+          let consecutiveNoChanges = 0;
 
-          const pollInterval = setInterval(async () => {
+          const poll = async () => {
             try {
               const state = await kv.hgetall(`deck:${deckId}:state`) || {};
               const currentSlide = state.slide ?? 0;
@@ -46,18 +48,34 @@ export async function GET(req) {
                 const slideEvent = JSON.stringify({ type: 'slide', slide: currentSlide, ts: Date.now() });
                 controller.enqueue(encoder.encode(`data: ${slideEvent}\n\n`));
                 lastSlide = currentSlide;
-                console.log('Polled slide update:', currentSlide);
+                console.log('Slide changed:', currentSlide);
+
+                // Speed up polling after a change (presenter might be advancing rapidly)
+                pollDelay = 300;
+                consecutiveNoChanges = 0;
+              } else {
+                consecutiveNoChanges++;
+
+                // Slow down polling if no changes (exponential backoff, max 2s)
+                if (consecutiveNoChanges > 3) {
+                  pollDelay = Math.min(pollDelay * 1.2, 2000);
+                }
               }
+
+              setTimeout(poll, pollDelay);
             } catch (e) {
               console.error('Poll error:', e);
+              setTimeout(poll, 2000); // Retry in 2s on error
             }
-          }, 100);
+          };
+
+          // Start polling
+          poll();
 
           // Cleanup on disconnect
           req.signal?.addEventListener('abort', () => {
             console.log('SSE connection closed for deck:', deckId);
             clearInterval(pingInterval);
-            clearInterval(pollInterval);
             controller.close();
           });
 
