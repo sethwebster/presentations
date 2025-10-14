@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { reactionService } from '../services/ReactionService';
 
-const REACTIONS = ['👏', '❤️', '🔥', '🎉', '👍', '🤯'] as const;
+const REACTIONS = ['👏', '❤️', '🔥', '🎉', '👍', '🤯'];
 
-interface ReactionButtonsProps {
+type ReactionButtonsProps = {
   onReact: (emoji: string) => void;
   isVisible: boolean;
-}
+};
 
 export function ReactionButtons({ onReact, isVisible }: ReactionButtonsProps) {
   const [expanded, setExpanded] = useState(false);
@@ -29,7 +29,7 @@ export function ReactionButtons({ onReact, isVisible }: ReactionButtonsProps) {
   // Keep visible even after tap/click
   return (
     <div
-      className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 flex gap-2 transition-all duration-300"
+      className="fixed z-50 flex gap-2 transition-all duration-300 -translate-x-1/2 bottom-20 left-1/2"
       style={{
         opacity: expanded ? 1 : 0.4,
       }}
@@ -51,7 +51,7 @@ export function ReactionButtons({ onReact, isVisible }: ReactionButtonsProps) {
             e.preventDefault();
             handleReact(emoji);
           }}
-          className="w-12 h-12 rounded-full flex items-center justify-center text-2xl transition-all duration-200 hover:scale-125 active:scale-110"
+          className="flex items-center justify-center w-12 h-12 text-2xl transition-all duration-200 rounded-full hover:scale-125 active:scale-110"
           style={{
             background: activeButton === emoji
               ? 'rgba(22, 194, 199, 0.4)'

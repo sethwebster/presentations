@@ -9,10 +9,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 export default defineConfig({
   plugins: [
     react({
-      include: ['**/*.jsx', '**/*.tsx'],
+      include: /\.(jsx|tsx)$/,
       jsxRuntime: 'automatic',
       babel: {
-        plugins: ['babel-plugin-react-compiler'],
+        plugins: [
+          ['babel-plugin-react-compiler', {
+            runtimeModule: 'react-compiler-runtime'
+          }]
+        ],
       },
     })
   ],
