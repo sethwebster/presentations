@@ -31,8 +31,12 @@ export function useRealtimePresentation(deckId, currentSlide, goToSlide, isPrese
           console.log('VIEWER: Following presenter to slide:', event.slide);
           goToSlide(event.slide);
         } else if (event.type === 'reaction') {
-          console.log('ALL: Showing reaction:', event.emoji);
-          setReactions(prev => [...prev, event]);
+          console.log('REACTION EVENT: Adding to reactions array:', event);
+          setReactions(prev => {
+            const updated = [...prev, event];
+            console.log('Reactions array updated, new length:', updated.length);
+            return updated;
+          });
         }
       });
 
