@@ -108,9 +108,12 @@ export function AutopilotHUD({
                   defaultValue={thresholdPercentage}
                   onChange={(e) => {
                     const newVal = parseInt(e.target.value) / 100;
-                    console.log('🎚️ Slider onChange - raw value:', e.target.value, '→', newVal);
+                    console.log('🎚️ Slider onChange - raw value:', e.target.value, '→', newVal, 'hasCallback:', !!onThresholdChange);
                     if (onThresholdChange) {
+                      console.log('📞 Calling onThresholdChange with:', newVal);
                       onThresholdChange(newVal);
+                    } else {
+                      console.error('❌ onThresholdChange is not defined!');
                     }
                   }}
                   className="threshold-slider"
