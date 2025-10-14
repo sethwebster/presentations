@@ -9,10 +9,10 @@ import { extractSpeakerNotes } from './extractSpeakerNotes';
  * @param {string} options.deckId - Deck identifier
  * @param {number} options.currentSlide - Current slide index
  * @param {Array} options.slides - Slide data with notes
- * @param {string} options.bearer - Auth bearer token
+ * @param {string} options.token - Auth presenter token
  * @param {boolean} options.enabled - Whether autopilot can be used
  */
-export function useAutopilot({ deckId, currentSlide, slides, bearer, enabled = false }) {
+export function useAutopilot({ deckId, currentSlide, slides, token, enabled = false }) {
   const [autopilotEnabled, setAutopilotEnabled] = useState(false);
 
   // Load threshold from localStorage, default to 0.50
@@ -87,7 +87,7 @@ EXAMPLES
     currentSlide,
     transcript: speech.finalTranscript,
     notesBySlide,
-    bearer,
+    token,
     threshold,
     enabled: autopilotEnabled && enabled,
   });

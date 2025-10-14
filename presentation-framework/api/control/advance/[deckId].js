@@ -14,13 +14,34 @@ export async function POST(req) {
   const pathParts = url.pathname.split('/');
   const deckId = pathParts[pathParts.length - 1];
 
-  // Check authorization
+  // Check authorization - support both token and direct secret
   const auth = req.headers.get('authorization');
   const expectedAuth = `Bearer ${process.env.LUME_CONTROL_SECRET || 'your_super_secret_key_here'}`;
 
-  console.log('Auth check - received:', auth, 'expected:', expectedAuth);
+  let isAuthorized = false;
 
-  if (auth !== expectedAuth) {
+  // Check if it's the direct secret (for backward compatibility)
+  if (auth === expectedAuth) {
+    console.log('Auth: Direct secret validated');
+    isAuthorized = true;
+  }
+  // Check if it's a token
+  else if (auth && auth.startsWith('Bearer ')) {
+    const token = auth.substring(7); // Remove 'Bearer '
+
+    // Validate token from KV store
+    const tokenData = await kv.get(`presenter-token:${token}`);
+
+    if (tokenData && tokenData.valid) {
+      console.log('Auth: Token validated');
+      isAuthorized = true;
+    } else {
+      console.log('Auth: Invalid or expired token');
+    }
+  }
+
+  if (!isAuthorized) {
+    console.log('Auth failed - received:', auth);
     return new Response('Unauthorized', { status: 401 });
   }
   try {

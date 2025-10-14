@@ -11,7 +11,7 @@ export function useAutoAdvance(options) {
     currentSlide,
     transcript,
     notesBySlide,
-    bearer,
+    token,
     threshold = 0.55, // Balanced - not too early, not too late
     minChars = 50, // Very low - don't require much text
     cooldownMs = 2500, // Reduced from 3s to 2.5s
@@ -49,8 +49,8 @@ export function useAutoAdvance(options) {
       return;
     }
 
-    if (!deckId || !bearer) {
-      console.log('❌ Missing deckId or bearer token');
+    if (!deckId || !token) {
+      console.log('❌ Missing deckId or presenter token');
       return;
     }
 
@@ -93,8 +93,8 @@ export function useAutoAdvance(options) {
     if (!okCooldown) {
       console.log('❌ Blocked: Cooldown active', now - lastAdvanceAt.current, 'ms since last advance');
     }
-    if (!bearer) {
-      console.log('❌ Blocked: No bearer token (VITE_LUME_CONTROL_SECRET not set)');
+    if (!token) {
+      console.log('❌ Blocked: No presenter token available');
     }
 
     if (okScore && okChars && okCooldown) {
@@ -108,7 +108,7 @@ export function useAutoAdvance(options) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${bearer}`,
+            'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({ slide: currentSlide + 1 }),
         }).catch(err => console.error('Advance error:', err));
@@ -125,7 +125,7 @@ export function useAutoAdvance(options) {
     currentSlide,
     transcript,
     notesBySlide,
-    bearer,
+    token,
     threshold,
     minChars,
     cooldownMs,
@@ -133,7 +133,7 @@ export function useAutoAdvance(options) {
 
   // Listen for model-triggered advances
   useEffect(() => {
-    if (!enabled || !deckId || !bearer) return;
+    if (!enabled || !deckId || !token) return;
 
     const handleModelAdvance = (event) => {
       console.log('📨 Received lume-autopilot-advance event:', event.detail);
@@ -159,7 +159,7 @@ export function useAutoAdvance(options) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${bearer}`,
+            'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({ slide: currentSlide + 1 }),
         }).catch(err => console.error('Advance error:', err));
@@ -173,7 +173,7 @@ export function useAutoAdvance(options) {
 
     window.addEventListener('lume-autopilot-advance', handleModelAdvance);
     return () => window.removeEventListener('lume-autopilot-advance', handleModelAdvance);
-  }, [enabled, deckId, currentSlide, bearer, cooldownMs]);
+  }, [enabled, deckId, currentSlide, token, cooldownMs]);
 
   // Countdown logic
   const startCountdown = (source, reason) => {
@@ -213,7 +213,7 @@ export function useAutoAdvance(options) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${bearer}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ slide: currentSlide + 1 }),
       })

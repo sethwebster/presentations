@@ -76,12 +76,19 @@ export function useRealtimePresentation(deckId, currentSlide, goToSlide, isPrese
 
     console.log('Publishing slide to API:', slideIndex, 'deck:', deckId);
 
+    // Get token from localStorage
+    const token = localStorage.getItem('lume-presenter-token');
+    if (!token) {
+      console.error('No presenter token available');
+      return;
+    }
+
     try {
       const response = await fetch(`/api/control/advance/${deckId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_LUME_CONTROL_SECRET || 'your_super_secret_key_here'}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ slide: slideIndex }),
       });

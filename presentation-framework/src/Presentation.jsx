@@ -7,6 +7,7 @@ import { useKeyboardNavigation } from './hooks/useKeyboardNavigation';
 import { useWindowSync } from './hooks/useWindowSync';
 import { useMouseIdle } from './hooks/useMouseIdle';
 import { useRealtimePresentation } from './hooks/useRealtimePresentation';
+import { usePresenterAuth } from './hooks/usePresenterAuth';
 import { PresenterView } from './components/PresenterView';
 import { SlideQRCode } from './components/SlideQRCode';
 import { QRCodePreloader } from './components/QRCodePreloader';
@@ -27,13 +28,17 @@ import { useAutopilot } from './autopilot/useAutopilot';
  */
 export function Presentation({ slides, config = {} }) {
   const [isPresenterMode, setIsPresenterMode] = useState(false);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const lastEscapeTime = useRef(0);
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState(false);
+  const [rememberKey, setRememberKey] = useState(true);
+  const [showWelcomeToast, setShowWelcomeToast] = useState(false);
 
   // Get deckId from URL, or generate one based on presentation name
   let deckId = searchParams.get('deckId');
-  const isViewer = searchParams.get('viewer') === 'true';
 
   // If no deckId provided, generate from URL path (for simple single-presenter mode)
   if (!deckId && typeof window !== 'undefined') {
@@ -50,10 +55,60 @@ export function Presentation({ slides, config = {} }) {
     setIsPresenterMode(params.get('presenter') === 'true');
   }, []);
 
+  // Authentication (business logic in AuthService)
+  const auth = usePresenterAuth();
+
+  // By default, everyone is a viewer unless authenticated
+  const isViewer = !auth.isAuthenticated;
+
+  // Show welcome toast when becoming a presenter (observe auth state changes)
+  useEffect(() => {
+    // Don't show in presenter mode window
+    if (isPresenterMode) return;
+
+    // Only show when we first become authenticated
+    if (auth.isAuthenticated) {
+      setShowWelcomeToast(true);
+
+      const timer = setTimeout(() => {
+        setShowWelcomeToast(false);
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [auth.isAuthenticated, isPresenterMode]);
+
+  // Handle password submission (delegates to AuthService)
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (passwordInput.trim()) {
+      const result = await auth.login(passwordInput.trim(), rememberKey);
+
+      if (result.success) {
+        setShowPasswordPrompt(false);
+        setPasswordInput('');
+        setPasswordError(false);
+        // Reload to update presenter status
+        window.location.reload();
+      } else {
+        setPasswordError(true);
+        setPasswordInput('');
+      }
+    }
+  };
+
   // Double-Escape to return to homepage
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape') {
+        // Close password prompt if open
+        if (showPasswordPrompt) {
+          setShowPasswordPrompt(false);
+          setPasswordInput('');
+          setPasswordError(false);
+          return;
+        }
+
         const now = Date.now();
         if (now - lastEscapeTime.current < 500) {
           // Double escape pressed within 500ms
@@ -65,7 +120,7 @@ export function Presentation({ slides, config = {} }) {
 
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [navigate]);
+  }, [navigate, showPasswordPrompt, searchParams, setSearchParams]);
 
   const {
     currentSlide,
@@ -87,8 +142,8 @@ export function Presentation({ slides, config = {} }) {
   const { openPresenterView, presenterWindowOpen } = useWindowSync(currentSlide, goToSlide);
   const { isIdle, hasMouseMoved } = useMouseIdle(500);
 
-  // Determine who is the presenter (not viewer, not presenter mode window)
-  const isPresenter = deckId && !isViewer && !isPresenterMode;
+  // Determine who is the presenter (authenticated and not in presenter mode window)
+  const isPresenter = deckId && auth.isAuthenticated && !isPresenterMode;
 
   // Realtime features
   const { reactions, publishSlideChange, sendReaction } = useRealtimePresentation(
@@ -118,9 +173,16 @@ export function Presentation({ slides, config = {} }) {
       isViewer,
       isPresenterMode,
       isPresenter,
+      isAuthenticated: auth.isAuthenticated,
       currentSlide
     });
-  }, [deckId, isViewer, isPresenterMode, isPresenter, currentSlide]);
+
+    if (isPresenter) {
+      console.log('✅ PRESENTER MODE: You can control slides');
+    } else if (isViewer) {
+      console.log('👁️ VIEWER MODE: Following presenter');
+    }
+  }, [deckId, isViewer, isPresenterMode, isPresenter, auth.isAuthenticated, currentSlide]);
 
   // Autopilot - Voice-driven auto-advance (works in presenter mode window OR main presenter)
   const canUseAutopilot = deckId && (isPresenter || isPresenterMode);
@@ -129,7 +191,7 @@ export function Presentation({ slides, config = {} }) {
     deckId,
     currentSlide,
     slides,
-    bearer: import.meta.env.VITE_LUME_CONTROL_SECRET,
+    token: auth.token,
     enabled: canUseAutopilot,
   });
 
@@ -167,11 +229,34 @@ export function Presentation({ slides, config = {} }) {
     </div>
   );
 
+  // Logout (delegates to AuthService)
+  const handleLogout = () => {
+    auth.logout();
+    window.location.reload();
+  };
+
   // Default navigation renderer
   const defaultNavigationRenderer = () => {
-    // Hide all navigation controls for viewers
-    if (isViewer) return null;
+    // For viewers, show a "Become Presenter" button
+    if (isViewer && deckId) {
+      return (
+        <button
+          className={`presenter-button become-presenter ${!hasMouseMoved ? 'initial' : isIdle ? 'hidden' : 'visible'}`}
+          onClick={() => setShowPasswordPrompt(true)}
+          aria-label="Become presenter"
+          style={{
+            bottom: '80px',
+            padding: '12px 24px',
+            fontSize: '14px',
+            borderRadius: '8px',
+          }}
+        >
+          🎤 Become Presenter
+        </button>
+      );
+    }
 
+    // For presenters, show full navigation
     return (
       <>
         <button
@@ -190,20 +275,37 @@ export function Presentation({ slides, config = {} }) {
         >
           →
         </button>
-        {!presenterWindowOpen && (
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {!presenterWindowOpen && (
+            <button
+              className={`presenter-button ${!hasMouseMoved ? 'initial' : isIdle ? 'hidden' : 'visible'}`}
+              onClick={openPresenterView}
+              aria-label="Open presenter view"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="14" y="14" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+              </svg>
+            </button>
+          )}
           <button
             className={`presenter-button ${!hasMouseMoved ? 'initial' : isIdle ? 'hidden' : 'visible'}`}
-            onClick={openPresenterView}
-            aria-label="Open presenter view"
+            onClick={handleLogout}
+            aria-label="End presenter session"
+            style={{
+              backgroundColor: 'rgba(239, 68, 68, 0.2)',
+              borderColor: 'rgba(239, 68, 68, 0.4)',
+            }}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="7" rx="1"/>
-              <rect x="14" y="3" width="7" height="7" rx="1"/>
-              <rect x="14" y="14" width="7" height="7" rx="1"/>
-              <rect x="3" y="14" width="7" height="7" rx="1"/>
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
             </svg>
           </button>
-        )}
+        </div>
       </>
     );
   };
@@ -214,6 +316,31 @@ export function Presentation({ slides, config = {} }) {
   return (
     <div className="app">
       <div className="progress-bar" style={{ width: `${progress}%` }} />
+
+      {/* Presenter welcome toast */}
+      {showWelcomeToast && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          padding: '12px 24px',
+          backgroundColor: 'rgba(34, 197, 94, 0.95)',
+          borderRadius: '8px',
+          color: 'white',
+          fontSize: '14px',
+          fontWeight: '600',
+          zIndex: 10000,
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+          animation: 'slideDown 0.3s ease-out',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}>
+          <span style={{ fontSize: '18px' }}>✓</span>
+          You are now presenting
+        </div>
+      )}
 
       <div className="slide-container">
         <ViewTransition>
@@ -248,6 +375,141 @@ export function Presentation({ slides, config = {} }) {
       {/* Reaction buttons for viewers */}
       {deckId && isViewer && (
         <ReactionButtons onReact={sendReaction} isVisible={!isIdle} />
+      )}
+
+      {/* Password prompt modal */}
+      {showPasswordPrompt && (
+        <div
+          className="password-modal-overlay"
+          onClick={() => setShowPasswordPrompt(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+          }}
+        >
+          <div
+            className="password-modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: 'var(--lume-midnight, #1a1a2e)',
+              padding: '32px',
+              borderRadius: '12px',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+              maxWidth: '400px',
+              width: '90%',
+            }}
+          >
+            <h2 style={{
+              margin: '0 0 16px 0',
+              color: 'var(--lume-mist, #e0e0e0)',
+              fontSize: '24px',
+            }}>
+              Enter Presenter Password
+            </h2>
+            {passwordError && (
+              <div style={{
+                padding: '12px',
+                marginBottom: '16px',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                border: '2px solid rgb(239, 68, 68)',
+                borderRadius: '8px',
+                color: 'rgb(239, 68, 68)',
+                fontSize: '14px',
+              }}>
+                Incorrect password. Please try again.
+              </div>
+            )}
+            <form onSubmit={handlePasswordSubmit}>
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={(e) => {
+                  setPasswordInput(e.target.value);
+                  setPasswordError(false);
+                }}
+                placeholder="Password"
+                autoFocus
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  fontSize: '16px',
+                  border: `2px solid ${passwordError ? 'rgb(239, 68, 68)' : 'var(--lume-cobalt, #4a5568)'}`,
+                  borderRadius: '8px',
+                  backgroundColor: 'var(--lume-shadow, #0f0f1e)',
+                  color: 'var(--lume-mist, #e0e0e0)',
+                  marginBottom: '12px',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '16px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                color: 'var(--lume-mist, #e0e0e0)',
+              }}>
+                <input
+                  type="checkbox"
+                  checked={rememberKey}
+                  onChange={(e) => setRememberKey(e.target.checked)}
+                  style={{
+                    width: '18px',
+                    height: '18px',
+                    cursor: 'pointer',
+                  }}
+                />
+                Remember me on this device
+              </label>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordPrompt(false);
+                    setPasswordInput('');
+                    setPasswordError(false);
+                  }}
+                  style={{
+                    padding: '10px 20px',
+                    fontSize: '14px',
+                    border: '2px solid var(--lume-cobalt, #4a5568)',
+                    borderRadius: '8px',
+                    backgroundColor: 'transparent',
+                    color: 'var(--lume-mist, #e0e0e0)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!passwordInput.trim()}
+                  style={{
+                    padding: '10px 20px',
+                    fontSize: '14px',
+                    border: 'none',
+                    borderRadius: '8px',
+                    backgroundColor: 'var(--lume-cobalt, #3b82f6)',
+                    color: 'white',
+                    cursor: passwordInput.trim() ? 'pointer' : 'not-allowed',
+                    opacity: passwordInput.trim() ? 1 : 0.5,
+                  }}
+                >
+                  Submit
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
