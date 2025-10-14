@@ -11,16 +11,20 @@ export async function POST(req) {
   const deckId = pathParts[pathParts.length - 1];
   const { emoji } = await req.json();
 
-  // Create reaction event
-  const evt = JSON.stringify({
+  // Store reaction in KV with TTL
+  const reactionId = crypto.randomUUID();
+  const reaction = {
     type: 'reaction',
     emoji,
-    id: crypto.randomUUID(),
+    id: reactionId,
     ts: Date.now()
-  });
+  };
 
-  // Publish to all subscribers
-  await kv.publish(`deck:${deckId}:events`, evt);
+  // Add to reactions list with 5-second TTL
+  await kv.lpush(`deck:${deckId}:reactions`, JSON.stringify(reaction));
+  await kv.expire(`deck:${deckId}:reactions`, 5);
+
+  console.log('Stored reaction:', emoji, 'id:', reactionId);
 
   return new Response('ok', {
     headers: {

@@ -34,29 +34,45 @@ export async function GET(req) {
             }
           }, 15000);
 
-          // Poll for state changes with adaptive interval
+          // Poll for state and reactions
           let lastSlide = current.slide ?? 0;
-          let pollDelay = 500; // Start at 500ms
+          let processedReactionIds = new Set();
+          let pollDelay = 500;
           let consecutiveNoChanges = 0;
 
           const poll = async () => {
             try {
               const state = await kv.hgetall(`deck:${deckId}:state`) || {};
               const currentSlide = state.slide ?? 0;
+              let hasChanges = false;
 
+              // Check for slide changes
               if (currentSlide !== lastSlide) {
                 const slideEvent = JSON.stringify({ type: 'slide', slide: currentSlide, ts: Date.now() });
                 controller.enqueue(encoder.encode(`data: ${slideEvent}\n\n`));
                 lastSlide = currentSlide;
+                hasChanges = true;
                 console.log('Slide changed:', currentSlide);
+              }
 
-                // Speed up polling after a change (presenter might be advancing rapidly)
+              // Check for new reactions
+              const reactions = await kv.lrange(`deck:${deckId}:reactions`, 0, -1) || [];
+              for (const reactionStr of reactions) {
+                const reaction = JSON.parse(reactionStr);
+                if (!processedReactionIds.has(reaction.id)) {
+                  controller.enqueue(encoder.encode(`data: ${reactionStr}\n\n`));
+                  processedReactionIds.add(reaction.id);
+                  hasChanges = true;
+                  console.log('Sent reaction:', reaction.emoji);
+                }
+              }
+
+              // Adaptive polling interval
+              if (hasChanges) {
                 pollDelay = 300;
                 consecutiveNoChanges = 0;
               } else {
                 consecutiveNoChanges++;
-
-                // Slow down polling if no changes (exponential backoff, max 2s)
                 if (consecutiveNoChanges > 3) {
                   pollDelay = Math.min(pollDelay * 1.2, 2000);
                 }
@@ -65,11 +81,10 @@ export async function GET(req) {
               setTimeout(poll, pollDelay);
             } catch (e) {
               console.error('Poll error:', e);
-              setTimeout(poll, 2000); // Retry in 2s on error
+              setTimeout(poll, 2000);
             }
           };
 
-          // Start polling
           poll();
 
           // Cleanup on disconnect
