@@ -25,6 +25,10 @@ export default defineConfig({
   server: {
     fs: {
       strict: false
-    }
+    },
+    proxy: {
+      // forward /api to vercel dev server
+      '/api': 'http://localhost:3000',
+    },
   }
 })
