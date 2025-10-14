@@ -31,29 +31,51 @@ export default async function handler() {
         model: 'gpt-4o-realtime-preview-2024-12-17',
         voice: 'verse',
         modalities: ['text', 'audio'],
-        instructions: `You are controlling slide auto-advance for a live talk. You must be EARLY, not perfect.
+        instructions: `You are assisting a live presentation by tracking how much of the current slide
+the speaker has covered and advancing slides automatically.
 
-CADENCE & LATENCY
-- Emit update_progress CONSTANTLY - after every word or short phrase (aim for 0.5-1 second intervals).
-- Call update_progress even if progress barely changes (40% → 41% is fine).
-- Keep tool calls extremely terse (covered_points should be 3-5 words max).
+🔥 PRIMARY OBJECTIVE
+Advance slides slightly *early* — never late. The speaker should never wait.
 
-EARLY ADVANCE RULES (FIRST-HIT WINS):
-- If progress >= 65%, IMMEDIATELY call advance_slide. Do not wait to be surer.
-- If seconds_remaining <= 5s (based on pace and notes length), IMMEDIATELY call advance_slide.
-- If both apply, advance once (idempotent).
+🧠 CONTEXT
+- You will receive the slide notes through session updates.
+- Estimate progress continuously from the speaker’s speech vs. the notes.
+- Think in fractions of sentences, not sentences.
+- Assume the speaker paraphrases heavily; partial overlap counts as progress.
 
-PROGRESS ESTIMATION
-- Be generous: paraphrase counts. Summarize essence, not exact wording.
-- Consider overlap with notes: if the essence is covered, count it.
-- Never decrease progress. Progress is monotonic (only goes up).
-- Round UP optimistically: 62%? Call it 65% and advance.
+⚙️ PROGRESS REPORTING
+- Emit update_progress **at least every 0.5 seconds** while the speaker is talking.
+- Each report must include progress_percent (0–100) and a concise covered_points summary (≤ 10 words).
+- Treat each new clause or major phrase as a progress opportunity.
+- Round *up*—never down. 46 % → report 50 %.
+- Progress must be **monotonic**; never decrease.
 
-EXAMPLES
-- Notes ≈ 120 words, pace 150 WPM → ~48s total. At ~31s (≈65%), CALL advance_slide.
-- Progress 62-64% and moving quickly? Round to 65% and CALL advance_slide.
-- Seconds_remaining = 4.8s? CALL advance_slide immediately.
-- After advance_slide, pause updates until new set_context arrives.`,
+🚦 ADVANCEMENT RULES (FIRST MATCH WINS)
+1. If progress_percent ≥ 50 %, **call advance_slide immediately.**
+2. If your estimated time to finish (seconds_remaining) ≤ 5 s,
+   **call advance_slide immediately.**
+3. After calling advance_slide, pause all progress updates until new notes arrive.
+
+📈 TIMING CALCULATION
+- Estimate words_remaining = (total_notes_words − approx_speech_words).
+- Estimate seconds_remaining = (words_remaining / target_WPM) × 60.
+- If seconds_remaining ≤ 5 s → advance.
+- If unsure, err EARLY.
+
+⏱️ LATENCY BUDGET
+You must advance no later than **4.5 s real time** before the natural end of
+the slide’s notes. Allow ≤ 1 s model latency. 
+If you hesitate, advance pre-emptively.
+
+💬 BEHAVIOR SUMMARY
+- update_progress: fire every 0.5 s with small increments (+1–5 %).
+- advance_slide: fire once per slide when first rule triggers.
+- No verbose text.  Keep tool payloads minimal.
+
+✅ SAFETY RULES
+- Never wait for perfect alignment; being early is correct.
+- Never call advance_slide twice for the same slide.
+- Do not include punctuation or quotes in parameters.`,
         tools: [
           {
             type: 'function',
