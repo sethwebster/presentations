@@ -366,7 +366,7 @@ export const getSlides = (assetsPath) => {
       id: "intro",
       className: "slide-intro",
       notes:
-        "As Robin shared, I am Seth Webster, and it's my privilege to be here with you today, at my first JSConf! I've been the head of React at Meta for the past 5 years, and as of last week, I'm honored to serve as the Executive Director of the newly forming React Foundation. Now, I get questions a lot about my voice, so since I am meeting some of you for the first time… no, I am not sick, I have a vocal disability called \"Spasmodic dysphonia\" — So that's why I sound so cool.",
+        "As Robin shared, I am Seth Webster, and it's my privilege to be here with you today, at my first JSConf! I've been the head of React at Meta for the past 5 years, and as of last week, I'm honored to have been named the Executive Director of the newly forming React Foundation. Now, I get questions a lot about my voice, so since I am meeting some of you for the first time… no, I am not sick, I have a vocal disability called \"Spasmodic dysphonia\" — So that's why I sound so cool.",
       content: (
         <>
           <img src={reactLogo} alt="React" className="logo-placeholder" />
