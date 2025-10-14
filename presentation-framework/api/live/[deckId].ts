@@ -24,7 +24,19 @@ export async function GET(req: Request): Promise<Response> {
   console.log('SSE connection request for deck:', deckId);
 
   // Create Redis subscriber (ioredis for pub/sub)
-  const subscriber = new Redis(process.env.KV_URL as string);
+  const kvUrl = process.env.KV_URL;
+  if (!kvUrl) {
+    console.error('KV_URL environment variable is not set');
+    return new Response('Server configuration error: KV_URL not configured', {
+      status: 500,
+      headers: {
+        'Content-Type': 'text/plain',
+        'Access-Control-Allow-Origin': '*',
+      }
+    });
+  }
+
+  const subscriber = new Redis(kvUrl);
   const channelName = `deck:${deckId}:channel`;
 
   const encoder = new TextEncoder();
