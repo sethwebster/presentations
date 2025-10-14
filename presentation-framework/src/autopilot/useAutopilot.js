@@ -28,6 +28,11 @@ export function useAutopilot({ deckId, currentSlide, slides, bearer, enabled = f
     }
   });
 
+  const notesBySlide = useMemo(() => extractSpeakerNotes(slides), [slides]);
+
+  // Speech recognition
+  const speech = useRealtimeSpeech();
+
   const setThreshold = useCallback((newThreshold) => {
     setThresholdState(newThreshold);
     try {
@@ -62,11 +67,6 @@ EXAMPLES
       console.error('Failed to save threshold:', err);
     }
   }, [speech]);
-
-  const notesBySlide = useMemo(() => extractSpeakerNotes(slides), [slides]);
-
-  // Speech recognition
-  const speech = useRealtimeSpeech();
 
   // Auto-advance logic (deterministic fallback)
   const { currentScore: deterministicScore, countdown, cancelCountdown, resetForManualNavigation } = useAutoAdvance({
