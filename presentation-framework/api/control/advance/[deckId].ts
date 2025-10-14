@@ -67,7 +67,7 @@ export async function POST(req: Request): Promise<Response> {
     return new Response('Unauthorized', { status: 401 });
   }
   try {
-    const { slide }: AdvanceRequestBody = await req.json();
+    const { slide } = await req.json() as AdvanceRequestBody;
     console.log('Updating deck state:', deckId, 'slide:', slide);
 
     // Update current state in KV (for initial sync)

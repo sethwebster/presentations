@@ -24,7 +24,7 @@ export async function POST(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const pathParts = url.pathname.split('/');
   const deckId = pathParts[pathParts.length - 1];
-  const { emoji }: ReactionRequestBody = await req.json();
+  const { emoji } = await req.json() as ReactionRequestBody;
 
   const reactionId = crypto.randomUUID();
   const reaction: ReactionEvent = {
