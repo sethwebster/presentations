@@ -1,12 +1,4 @@
-// Use dev pub/sub if KV not available
-let kvClient;
-try {
-  const { kv } = await import('@vercel/kv');
-  kvClient = kv;
-} catch (e) {
-  const { devPubSub } = await import('../_dev-pubsub.js');
-  kvClient = devPubSub;
-}
+import { kv } from '@vercel/kv';
 
 export const config = {
   runtime: 'edge',
@@ -25,14 +17,23 @@ export default async function handler(req) {
     async start(controller) {
       try {
         // Send current state first
-        const current = await kvClient.hgetall(`deck:${deckId}:state`) || {};
+        const current = await kv.hgetall(`deck:${deckId}:state`) || {};
         const initData = JSON.stringify({ slide: current.slide ?? 0 });
         controller.enqueue(encoder.encode(`event: init\ndata: ${initData}\n\n`));
         console.log('Sent init event:', initData);
 
-        // Subscribe to channel
+        // Subscribe to Pub/Sub - CRITICAL: This needs proper KV setup
         const channelName = `deck:${deckId}:events`;
-        const subscription = kvClient.subscribe(channelName, controller);
+
+        // Vercel KV subscribe returns async iterator
+        const subscriber = kv.subscribe(channelName);
+
+        // Process messages
+        (async () => {
+          for await (const message of subscriber) {
+            controller.enqueue(encoder.encode(`data: ${message}\n\n`));
+          }
+        })();
 
         // Heartbeat
         const ping = setInterval(() => {
