@@ -40,7 +40,28 @@ export function PresenterView({
 
   return (
     <div className="presenter-view">
-      <div className="presenter-header">
+      <div className={`presenter-header ${autopilot?.countdown ? 'countdown-active' : ''}`}>
+        {/* Countdown Progress Bar (full header takeover) */}
+        {autopilot?.countdown && (
+          <div className="header-countdown-bar">
+            <div
+              className="header-countdown-fill"
+              style={{
+                width: `${(autopilot.countdown.secondsRemaining / 3) * 100}%`,
+              }}
+            />
+            <div className="header-countdown-content">
+              <span className="header-countdown-text">
+                Advancing in {autopilot.countdown.secondsRemaining}s - {autopilot.countdown.source === 'model' ? '🤖' : '📊'} {autopilot.countdown.reason}
+              </span>
+              <button className="header-countdown-cancel" onClick={autopilot.onCancelCountdown}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Normal header content */}
         <div className="presenter-header-left">
           <h1>Presenter View</h1>
           <div className="slide-counter">
