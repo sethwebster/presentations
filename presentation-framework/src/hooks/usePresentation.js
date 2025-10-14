@@ -34,12 +34,22 @@ export const usePresentation = (totalSlides) => {
   }, [totalSlides, startTransition]);
 
   const nextSlide = useCallback(() => {
-    navigateWithTransition(currentSlide + 1);
-  }, [currentSlide, navigateWithTransition]);
+    setCurrentSlide((current) => {
+      const next = current + 1;
+      if (next >= totalSlides) return current;
+      startTransition(() => setCurrentSlide(next));
+      return current; // Return current to prevent immediate update, let transition handle it
+    });
+  }, [totalSlides, startTransition]);
 
   const prevSlide = useCallback(() => {
-    navigateWithTransition(currentSlide - 1);
-  }, [currentSlide, navigateWithTransition]);
+    setCurrentSlide((current) => {
+      const prev = current - 1;
+      if (prev < 0) return current;
+      startTransition(() => setCurrentSlide(prev));
+      return current;
+    });
+  }, [totalSlides, startTransition]);
 
   const goToSlide = useCallback((index) => {
     navigateWithTransition(index);
