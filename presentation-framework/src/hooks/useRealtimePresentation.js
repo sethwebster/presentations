@@ -13,6 +13,7 @@ export function useRealtimePresentation(deckId, currentSlide, goToSlide, isPrese
   const sseUrl = deckId ? `/api/live/${deckId}` : null;
   const events = useSSE(sseUrl);
   const processedCountRef = useRef(0);
+  const seenReactionIdsRef = useRef(new Set());
 
   // Process only NEW events (not all events every time)
   useEffect(() => {
