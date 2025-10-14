@@ -21,7 +21,7 @@ export function useAutopilot({ deckId, currentSlide, slides, bearer, enabled = f
   const speech = useRealtimeSpeech();
 
   // Auto-advance logic (deterministic fallback)
-  const { currentScore: deterministicScore, countdown, cancelCountdown } = useAutoAdvance({
+  const { currentScore: deterministicScore, countdown, cancelCountdown, resetForManualNavigation } = useAutoAdvance({
     deckId,
     currentSlide,
     transcript: speech.finalTranscript,

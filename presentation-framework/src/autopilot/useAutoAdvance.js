@@ -204,6 +204,22 @@ export function useAutoAdvance(options) {
     setCountdown(null);
   };
 
+  const resetForManualNavigation = useCallback(() => {
+    console.log('🔄 Manual navigation detected - resetting autopilot');
+
+    // Cancel any pending countdown
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
+    setCountdown(null);
+
+    // Reset advance flag for current slide
+    hasAdvancedForSlideRef.current = currentSlide;
+    slideStartTimeRef.current = Date.now();
+
+    // Reset decision
+    setLastDecision(null);
+  }, [currentSlide]);
+
   // Local deadline fallback - advance if model hasn't triggered
   useEffect(() => {
     if (!enabled || !deckId || !bearer) return;
@@ -244,6 +260,7 @@ export function useAutoAdvance(options) {
     lastDecision,
     countdown,
     cancelCountdown,
+    resetForManualNavigation,
     getScore: () => currentScore,
   };
 }
