@@ -80,6 +80,7 @@ export function PresenterView({
               countdown={autopilot.countdown}
               onToggle={autopilot.onToggle}
               onCancelCountdown={autopilot.onCancelCountdown}
+              onThresholdChange={autopilot.onThresholdChange}
             />
           </div>
         )}

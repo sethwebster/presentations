@@ -143,6 +143,7 @@ export function Presentation({ slides, config = {} }) {
     countdown: autopilot.countdown,
     onToggle: autopilot.toggle,
     onCancelCountdown: autopilot.cancelCountdown,
+    onThresholdChange: autopilot.setThreshold,
   } : null;
 
   if (isPresenterMode) {

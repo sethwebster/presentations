@@ -14,6 +14,7 @@ import { extractSpeakerNotes } from './extractSpeakerNotes';
  */
 export function useAutopilot({ deckId, currentSlide, slides, bearer, enabled = false }) {
   const [autopilotEnabled, setAutopilotEnabled] = useState(false);
+  const [threshold, setThreshold] = useState(0.50); // User-adjustable threshold
   const notesBySlide = useMemo(() => extractSpeakerNotes(slides), [slides]);
 
   // Speech recognition
@@ -26,6 +27,7 @@ export function useAutopilot({ deckId, currentSlide, slides, bearer, enabled = f
     transcript: speech.finalTranscript,
     notesBySlide,
     bearer,
+    threshold,
     enabled: autopilotEnabled && enabled,
   });
 

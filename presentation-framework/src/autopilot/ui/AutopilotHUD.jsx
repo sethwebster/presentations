@@ -7,13 +7,15 @@ export function AutopilotHUD({
   connected,
   enabled,
   currentScore,
-  threshold = 0.78,
+  threshold = 0.50,
   error,
   countdown = null,
   onToggle,
   onCancelCountdown,
+  onThresholdChange,
 }) {
   const progressPercentage = Math.round(currentScore * 100);
+  const thresholdPercentage = Math.round(threshold * 100);
   const isReadyToAdvance = currentScore >= threshold;
 
   const getStatusIcon = () => {

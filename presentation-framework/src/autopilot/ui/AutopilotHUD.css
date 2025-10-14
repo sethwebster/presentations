@@ -142,4 +142,59 @@
   animation: pulse 2s ease-in-out infinite;
 }
 
-/* Countdown styles moved to PresenterView.css */
+/* Threshold Control */
+.threshold-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 140px;
+}
+
+.threshold-label {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.threshold-slider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.threshold-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--lume-primary, #16c2c7);
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(22, 194, 199, 0.6);
+}
+
+.threshold-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--lume-primary, #16c2c7);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 8px rgba(22, 194, 199, 0.6);
+}
+
+.threshold-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.2);
+  box-shadow: 0 0 12px rgba(22, 194, 199, 0.8);
+}
+
+.threshold-slider:hover::-moz-range-thumb {
+  transform: scale(1.2);
+  box-shadow: 0 0 12px rgba(22, 194, 199, 0.8);
+}
