@@ -173,7 +173,7 @@ export function useRealtimeSpeech() {
               }
 
               window.dispatchEvent(new CustomEvent('lume-autopilot-advance', {
-                detail: { source: 'model', reason, progress: monotonicProgress }
+                detail: { source: 'model', reason, progress: lastProgressRef.current }
               }));
             }
           }
