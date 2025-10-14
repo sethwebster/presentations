@@ -58,7 +58,13 @@ export function useRealtimeSpeech() {
       dc.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          console.log('Received message:', message.type);
+
+          // Log all function-related events
+          if (message.type?.includes('function')) {
+            console.log('🔧 Function event:', message.type, message);
+          } else {
+            console.log('Received message:', message.type);
+          }
 
           // Handle different event types
           if (message.type === 'response.audio_transcript.delta') {

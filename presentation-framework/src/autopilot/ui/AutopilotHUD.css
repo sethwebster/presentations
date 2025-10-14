@@ -141,3 +141,97 @@
 .autopilot-toggle.enabled .mic-icon {
   animation: pulse 2s ease-in-out infinite;
 }
+
+/* Countdown Overlay */
+.countdown-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.countdown-content {
+  background: rgba(10, 10, 10, 0.95);
+  border: 2px solid var(--lume-primary, #16c2c7);
+  border-radius: 1rem;
+  padding: 2rem 3rem;
+  text-align: center;
+  box-shadow: 0 0 40px rgba(22, 194, 199, 0.4);
+  min-width: 300px;
+}
+
+.countdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.countdown-title {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+.countdown-cancel {
+  background: rgba(255, 107, 107, 0.2);
+  border: 1px solid rgba(255, 107, 107, 0.5);
+  color: #ff6b6b;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.countdown-cancel:hover {
+  background: rgba(255, 107, 107, 0.3);
+  border-color: #ff6b6b;
+}
+
+.countdown-timer {
+  font-size: 4rem;
+  font-weight: 700;
+  color: var(--lume-primary, #16c2c7);
+  margin: 1rem 0;
+  text-shadow: 0 0 20px rgba(22, 194, 199, 0.5);
+}
+
+.countdown-reason {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 1.5rem;
+}
+
+.countdown-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.countdown-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--lume-primary, #16c2c7), var(--lume-secondary, #20e3b2));
+  transition: width 1s linear;
+  box-shadow: 0 0 10px rgba(22, 194, 199, 0.6);
+}

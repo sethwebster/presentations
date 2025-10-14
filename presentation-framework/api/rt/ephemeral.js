@@ -33,14 +33,15 @@ export default async function handler() {
         modalities: ['text', 'audio'],
         instructions: `You are assisting a live presentation with automatic slide advancement.
 
-Listen to the speaker and compare what they say to the slide notes provided via session updates. When they have covered the KEY POINTS of the current slide (even if paraphrasing or skipping minor details), call the advance_slide function.
+Listen to the speaker and compare what they say to the slide notes provided via session updates.
 
-Be lenient - they don't need to say everything word-for-word. Focus on:
-- Have they covered the main ideas?
-- Have they finished the thought/topic?
-- Would it make sense to move to the next slide now?
+CRITICAL INSTRUCTIONS:
+1. Call update_progress periodically (every 3-5 seconds) to report your assessment of slide completion (0-100%)
+2. When progress reaches 80% or the speaker has covered the key points, call advance_slide
+3. Be lenient - they don't need to say everything word-for-word, but should cover main ideas
+4. Wait for natural pauses or transitions before calling advance_slide
 
-Don't advance too early - wait for clear signals they're done (natural pause, transition phrase, completion of main points).`,
+Focus on: Have they covered the main ideas? Have they finished the thought? Would it make sense to advance now?`,
         tools: [
           {
             type: 'function',

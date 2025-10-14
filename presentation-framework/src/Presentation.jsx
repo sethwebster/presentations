@@ -140,7 +140,9 @@ export function Presentation({ slides, config = {} }) {
     currentScore: autopilot.currentScore,
     threshold: autopilot.threshold,
     error: autopilot.error,
+    countdown: autopilot.countdown,
     onToggle: autopilot.toggle,
+    onCancelCountdown: autopilot.cancelCountdown,
   } : null;
 
   if (isPresenterMode) {

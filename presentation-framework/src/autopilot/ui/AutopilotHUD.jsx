@@ -9,7 +9,9 @@ export function AutopilotHUD({
   currentScore,
   threshold = 0.78,
   error,
+  countdown = null,
   onToggle,
+  onCancelCountdown,
 }) {
   const progressPercentage = Math.round(currentScore * 100);
   const isReadyToAdvance = currentScore >= threshold;
@@ -91,6 +93,30 @@ export function AutopilotHUD({
           )}
 
           {error && <div className="error-message">{error}</div>}
+        </div>
+      )}
+
+      {/* Countdown Timer */}
+      {countdown && (
+        <div className="countdown-overlay">
+          <div className="countdown-content">
+            <div className="countdown-header">
+              <span className="countdown-title">Advancing in</span>
+              <button className="countdown-cancel" onClick={onCancelCountdown}>
+                Cancel
+              </button>
+            </div>
+            <div className="countdown-timer">{countdown.secondsRemaining}s</div>
+            <div className="countdown-reason">
+              {countdown.source === 'model' ? '🤖 AI' : '📊 Auto'}: {countdown.reason}
+            </div>
+            <div className="countdown-progress-bar">
+              <div
+                className="countdown-progress-fill"
+                style={{ width: `${(countdown.secondsRemaining / 5) * 100}%` }}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -56,7 +56,9 @@ export function PresenterView({
               currentScore={autopilot.currentScore}
               threshold={autopilot.threshold}
               error={autopilot.error}
+              countdown={autopilot.countdown}
               onToggle={autopilot.onToggle}
+              onCancelCountdown={autopilot.onCancelCountdown}
             />
           </div>
         )}

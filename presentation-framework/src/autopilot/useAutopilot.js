@@ -20,7 +20,7 @@ export function useAutopilot({ deckId, currentSlide, slides, bearer, enabled = f
   const speech = useRealtimeSpeech();
 
   // Auto-advance logic (deterministic fallback)
-  const { currentScore: deterministicScore } = useAutoAdvance({
+  const { currentScore: deterministicScore, countdown, cancelCountdown } = useAutoAdvance({
     deckId,
     currentSlide,
     transcript: speech.finalTranscript,
@@ -58,9 +58,11 @@ export function useAutopilot({ deckId, currentSlide, slides, bearer, enabled = f
     connected: speech.connected,
     error: speech.error,
     currentScore,
+    countdown,
 
     // Controls
     toggle,
+    cancelCountdown,
 
     // Display
     threshold: 0.65,

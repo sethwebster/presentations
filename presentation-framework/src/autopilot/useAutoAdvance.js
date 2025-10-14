@@ -21,6 +21,9 @@ export function useAutoAdvance(options) {
   const lastAdvanceAt = useRef(0);
   const [currentScore, setCurrentScore] = useState(0);
   const [lastDecision, setLastDecision] = useState(null);
+  const [countdown, setCountdown] = useState(null); // { secondsRemaining, source, reason }
+  const countdownTimerRef = useRef(null);
+  const advanceTimeoutRef = useRef(null);
 
   // Monitor transcript and decide when to advance
   useEffect(() => {
@@ -66,28 +69,10 @@ export function useAutoAdvance(options) {
     }
 
     if (okScore && okChars && okCooldown) {
-      console.log('✅ [DETERMINISTIC] Auto-advancing to slide', currentSlide + 1, '(score:', score.toFixed(3), ')');
+      console.log('✅ [DETERMINISTIC] Starting 5s countdown to slide', currentSlide + 1, '(score:', score.toFixed(3), ')');
       lastAdvanceAt.current = now;
       setLastDecision({ type: 'deterministic', score, timestamp: now });
-
-      fetch(`/api/control/advance/${deckId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${bearer}`,
-        },
-        body: JSON.stringify({ slide: currentSlide + 1 }),
-      })
-        .then(res => {
-          if (!res.ok) {
-            console.error('Advance failed:', res.status, res.statusText);
-          } else {
-            console.log('Advance successful');
-          }
-        })
-        .catch(err => {
-          console.error('Advance error:', err);
-        });
+      startCountdown('deterministic', `Score: ${Math.round(score * 100)}%`);
     }
   }, [
     enabled,
@@ -114,9 +99,40 @@ export function useAutoAdvance(options) {
         return;
       }
 
-      console.log('✅ [AI MODEL] Auto-advancing to slide', currentSlide + 1, '(AI decided you covered the key points)');
+      console.log('✅ [AI MODEL] Starting 5s countdown to slide', currentSlide + 1);
       lastAdvanceAt.current = now;
       setLastDecision({ type: 'model', timestamp: now });
+      startCountdown('model', 'AI decision');
+    };
+
+    window.addEventListener('lume-autopilot-advance', handleModelAdvance);
+    return () => window.removeEventListener('lume-autopilot-advance', handleModelAdvance);
+  }, [enabled, deckId, currentSlide, bearer, cooldownMs]);
+
+  // Countdown logic
+  const startCountdown = (source, reason) => {
+    // Clear any existing countdown
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
+
+    setCountdown({ secondsRemaining: 5, source, reason });
+
+    // Update countdown every second
+    let remaining = 5;
+    countdownTimerRef.current = setInterval(() => {
+      remaining--;
+      setCountdown(prev => prev ? { ...prev, secondsRemaining: remaining } : null);
+
+      if (remaining <= 0) {
+        clearInterval(countdownTimerRef.current);
+        setCountdown(null);
+      }
+    }, 1000);
+
+    // Actually advance after 5 seconds
+    advanceTimeoutRef.current = setTimeout(() => {
+      console.log('⏰ Countdown complete - advancing now!');
+      setCountdown(null);
 
       fetch(`/api/control/advance/${deckId}`, {
         method: 'POST',
@@ -128,23 +144,37 @@ export function useAutoAdvance(options) {
       })
         .then(res => {
           if (!res.ok) {
-            console.error('Model advance failed:', res.status, res.statusText);
+            console.error('Advance failed:', res.status, res.statusText);
           } else {
-            console.log('Model advance successful');
+            console.log('✅ Advance successful');
           }
         })
         .catch(err => {
-          console.error('Model advance error:', err);
+          console.error('Advance error:', err);
         });
-    };
+    }, 5000);
+  };
 
-    window.addEventListener('lume-autopilot-advance', handleModelAdvance);
-    return () => window.removeEventListener('lume-autopilot-advance', handleModelAdvance);
-  }, [enabled, deckId, currentSlide, bearer, cooldownMs]);
+  const cancelCountdown = () => {
+    console.log('❌ Countdown canceled');
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
+    setCountdown(null);
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+      if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
+    };
+  }, []);
 
   return {
     currentScore,
     lastDecision,
+    countdown,
+    cancelCountdown,
     getScore: () => currentScore,
   };
 }
