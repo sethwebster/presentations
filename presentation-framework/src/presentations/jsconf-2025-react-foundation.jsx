@@ -109,17 +109,21 @@ export const customStyles = `
 /* Partners Slide Layout */
 
 .partners-title-container {
-  position: absolute;
-  top: 20%;
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
 }
 
-.partners-title-better {
+.partners-title-container > div:first-child {
+  opacity: 1;
+}
+
+.partners-title-container > div:last-child {
   position: absolute;
   top: 0;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  width: 100%;
+}
+
+.partners-title-container h1 {
   white-space: nowrap;
 }
 
