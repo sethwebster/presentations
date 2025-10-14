@@ -95,10 +95,11 @@ export function AutopilotHUD({
               </div>
 
               <div className="threshold-control">
-                <label className="threshold-label">
+                <label className="threshold-label" htmlFor="threshold-slider">
                   Threshold: {thresholdPercentage}%
                 </label>
                 <input
+                  id="threshold-slider"
                   type="range"
                   min="30"
                   max="80"
@@ -106,16 +107,19 @@ export function AutopilotHUD({
                   value={thresholdPercentage}
                   onChange={(e) => {
                     const newVal = parseInt(e.target.value) / 100;
-                    console.log('🎚️ Threshold changed to:', newVal);
-                    onThresholdChange?.(newVal);
-                  }}
-                  onInput={(e) => {
-                    const newVal = parseInt(e.target.value) / 100;
-                    onThresholdChange?.(newVal);
+                    console.log('🎚️ Slider onChange - raw value:', e.target.value, '→', newVal);
+                    if (onThresholdChange) {
+                      onThresholdChange(newVal);
+                    }
                   }}
                   className="threshold-slider"
-                  style={{ touchAction: 'none' }}
+                  title={`Adjust threshold: ${thresholdPercentage}%`}
                 />
+                <div className="threshold-ticks">
+                  <span>30%</span>
+                  <span>55%</span>
+                  <span>80%</span>
+                </div>
               </div>
             </>
           )}
