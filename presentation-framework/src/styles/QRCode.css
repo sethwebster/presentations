@@ -1,0 +1,56 @@
+.qr-code-container {
+  position: relative;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+}
+
+.qr-code-container::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 14px;
+  padding: 2px;
+  background: linear-gradient(
+    45deg,
+    var(--lume-primary),
+    var(--lume-accent),
+    var(--lume-ember),
+    var(--lume-primary)
+  );
+  background-size: 300% 300%;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: qr-edge-trace 3s linear infinite;
+  opacity: 0.8;
+}
+
+.qr-code-container:hover::before {
+  opacity: 1;
+  animation-duration: 1.5s;
+}
+
+@keyframes qr-edge-trace {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.qr-code-inner {
+  position: relative;
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
