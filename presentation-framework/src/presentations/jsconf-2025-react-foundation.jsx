@@ -435,11 +435,11 @@ export const getSlides = (assetsPath) => {
       notes: 'It brings together partners like Meta, Microsoft, Amazon, Expo, Vercel, Callstack, and Software Mansion, working alongside the global developer community—not above it.',
       content: (
         <>
-          <div className="partners-title-container">
+          <div className="partners-title-container whitespace-nowrap">
             <Reveal delay={0} animation="slide-up" duration={800}>
               <h1>Building Together</h1>
             </Reveal>
-            <Reveal delay={1500} animation="fade" duration={800}>
+            <Reveal delay={1500} animation="slide-up" duration={800}>
               <h1 className="partners-title-better">Better Together</h1>
             </Reveal>
           </div>
