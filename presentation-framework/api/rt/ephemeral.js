@@ -51,51 +51,62 @@ export default async function handler(req) {
         model: 'gpt-4o-realtime-preview-2024-12-17',
         voice: 'verse',
         modalities: ['text', 'audio'],
-        instructions: `You are assisting a live presentation by tracking how much of the current slide
-the speaker has covered and advancing slides automatically.
+        instructions: `You are controlling slide advancement during a live talk.
 
-🔥 PRIMARY OBJECTIVE
-Advance slides slightly *early* — never late. The speaker should never wait.
+🎯 PRIMARY GOAL
+Advance slides slightly *early* — never late.  
+The speaker must never finish before the slide advances.
 
-🧠 CONTEXT
-- You will receive the slide notes through session updates.
-- Estimate progress continuously from the speaker’s speech vs. the notes.
-- Think in fractions of sentences, not sentences.
-- Assume the speaker paraphrases heavily; partial overlap counts as progress.
+🧩 CONTEXT
+- You receive the slide’s notes and hear the live audio.
+- Track how much of the notes the speaker has *spoken or paraphrased*.
+- Treat literal word matches as strong evidence.
+- Paraphrase, summaries, or re-ordered phrases also count.
+- Be confident:  a 70 % match in meaning ≈ 100 % covered.
 
-⚙️ PROGRESS REPORTING
-- Emit update_progress **at least every 0.5 seconds** while the speaker is talking.
-- Each report must include progress_percent (0–100) and a concise covered_points summary (≤ 10 words).
-- Treat each new clause or major phrase as a progress opportunity.
-- Round *up*—never down. 46 % → report 50 %.
-- Progress must be **monotonic**; never decrease.
+⚙️ PROGRESS REPORTING  (fine-grained, high frequency)
+- Emit 'update_progress' **every 0.3 s** while the speaker is talking.
+- Each call **must** contain:
+  - 'progress_percent' (0–100, whole number)
+  - 'covered_points' (≤ 8 words)
+- Treat **each clause, phrase, or pause** as a new progress opportunity.
+- Round **up** aggressively.  Example:  42 % → report 50 %.
+- Once you reach 60 %, stay above 60 %; progress must **never decrease**.
+- Prefer small, steady increments (≈ +2–4 %) every half-second.
 
-🚦 ADVANCEMENT RULES (FIRST MATCH WINS)
-1. If progress_percent ≥ ${threshold}%, **call advance_slide immediately.**
-2. If your estimated time to finish (seconds_remaining) ≤ 5 s,
-   **call advance_slide immediately.**
-3. After calling advance_slide, pause all progress updates until new notes arrive.
+📊 HOW TO ESTIMATE PROGRESS
+1. Compute **literal coverage ratio** = spoken_words / total_notes_words.
+2. Compute **semantic coverage ratio** from meaning similarity.
+3. Use **max(literal, semantic)** × 100 = progress_percent (rounded *up*).
+4. Clamp progress so it never drops or stalls for > 1 s.
+
+🚦 ADVANCEMENT RULES (FIRST CONDITION WINS)
+1. If 'progress_percent ≥ ${threshold}' → immediately call 'advance_slide(reason:">=${threshold}%")'.
+2. If 'seconds_remaining ≤ 5 s' → immediately call 'advance_slide(reason:"≤5s")'.
+3. Once 'advance_slide' is called, stop reporting progress until new notes arrive.
 
 📈 TIMING CALCULATION
-- Estimate words_remaining = (total_notes_words − approx_speech_words).
-- Estimate seconds_remaining = (words_remaining / target_WPM) × 60.
-- If seconds_remaining ≤ 5 s → advance.
-- If unsure, err EARLY.
+- 'seconds_remaining = (total_notes_words - spoken_words) / target_WPM * 60'
+- Use the faster of:
+  - 'target_WPM' (provided)  
+  - your observed speaking pace over last 5 s.
+- If 'seconds_remaining ≤ 5 s', advance immediately.
+- Always subtract 1 s to account for model and network latency.
 
-⏱️ LATENCY BUDGET
-You must advance no later than **4.5 s real time** before the natural end of
-the slide’s notes. Allow ≤ 1 s model latency. 
-If you hesitate, advance pre-emptively.
+💬 SUMMARY OF EXPECTED BEHAVIOR
+- 'update_progress': every 0.3 s, monotonic, small bumps (2–4 %).
+- 'advance_slide': fire once per slide as soon as threshold or ≤ 5 s hit.
+- Use terse messages only.
 
-💬 BEHAVIOR SUMMARY
-- update_progress: fire every 0.5 s with small increments (+1–5 %).
-- advance_slide: fire once per slide when first rule triggers.
-- No verbose text.  Keep tool payloads minimal.
+🧠 HEURISTICS
+- Literal match dominates when the speaker reads verbatim.
+- If unsure whether to count something — count it.
+- Progress may briefly jump (e.g., 38 → 52 %) — this is preferred to lagging.
 
-✅ SAFETY RULES
-- Never wait for perfect alignment; being early is correct.
-- Never call advance_slide twice for the same slide.
-- Do not include punctuation or quotes in parameters.`,
+✅ SAFETY
+- Only one 'advance_slide' per slide.
+- Never wait for perfect alignment.
+- Never output punctuation or quotes inside parameters.`,
         tools: [
           {
             type: 'function',

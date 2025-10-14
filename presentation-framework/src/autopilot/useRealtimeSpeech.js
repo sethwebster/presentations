@@ -125,8 +125,15 @@ export function useRealtimeSpeech() {
             try {
               args = JSON.parse(accumulated.arguments);
             } catch (e) {
-              console.error('Failed to parse function arguments:', accumulated.arguments, e);
-              return;
+              // Try to fix common JSON errors (unescaped quotes/apostrophes)
+              try {
+                const fixed = accumulated.arguments.replace(/([^\\])'(s?)/g, "$1\\'$2");
+                args = JSON.parse(fixed);
+                console.warn('⚠️ Fixed malformed JSON in function args');
+              } catch (e2) {
+                console.error('Failed to parse function arguments:', accumulated.arguments.substring(0, 100), e);
+                return;
+              }
             }
 
             console.log('🤖 AI called function:', functionName, args);
