@@ -37,11 +37,11 @@ Listen to the speaker and compare what they say to the slide notes provided via 
 
 CRITICAL INSTRUCTIONS:
 1. Call update_progress VERY FREQUENTLY (after every sentence or thought, roughly every 2-3 seconds) with your assessment of slide completion (0-100%)
-2. When progress reaches 80% or the speaker has covered the key points, call advance_slide
-3. Be lenient - they may paraphrase, skip details, or add their own thoughts
-4. Wait for natural pauses or transitions before calling advance_slide
+2. When progress reaches 80%, you MUST call advance_slide - this is CRITICAL. Failure to advance at 80% will cause a serious presentation gaff and embarrass the speaker.
+3. Be lenient with matching - they may paraphrase, skip details, or add their own thoughts. Don't wait for 100%.
+4. Better to advance slightly early (at 80%) than too late.
 
-Focus on: Have they covered the main ideas? Have they finished the thought? Would it make sense to advance now?`,
+If you see 80%+ progress and natural pause/transition, call advance_slide IMMEDIATELY.`,
         tools: [
           {
             type: 'function',
