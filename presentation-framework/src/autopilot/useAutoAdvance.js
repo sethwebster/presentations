@@ -98,10 +98,26 @@ export function useAutoAdvance(options) {
     }
 
     if (okScore && okChars && okCooldown) {
-      console.log('✅ [DETERMINISTIC] Starting 5s countdown to slide', currentSlide + 1, '(score:', score.toFixed(3), ')');
-      lastAdvanceAt.current = now;
-      setLastDecision({ type: 'deterministic', score, timestamp: now });
-      startCountdown('deterministic', `Score: ${Math.round(score * 100)}%`);
+      // If 100% match, advance immediately without countdown
+      if (score >= 0.99) {
+        console.log('✅ [DETERMINISTIC] 100% match - advancing immediately!');
+        lastAdvanceAt.current = now;
+        hasAdvancedForSlideRef.current = -1;
+
+        fetch(`/api/control/advance/${deckId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${bearer}`,
+          },
+          body: JSON.stringify({ slide: currentSlide + 1 }),
+        }).catch(err => console.error('Advance error:', err));
+      } else {
+        console.log('✅ [DETERMINISTIC] Starting 5s countdown to slide', currentSlide + 1, '(score:', score.toFixed(3), ')');
+        lastAdvanceAt.current = now;
+        setLastDecision({ type: 'deterministic', score, timestamp: now });
+        startCountdown('deterministic', `Score: ${Math.round(score * 100)}%`);
+      }
     }
   }, [
     enabled,
@@ -119,7 +135,7 @@ export function useAutoAdvance(options) {
   useEffect(() => {
     if (!enabled || !deckId || !bearer) return;
 
-    const handleModelAdvance = () => {
+    const handleModelAdvance = (event) => {
       const now = Date.now();
       const cooldownRemaining = cooldownMs - (now - lastAdvanceAt.current);
 
@@ -128,10 +144,27 @@ export function useAutoAdvance(options) {
         return;
       }
 
-      console.log('✅ [AI MODEL] Starting 5s countdown to slide', currentSlide + 1);
-      lastAdvanceAt.current = now;
-      setLastDecision({ type: 'model', timestamp: now });
-      startCountdown('model', 'AI decision');
+      // Check if AI reported 100% progress - advance immediately
+      const aiProgressPercent = event?.detail?.progress || 0;
+      if (aiProgressPercent >= 100) {
+        console.log('✅ [AI MODEL] 100% progress - advancing immediately!');
+        lastAdvanceAt.current = now;
+        hasAdvancedForSlideRef.current = -1;
+
+        fetch(`/api/control/advance/${deckId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${bearer}`,
+          },
+          body: JSON.stringify({ slide: currentSlide + 1 }),
+        }).catch(err => console.error('Advance error:', err));
+      } else {
+        console.log('✅ [AI MODEL] Starting 5s countdown to slide', currentSlide + 1);
+        lastAdvanceAt.current = now;
+        setLastDecision({ type: 'model', timestamp: now });
+        startCountdown('model', 'AI decision');
+      }
     };
 
     window.addEventListener('lume-autopilot-advance', handleModelAdvance);
