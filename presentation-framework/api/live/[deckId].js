@@ -1,142 +1,103 @@
 import { kv } from '@vercel/kv';
+import Redis from 'ioredis';
 
 export const config = {
-  runtime: 'edge',
+  runtime: 'nodejs',
+  maxDuration: 300, // 5 minutes max connection time
 };
 
 export async function GET(req) {
   const url = new URL(req.url);
   const pathParts = url.pathname.split('/');
   const deckId = pathParts[pathParts.length - 1];
-  const encoder = new TextEncoder();
 
   console.log('SSE connection request for deck:', deckId);
 
-  try {
-    const stream = new ReadableStream({
-      async start(controller) {
-        let pingInterval;
+  // Create Redis subscriber (ioredis for pub/sub)
+  const subscriber = new Redis(process.env.KV_URL);
+  const channelName = `deck:${deckId}:channel`;
 
-        try {
-          // Send current state first
-          console.log('Fetching initial state for deck:', deckId);
-          const current = await kv.hgetall(`deck:${deckId}:state`) || {};
-          const initData = JSON.stringify({ slide: current.slide ?? 0 });
-          controller.enqueue(encoder.encode(`event: init\ndata: ${initData}\n\n`));
-          console.log('Sent init event:', initData);
+  const encoder = new TextEncoder();
+  let pingInterval;
 
-          // Heartbeat to keep stream alive
-          pingInterval = setInterval(() => {
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        // Send current state first
+        console.log('Fetching initial state for deck:', deckId);
+        const current = await kv.hgetall(`deck:${deckId}:state`) || {};
+        const initData = JSON.stringify({ slide: current.slide ?? 0 });
+        controller.enqueue(encoder.encode(`event: init\ndata: ${initData}\n\n`));
+        console.log('Sent init event:', initData);
+
+        // Subscribe to the Redis channel
+        await subscriber.subscribe(channelName);
+        console.log('Subscribed to channel:', channelName);
+
+        // Handle messages from Redis pub/sub
+        subscriber.on('message', (channel, message) => {
+          if (channel === channelName) {
             try {
-              controller.enqueue(encoder.encode(`: ping\n\n`));
-            } catch (e) {
-              clearInterval(pingInterval);
+              console.log('Received pub/sub message:', message);
+              controller.enqueue(encoder.encode(`data: ${message}\n\n`));
+            } catch (err) {
+              console.error('Error sending message to client:', err);
             }
-          }, 15000);
+          }
+        });
 
-          // Poll for state and reactions
-          let lastSlide = current.slide ?? 0;
-          let processedReactionIds = new Set();
-          let pollDelay = 500;
-          let consecutiveNoChanges = 0;
+        // Handle Redis errors
+        subscriber.on('error', (err) => {
+          console.error('Redis subscriber error:', err);
+        });
 
-          const poll = async () => {
-            try {
-              const state = await kv.hgetall(`deck:${deckId}:state`) || {};
-              const currentSlide = state.slide ?? 0;
-              let hasChanges = false;
-
-              // Check for slide changes
-              if (currentSlide !== lastSlide) {
-                const slideEvent = JSON.stringify({ type: 'slide', slide: currentSlide, ts: Date.now() });
-                controller.enqueue(encoder.encode(`data: ${slideEvent}\n\n`));
-                lastSlide = currentSlide;
-                hasChanges = true;
-                console.log('Slide changed:', currentSlide);
-              }
-
-              // Check for new reactions (only from last 10 seconds)
-              const reactions = await kv.lrange(`deck:${deckId}:reactions`, 0, -1) || [];
-              const now = Date.now();
-
-              for (const reactionStr of reactions) {
-                try {
-                  const reaction = typeof reactionStr === 'string' ? JSON.parse(reactionStr) : reactionStr;
-
-                  // Only send reactions from last 10 seconds and not yet processed
-                  const age = now - reaction.ts;
-                  if (age < 10000 && !processedReactionIds.has(reaction.id)) {
-                    const reactionJson = typeof reactionStr === 'string' ? reactionStr : JSON.stringify(reaction);
-                    controller.enqueue(encoder.encode(`data: ${reactionJson}\n\n`));
-                    processedReactionIds.add(reaction.id);
-                    hasChanges = true;
-                    console.log('Sent reaction:', reaction.emoji, 'age:', age, 'ms');
-                  }
-                } catch (parseErr) {
-                  console.error('Failed to parse reaction:', reactionStr, parseErr);
-                }
-              }
-
-              // Adaptive polling interval
-              if (hasChanges) {
-                pollDelay = 300;
-                consecutiveNoChanges = 0;
-              } else {
-                consecutiveNoChanges++;
-                if (consecutiveNoChanges > 3) {
-                  pollDelay = Math.min(pollDelay * 1.2, 2000);
-                }
-              }
-
-              setTimeout(poll, pollDelay);
-            } catch (e) {
-              console.error('Poll error:', e);
-              setTimeout(poll, 2000);
-            }
-          };
-
-          poll();
-
-          // Cleanup on disconnect
-          req.signal?.addEventListener('abort', () => {
-            console.log('SSE connection closed for deck:', deckId);
-            clearInterval(pingInterval);
-            controller.close();
-          });
-
-        } catch (err) {
-          console.error('SSE stream error:', err, err.message, err.stack);
-          if (pingInterval) clearInterval(pingInterval);
+        // Heartbeat to keep stream alive
+        pingInterval = setInterval(() => {
           try {
-            controller.error(err);
+            controller.enqueue(encoder.encode(`: ping\n\n`));
+          } catch (e) {
+            clearInterval(pingInterval);
+            subscriber.quit();
+          }
+        }, 15000);
+
+        // Cleanup on disconnect
+        req.signal?.addEventListener('abort', () => {
+          console.log('SSE connection closed for deck:', deckId);
+          clearInterval(pingInterval);
+          subscriber.quit();
+          try {
+            controller.close();
           } catch (e) {
             // Controller might already be closed
           }
+        });
+
+      } catch (err) {
+        console.error('SSE stream error:', err);
+        if (pingInterval) clearInterval(pingInterval);
+        await subscriber.quit();
+        try {
+          controller.error(err);
+        } catch (e) {
+          // Controller might already be closed
         }
-      },
-
-      cancel() {
-        console.log('SSE stream cancelled for deck:', deckId);
       }
-    });
+    },
 
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
-        'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
+    cancel() {
+      console.log('SSE stream cancelled for deck:', deckId);
+      clearInterval(pingInterval);
+      subscriber.quit();
+    }
+  });
 
-  } catch (err) {
-    console.error('SSE setup error:', err, err.message, err.stack);
-    return new Response(JSON.stringify({ error: err.message, stack: err.stack }), {
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      }
-    });
-  }
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
 }

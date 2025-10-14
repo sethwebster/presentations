@@ -1,8 +1,11 @@
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
 
 export const config = {
   runtime: 'edge',
 };
+
+// Edge-compatible Redis client
+const redis = Redis.fromEnv();
 
 export async function POST(req) {
   // Extract deckId from URL path
@@ -11,7 +14,6 @@ export async function POST(req) {
   const deckId = pathParts[pathParts.length - 1];
   const { emoji } = await req.json();
 
-  // Store reaction in KV with TTL
   const reactionId = crypto.randomUUID();
   const reaction = {
     type: 'reaction',
@@ -20,11 +22,12 @@ export async function POST(req) {
     ts: Date.now()
   };
 
-  // Add to reactions list with 5-second TTL
-  await kv.lpush(`deck:${deckId}:reactions`, JSON.stringify(reaction));
-  await kv.expire(`deck:${deckId}:reactions`, 5);
+  const channelName = `deck:${deckId}:channel`;
 
-  console.log('Stored reaction:', emoji, 'id:', reactionId);
+  // Publish reaction to Redis channel (instant delivery to all subscribers)
+  await redis.publish(channelName, JSON.stringify(reaction));
+
+  console.log('Published reaction:', emoji, 'id:', reactionId, 'to channel:', channelName);
 
   return new Response('ok', {
     headers: {

@@ -1,8 +1,12 @@
 import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
 
 export const config = {
   runtime: 'edge',
 };
+
+// Edge-compatible Redis client for pub/sub
+const redis = Redis.fromEnv();
 
 export async function POST(req) {
   // Extract deckId from URL path
@@ -23,19 +27,20 @@ export async function POST(req) {
     const { slide } = await req.json();
     console.log('Updating deck state:', deckId, 'slide:', slide);
 
-    // Update current state
+    // Update current state in KV (for initial sync)
     await kv.hset(`deck:${deckId}:state`, { slide });
     console.log('State updated successfully');
 
-    // Publish event to all subscribers
+    // Publish slide change to Redis channel (instant delivery to all subscribers)
+    const channelName = `deck:${deckId}:channel`;
     const evt = JSON.stringify({
       type: 'slide',
       slide,
       ts: Date.now()
     });
 
-    await kv.publish(`deck:${deckId}:events`, evt);
-    console.log('Published slide event:', evt);
+    await redis.publish(channelName, evt);
+    console.log('Published slide event to channel:', channelName, evt);
 
     return new Response('ok', {
       headers: {
