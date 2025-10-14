@@ -25,22 +25,30 @@ export async function GET(req) {
           controller.enqueue(encoder.encode(`event: init\ndata: ${initData}\n\n`));
           console.log('Sent init event:', initData);
 
-          // Heartbeat
-          pingInterval = setInterval(() => {
+          // Poll for state changes every 100ms
+          let lastSlide = current.slide ?? 0;
+
+          const pollInterval = setInterval(async () => {
             try {
-              controller.enqueue(encoder.encode(`: ping\n\n`));
+              const state = await kv.hgetall(`deck:${deckId}:state`) || {};
+              const currentSlide = state.slide ?? 0;
+
+              if (currentSlide !== lastSlide) {
+                const slideData = JSON.stringify({ type: 'slide', slide: currentSlide, ts: Date.now() });
+                controller.enqueue(encoder.encode(`data: ${slideData}\n\n`));
+                lastSlide = currentSlide;
+                console.log('Sent slide update:', currentSlide);
+              }
+
+              // Send ping every 15 polls (1.5s)
+              if (Math.random() < 0.067) {
+                controller.enqueue(encoder.encode(`: ping\n\n`));
+              }
             } catch (e) {
-              clearInterval(pingInterval);
+              console.error('Poll error:', e);
+              clearInterval(pollInterval);
             }
-          }, 15000);
-
-          // Subscribe to Pub/Sub and listen for messages
-          console.log('Subscribing to channel:', `deck:${deckId}:events`);
-
-          for await (const message of kv.subscribe(`deck:${deckId}:events`)) {
-            console.log('Received message:', message);
-            controller.enqueue(encoder.encode(`data: ${message}\n\n`));
-          }
+          }, 100);
 
         } catch (err) {
           console.error('SSE stream error:', err, err.message, err.stack);
