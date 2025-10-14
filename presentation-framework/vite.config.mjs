@@ -10,7 +10,10 @@ export default defineConfig({
   plugins: [
     react({
       include: ['**/*.jsx', '**/*.tsx'],
-      jsxRuntime: 'automatic'
+      jsxRuntime: 'automatic',
+      babel: {
+        plugins: ['babel-plugin-react-compiler'],
+      },
     })
   ],
   resolve: {
