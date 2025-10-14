@@ -109,40 +109,45 @@ export function Presentation({ slides, config = {} }) {
   );
 
   // Default navigation renderer
-  const defaultNavigationRenderer = () => (
-    <>
-      <button
-        className={`nav-arrow nav-arrow-left ${!hasMouseMoved ? 'initial' : isIdle ? 'hidden' : 'visible'}`}
-        onClick={prevSlide}
-        disabled={isFirst}
-        aria-label="Previous slide"
-      >
-        ←
-      </button>
-      <button
-        className={`nav-arrow nav-arrow-right ${!hasMouseMoved ? 'initial' : isIdle ? 'hidden' : 'visible'}`}
-        onClick={nextSlide}
-        disabled={isLast}
-        aria-label="Next slide"
-      >
-        →
-      </button>
-      {!presenterWindowOpen && (
+  const defaultNavigationRenderer = () => {
+    // Hide all navigation controls for viewers
+    if (isViewer) return null;
+
+    return (
+      <>
         <button
-          className={`presenter-button ${!hasMouseMoved ? 'initial' : isIdle ? 'hidden' : 'visible'}`}
-          onClick={openPresenterView}
-          aria-label="Open presenter view"
+          className={`nav-arrow nav-arrow-left ${!hasMouseMoved ? 'initial' : isIdle ? 'hidden' : 'visible'}`}
+          onClick={prevSlide}
+          disabled={isFirst}
+          aria-label="Previous slide"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="7" height="7" rx="1"/>
-            <rect x="14" y="3" width="7" height="7" rx="1"/>
-            <rect x="14" y="14" width="7" height="7" rx="1"/>
-            <rect x="3" y="14" width="7" height="7" rx="1"/>
-          </svg>
+          ←
         </button>
-      )}
-    </>
-  );
+        <button
+          className={`nav-arrow nav-arrow-right ${!hasMouseMoved ? 'initial' : isIdle ? 'hidden' : 'visible'}`}
+          onClick={nextSlide}
+          disabled={isLast}
+          aria-label="Next slide"
+        >
+          →
+        </button>
+        {!presenterWindowOpen && (
+          <button
+            className={`presenter-button ${!hasMouseMoved ? 'initial' : isIdle ? 'hidden' : 'visible'}`}
+            onClick={openPresenterView}
+            aria-label="Open presenter view"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1"/>
+              <rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="14" y="14" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          </button>
+        )}
+      </>
+    );
+  };
 
   const renderSlideNumber = config.renderSlideNumber || defaultSlideNumberRenderer;
   const renderNavigation = config.renderNavigation || defaultNavigationRenderer;
