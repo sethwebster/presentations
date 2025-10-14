@@ -1,16 +1,16 @@
 {
-  "extends": "../tsconfig.json",
   "compilerOptions": {
     "module": "ESNext",
-    "moduleResolution": "node",
-    "allowImportingTsExtensions": false,
+    "moduleResolution": "nodenext",
     "types": ["node", "@edge-runtime/types"],
     "lib": ["ES2020"],
     "target": "ES2020",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "strict": true,
-    "noEmit": true
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true
   },
   "include": ["./**/*.ts"],
   "exclude": ["node_modules"]
