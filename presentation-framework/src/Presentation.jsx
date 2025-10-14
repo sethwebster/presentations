@@ -8,6 +8,7 @@ import { useWindowSync } from './hooks/useWindowSync';
 import { useMouseIdle } from './hooks/useMouseIdle';
 import { PresenterView } from './components/PresenterView';
 import { SlideQRCode } from './components/SlideQRCode';
+import { QRCodePreloader } from './components/QRCodePreloader';
 
 /**
  * Main Presentation component - framework core
@@ -145,6 +146,9 @@ export function Presentation({ slides, config = {} }) {
       </div>
 
       {renderNavigation()}
+
+      {/* Preload QR codes for upcoming slides */}
+      <QRCodePreloader currentSlide={currentSlide} totalSlides={slides.length} />
     </div>
   );
 }

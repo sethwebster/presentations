@@ -17,8 +17,8 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "qrcode.react": "^4.2.0",
-    "react": "^0.0.0-experimental-ead92181-20251010",
-    "react-dom": "^0.0.0-experimental-ead92181-20251010",
+    "react": "^19.3.0-canary-d7215b49-20251013",
+    "react-dom": "^19.3.0-canary-d7215b49-20251013",
     "react-router-dom": "^7.9.4",
     "tailwind-merge": "^3.3.1"
   },
