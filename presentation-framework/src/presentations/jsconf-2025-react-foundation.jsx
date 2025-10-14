@@ -107,9 +107,6 @@ export const customStyles = `
 .slide-closing { background: linear-gradient(135deg, #2d4d5c 0%, #1f3d6b 100%); }
 
 /* Partners Slide Layout */
-.slide-partners {
-  position: relative;
-}
 
 .partners-title {
   position: absolute;

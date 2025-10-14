@@ -34,20 +34,20 @@ export const usePresentation = (totalSlides) => {
   }, [totalSlides, startTransition]);
 
   const nextSlide = useCallback(() => {
-    setCurrentSlide((current) => {
-      const next = current + 1;
-      if (next >= totalSlides) return current;
-      startTransition(() => setCurrentSlide(next));
-      return current; // Return current to prevent immediate update, let transition handle it
+    startTransition(() => {
+      setCurrentSlide((current) => {
+        const next = current + 1;
+        return next < totalSlides ? next : current;
+      });
     });
   }, [totalSlides, startTransition]);
 
   const prevSlide = useCallback(() => {
-    setCurrentSlide((current) => {
-      const prev = current - 1;
-      if (prev < 0) return current;
-      startTransition(() => setCurrentSlide(prev));
-      return current;
+    startTransition(() => {
+      setCurrentSlide((current) => {
+        const prev = current - 1;
+        return prev >= 0 ? prev : current;
+      });
     });
   }, [totalSlides, startTransition]);
 
