@@ -25,35 +25,47 @@ export async function GET(req) {
           controller.enqueue(encoder.encode(`event: init\ndata: ${initData}\n\n`));
           console.log('Sent init event:', initData);
 
-          // Poll for state changes every 100ms
-          let lastSlide = current.slide ?? 0;
-
-          const pollInterval = setInterval(async () => {
+          // Heartbeat to keep stream alive
+          pingInterval = setInterval(() => {
             try {
-              const state = await kv.hgetall(`deck:${deckId}:state`) || {};
-              const currentSlide = state.slide ?? 0;
-
-              if (currentSlide !== lastSlide) {
-                const slideData = JSON.stringify({ type: 'slide', slide: currentSlide, ts: Date.now() });
-                controller.enqueue(encoder.encode(`data: ${slideData}\n\n`));
-                lastSlide = currentSlide;
-                console.log('Sent slide update:', currentSlide);
-              }
-
-              // Send ping every 15 polls (1.5s)
-              if (Math.random() < 0.067) {
-                controller.enqueue(encoder.encode(`: ping\n\n`));
-              }
+              controller.enqueue(encoder.encode(`: ping\n\n`));
             } catch (e) {
-              console.error('Poll error:', e);
-              clearInterval(pollInterval);
+              clearInterval(pingInterval);
             }
-          }, 100);
+          }, 15000);
+
+          // Subscribe to KV pub/sub with callback
+          const channelName = `deck:${deckId}:events`;
+          console.log('Subscribing to channel:', channelName);
+
+          const sub = kv.subscribe(channelName, (msg) => {
+            try {
+              console.log('Received message:', msg);
+              controller.enqueue(encoder.encode(`data: ${msg}\n\n`));
+            } catch (e) {
+              console.error('Failed to enqueue message:', e);
+            }
+          });
+
+          // Cleanup on disconnect
+          const cleanup = () => {
+            console.log('Cleaning up SSE connection for deck:', deckId);
+            clearInterval(pingInterval);
+            sub.unsubscribe();
+            controller.close();
+          };
+
+          // Listen for abort signal
+          req.signal?.addEventListener('abort', cleanup);
 
         } catch (err) {
           console.error('SSE stream error:', err, err.message, err.stack);
           if (pingInterval) clearInterval(pingInterval);
-          controller.error(err);
+          try {
+            controller.error(err);
+          } catch (e) {
+            // Controller might already be closed
+          }
         }
       },
 
