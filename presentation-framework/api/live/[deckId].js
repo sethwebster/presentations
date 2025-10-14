@@ -34,29 +34,32 @@ export async function GET(req) {
             }
           }, 15000);
 
-          // Subscribe to KV pub/sub with callback
-          const channelName = `deck:${deckId}:events`;
-          console.log('Subscribing to channel:', channelName);
+          // Poll for state changes every 100ms
+          let lastSlide = current.slide ?? 0;
 
-          const sub = kv.subscribe(channelName, (msg) => {
+          const pollInterval = setInterval(async () => {
             try {
-              console.log('Received message:', msg);
-              controller.enqueue(encoder.encode(`data: ${msg}\n\n`));
+              const state = await kv.hgetall(`deck:${deckId}:state`) || {};
+              const currentSlide = state.slide ?? 0;
+
+              if (currentSlide !== lastSlide) {
+                const slideEvent = JSON.stringify({ type: 'slide', slide: currentSlide, ts: Date.now() });
+                controller.enqueue(encoder.encode(`data: ${slideEvent}\n\n`));
+                lastSlide = currentSlide;
+                console.log('Polled slide update:', currentSlide);
+              }
             } catch (e) {
-              console.error('Failed to enqueue message:', e);
+              console.error('Poll error:', e);
             }
-          });
+          }, 100);
 
           // Cleanup on disconnect
-          const cleanup = () => {
-            console.log('Cleaning up SSE connection for deck:', deckId);
+          req.signal?.addEventListener('abort', () => {
+            console.log('SSE connection closed for deck:', deckId);
             clearInterval(pingInterval);
-            sub.unsubscribe();
+            clearInterval(pollInterval);
             controller.close();
-          };
-
-          // Listen for abort signal
-          req.signal?.addEventListener('abort', cleanup);
+          });
 
         } catch (err) {
           console.error('SSE stream error:', err, err.message, err.stack);
