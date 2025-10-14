@@ -1,3 +1,0 @@
-# Vercel will convert this to proper config during build
-/api/* /api/:splat 200
-/* /index.html 200
