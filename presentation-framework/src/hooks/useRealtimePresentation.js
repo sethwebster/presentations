@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSSE } from './useSSE';
 
 /**
@@ -12,25 +12,32 @@ export function useRealtimePresentation(deckId, currentSlide, goToSlide, isPrese
   const [reactions, setReactions] = useState([]);
   const sseUrl = deckId ? `/api/live/${deckId}` : null;
   const events = useSSE(sseUrl);
+  const processedCountRef = useRef(0);
 
-  // Process incoming events
+  // Process only NEW events (not all events every time)
   useEffect(() => {
-    console.log('SSE events received:', events.length, 'events, isPresenter:', isPresenter);
+    const newEvents = events.slice(processedCountRef.current);
 
-    events.forEach(event => {
-      console.log('Processing event:', event);
+    if (newEvents.length > 0) {
+      console.log('Processing', newEvents.length, 'new events');
 
-      if (event.type === 'init' && !isPresenter) {
-        console.log('VIEWER: Syncing to initial slide:', event.slide);
-        goToSlide(event.slide);
-      } else if (event.type === 'slide' && !isPresenter) {
-        console.log('VIEWER: Following presenter to slide:', event.slide);
-        goToSlide(event.slide);
-      } else if (event.type === 'reaction') {
-        console.log('ALL: Showing reaction:', event.emoji);
-        setReactions(prev => [...prev, event]);
-      }
-    });
+      newEvents.forEach(event => {
+        console.log('Processing event:', event);
+
+        if (event.type === 'init' && !isPresenter) {
+          console.log('VIEWER: Syncing to initial slide:', event.slide);
+          goToSlide(event.slide);
+        } else if (event.type === 'slide' && !isPresenter) {
+          console.log('VIEWER: Following presenter to slide:', event.slide);
+          goToSlide(event.slide);
+        } else if (event.type === 'reaction') {
+          console.log('ALL: Showing reaction:', event.emoji);
+          setReactions(prev => [...prev, event]);
+        }
+      });
+
+      processedCountRef.current = events.length;
+    }
   }, [events, goToSlide, isPresenter]);
 
   // Publish slide change (presenter only)
