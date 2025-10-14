@@ -12,7 +12,7 @@ export default async function handler(req, context) {
 
   // Check authorization
   const auth = req.headers.get('authorization');
-  const expectedAuth = `Bearer ${process.env.LUME_CONTROL_SECRET || 'dev-secret-key-123'}`;
+  const expectedAuth = `Bearer ${process.env.LUME_CONTROL_SECRET || 'your_super_secret_key_here'}`;
 
   console.log('Auth check - received:', auth, 'expected:', expectedAuth);
 
