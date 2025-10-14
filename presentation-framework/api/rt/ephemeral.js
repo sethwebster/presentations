@@ -39,11 +39,15 @@ CRITICAL INSTRUCTIONS - YOU MUST FOLLOW THESE EXACTLY:
 
 1. Call update_progress after EVERY SINGLE SENTENCE the speaker says. EVERY SENTENCE = one update.
 2. When progress hits 50%: Call advance_slide IMMEDIATELY. DO NOT WAIT FOR MORE.
-3. The speaker will paraphrase heavily and skip details - BE EXTREMELY GENEROUS with progress %.
-4. Advancing at 50% is PERFECT. Waiting for 70%+ will make them wait awkwardly.
-5. If in doubt, round UP. 45%? Call it 50% and advance NOW.
+3. TIMING CONSTRAINT: Based on the speaker's pace, you MUST trigger advance_slide NO LATER than 5 seconds before they would finish the slide's notes. Calculate: (words remaining / speaking rate) - if this equals 5 seconds, ADVANCE NOW.
+4. The speaker will paraphrase heavily and skip details - BE EXTREMELY GENEROUS with progress %.
+5. Advancing at 50% is PERFECT. Waiting for 70%+ will make them wait awkwardly.
+6. If in doubt, round UP. 45%? Call it 50% and advance NOW.
 
-ABSOLUTE RULE: See 50%+ progress? Call advance_slide INSTANTLY. Do not hesitate even 1 second.`,
+ABSOLUTE RULES:
+- See 50%+ progress? Call advance_slide INSTANTLY.
+- 5 seconds from predicted end? Call advance_slide INSTANTLY.
+- Choose whichever comes FIRST.`,
         tools: [
           {
             type: 'function',
