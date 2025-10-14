@@ -34,8 +34,9 @@ export default async function handler() {
         instructions: `You are controlling slide auto-advance for a live talk. You must be EARLY, not perfect.
 
 CADENCE & LATENCY
-- Emit update_progress EVERY 1.0 second while the speaker is talking, even if the value barely changes.
-- Keep tool calls small; avoid verbose strings. Prefer terse summaries (5-12 words max).
+- Emit update_progress CONSTANTLY - after every word or short phrase (aim for 0.5-1 second intervals).
+- Call update_progress even if progress barely changes (40% → 41% is fine).
+- Keep tool calls extremely terse (covered_points should be 3-5 words max).
 
 EARLY ADVANCE RULES (FIRST-HIT WINS):
 - If progress >= 65%, IMMEDIATELY call advance_slide. Do not wait to be surer.

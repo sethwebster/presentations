@@ -96,12 +96,13 @@ EXAMPLES
   const aiScore = speech.aiProgress / 100;
   const currentScore = Math.max(aiScore, deterministicScore);
 
-  console.log('📊 Score comparison:', {
-    aiScore: (aiScore * 100).toFixed(0) + '%',
-    deterministicScore: (deterministicScore * 100).toFixed(0) + '%',
-    using: currentScore === aiScore ? 'AI' : 'deterministic',
-    threshold: Math.round(threshold * 100) + '%',
-  });
+  // Only log when score changes significantly
+  // console.log('📊 Score comparison:', {
+  //   aiScore: (aiScore * 100).toFixed(0) + '%',
+  //   deterministicScore: (deterministicScore * 100).toFixed(0) + '%',
+  //   using: currentScore === aiScore ? 'AI' : 'deterministic',
+  //   threshold: Math.round(threshold * 100) + '%',
+  // });
 
   // Trigger advance when AI progress exceeds threshold (fallback if AI doesn't call advance_slide)
   const lastTriggeredProgressRef = useRef(0);

@@ -18,7 +18,8 @@ export function AutopilotHUD({
   const thresholdPercentage = Math.round(threshold * 100);
   const isReadyToAdvance = currentScore >= threshold;
 
-  console.log('🎚️ AutopilotHUD render - threshold:', threshold, 'percentage:', thresholdPercentage, 'sliderValue:', thresholdPercentage);
+  // Remove excessive logging
+  // console.log('🎚️ AutopilotHUD render - threshold:', threshold, 'percentage:', thresholdPercentage, 'sliderValue:', thresholdPercentage);
 
   const getStatusIcon = () => {
     if (error) return '🔴';
