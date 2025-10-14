@@ -235,7 +235,7 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
           onClick={() => setShowPasswordPrompt(true)}
           aria-label="Become presenter"
           style={{
-            bottom: '80px',
+            bottom: '140px', // Position above reaction buttons (which are at ~80px)
             padding: '12px 24px',
             fontSize: '14px',
             borderRadius: '8px',
