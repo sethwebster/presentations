@@ -17,20 +17,19 @@ export function SlideQRCode({ currentSlide, totalSlides }) {
       href={currentUrl}
       target="_blank"
       rel="noopener noreferrer"
-      className="absolute bottom-4 left-4 p-2 rounded-lg backdrop-blur-md z-20 block cursor-pointer hover:scale-110 transition-transform"
-      style={{
-        background: 'rgba(255, 255, 255, 0.9)',
-      }}
+      className="qr-code-container"
       onClick={(e) => {
         e.stopPropagation(); // Prevent slide navigation
       }}
     >
-      <QRCodeSVG
-        value={currentUrl}
-        size={80}
-        level="M"
-        includeMargin={false}
-      />
+      <div className="qr-code-inner">
+        <QRCodeSVG
+          value={currentUrl}
+          size={80}
+          level="M"
+          includeMargin={false}
+        />
+      </div>
     </a>
   );
 }
