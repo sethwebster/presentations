@@ -14,7 +14,27 @@ import { extractSpeakerNotes } from './extractSpeakerNotes';
  */
 export function useAutopilot({ deckId, currentSlide, slides, bearer, enabled = false }) {
   const [autopilotEnabled, setAutopilotEnabled] = useState(false);
-  const [threshold, setThreshold] = useState(0.50); // User-adjustable threshold
+
+  // Load threshold from localStorage, default to 0.50
+  const [threshold, setThresholdState] = useState(() => {
+    try {
+      const saved = localStorage.getItem('lume-autopilot-threshold');
+      return saved ? parseFloat(saved) : 0.50;
+    } catch {
+      return 0.50;
+    }
+  });
+
+  const setThreshold = useCallback((newThreshold) => {
+    setThresholdState(newThreshold);
+    try {
+      localStorage.setItem('lume-autopilot-threshold', newThreshold.toString());
+      console.log('💾 Saved threshold to localStorage:', newThreshold);
+    } catch (err) {
+      console.error('Failed to save threshold:', err);
+    }
+  }, []);
+
   const notesBySlide = useMemo(() => extractSpeakerNotes(slides), [slides]);
 
   // Speech recognition
