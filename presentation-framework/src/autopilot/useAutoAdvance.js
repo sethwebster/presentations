@@ -204,6 +204,33 @@ export function useAutoAdvance(options) {
     setCountdown(null);
   };
 
+  // Local deadline fallback - advance if model hasn't triggered
+  useEffect(() => {
+    if (!enabled || !deckId || !bearer) return;
+
+    const fallbackInterval = setInterval(() => {
+      // Skip if already advanced
+      if (hasAdvancedForSlideRef.current !== currentSlide) return;
+
+      const notes = notesBySlide[currentSlide];
+      if (!notes) return;
+
+      const notesWordCount = notes.trim().split(/\s+/).length;
+      const targetWPM = 145;
+      const elapsedSeconds = (Date.now() - slideStartTimeRef.current) / 1000;
+      const estimatedTotalSeconds = (notesWordCount / targetWPM) * 60;
+      const secondsRemaining = estimatedTotalSeconds - elapsedSeconds;
+
+      // Local deadline: if 2.5s or less remaining, advance now
+      if (secondsRemaining <= 2.5 && secondsRemaining > 0) {
+        console.log('⏰ [LOCAL DEADLINE] Only', secondsRemaining.toFixed(1), 's remaining - triggering advance');
+        startCountdown('local_deadline', `${secondsRemaining.toFixed(1)}s left`);
+      }
+    }, 300); // Check every 300ms
+
+    return () => clearInterval(fallbackInterval);
+  }, [enabled, deckId, currentSlide, notesBySlide, bearer]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
