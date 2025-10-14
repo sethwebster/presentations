@@ -3,7 +3,7 @@ import Redis from 'ioredis';
 
 export const config = {
   runtime: 'nodejs',
-  maxDuration: 300, // 5 minutes max connection time
+  // maxDuration: 300, // Remove limit - let connections stay open
 };
 
 export async function GET(req) {
