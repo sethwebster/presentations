@@ -23,11 +23,13 @@ export function useSSE(url) {
 
     // Handle all other messages
     es.onmessage = (e) => {
+      console.log('SSE raw message received:', e.data);
       try {
         const data = JSON.parse(e.data);
+        console.log('SSE parsed data:', data);
         setEvents((prev) => [...prev, data]);
       } catch (err) {
-        console.error('Failed to parse SSE message:', err);
+        console.error('Failed to parse SSE message:', err, 'raw:', e.data);
       }
     };
 
