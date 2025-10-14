@@ -74,20 +74,35 @@ export function Presentation({ slides, config = {} }) {
   const { openPresenterView, presenterWindowOpen } = useWindowSync(currentSlide, goToSlide);
   const { isIdle, hasMouseMoved } = useMouseIdle(500);
 
+  // Determine who is the presenter (not viewer, not presenter mode window)
+  const isPresenter = deckId && !isViewer && !isPresenterMode;
+
   // Realtime features
   const { reactions, publishSlideChange, sendReaction } = useRealtimePresentation(
     deckId,
     currentSlide,
     goToSlide,
-    !isViewer && !isPresenterMode
+    isPresenter
   );
 
   // Publish slide changes when presenter navigates
   useEffect(() => {
-    if (deckId && !isViewer && !isPresenterMode) {
+    if (isPresenter) {
+      console.log('Publishing slide change:', currentSlide, 'to deck:', deckId);
       publishSlideChange(currentSlide);
     }
-  }, [currentSlide, deckId, isViewer, isPresenterMode, publishSlideChange]);
+  }, [currentSlide, isPresenter, publishSlideChange, deckId]);
+
+  // Debug logging
+  useEffect(() => {
+    console.log('Presentation mode:', {
+      deckId,
+      isViewer,
+      isPresenterMode,
+      isPresenter,
+      currentSlide
+    });
+  }, [deckId, isViewer, isPresenterMode, isPresenter, currentSlide]);
 
   if (isPresenterMode) {
     return (
