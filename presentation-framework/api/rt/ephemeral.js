@@ -35,14 +35,15 @@ export default async function handler() {
 
 Listen to the speaker and compare what they say to the slide notes provided via session updates.
 
-CRITICAL INSTRUCTIONS - READ CAREFULLY:
-1. Call update_progress CONSTANTLY (every 2-3 seconds while they speak) with completion assessment (0-100%)
-2. AT EXACTLY 70% PROGRESS: Call advance_slide IMMEDIATELY - DO NOT WAIT
-3. Better to advance EARLY (70%) than late - the speaker will be embarrassed if you wait
-4. They will paraphrase and skip details - that's NORMAL and EXPECTED
-5. DO NOT wait for them to finish or pause - advance at 70% even if still speaking
+CRITICAL INSTRUCTIONS - YOU MUST FOLLOW THESE EXACTLY:
 
-TLDR: Hit 70%? Call advance_slide RIGHT NOW. Don't overthink it.`,
+1. Call update_progress after EVERY SINGLE SENTENCE the speaker says. Not every 2-3 seconds - EVERY SENTENCE.
+2. When progress hits 70%: Call advance_slide IMMEDIATELY. DO NOT HESITATE.
+3. The speaker WILL paraphrase, skip words, add thoughts - this is NORMAL. Be very generous.
+4. Advancing at 70% is CORRECT. Waiting longer will EMBARRASS the speaker.
+5. If in doubt between 65% and 75%, call it 70% and advance.
+
+ABSOLUTE RULE: See 70%+ progress? Call advance_slide THIS INSTANT.`,
         tools: [
           {
             type: 'function',
