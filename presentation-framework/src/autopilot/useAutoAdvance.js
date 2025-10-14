@@ -157,10 +157,10 @@ export function useAutoAdvance(options) {
     if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
     if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
 
-    setCountdown({ secondsRemaining: 3, source, reason });
+    setCountdown({ secondsRemaining: 5, source, reason });
 
     // Update countdown every second
-    let remaining = 3;
+    let remaining = 5;
     countdownTimerRef.current = setInterval(() => {
       remaining--;
       setCountdown(prev => prev ? { ...prev, secondsRemaining: remaining } : null);
@@ -171,7 +171,7 @@ export function useAutoAdvance(options) {
       }
     }, 1000);
 
-    // Actually advance after 3 seconds
+    // Actually advance after 5 seconds
     advanceTimeoutRef.current = setTimeout(() => {
       console.log('⏰ Countdown complete - advancing now!');
       setCountdown(null);
@@ -194,7 +194,7 @@ export function useAutoAdvance(options) {
         .catch(err => {
           console.error('Advance error:', err);
         });
-    }, 3000);
+    }, 5000);
   };
 
   const cancelCountdown = () => {

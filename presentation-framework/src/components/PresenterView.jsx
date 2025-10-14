@@ -47,7 +47,7 @@ export function PresenterView({
             <div
               className="header-countdown-fill"
               style={{
-                width: `${(autopilot.countdown.secondsRemaining / 3) * 100}%`,
+                width: `${(autopilot.countdown.secondsRemaining / 5) * 100}%`,
               }}
             />
             <div className="header-countdown-content">
