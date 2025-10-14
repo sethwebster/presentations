@@ -54,6 +54,9 @@
   flex-direction: row;
   align-items: center;
   gap: 1rem;
+  pointer-events: all;
+  position: relative;
+  z-index: 10;
 }
 
 .status-row {
@@ -159,13 +162,29 @@
 
 .threshold-slider {
   width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.1);
+  height: 20px;
+  border-radius: 10px;
+  background: transparent;
   outline: none;
   -webkit-appearance: none;
   appearance: none;
   cursor: pointer;
+  position: relative;
+  z-index: 100;
+}
+
+.threshold-slider::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.threshold-slider::-moz-range-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
 }
 
 .threshold-slider::-webkit-slider-thumb {
