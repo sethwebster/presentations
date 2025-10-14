@@ -85,11 +85,22 @@ export function useRealtimeSpeech() {
             // Model called a function
             const functionName = message.name;
             const callId = message.call_id;
-            console.log('🤖 AI called function:', functionName, message.arguments);
+
+            // Parse arguments - they come as a JSON string in the `arguments` field
+            let args = {};
+            try {
+              args = typeof message.arguments === 'string'
+                ? JSON.parse(message.arguments)
+                : message.arguments || {};
+            } catch (e) {
+              console.error('Failed to parse function arguments:', message.arguments);
+            }
+
+            console.log('🤖 AI called function:', functionName, args);
 
             if (functionName === 'update_progress') {
-              const progress = message.arguments?.progress_percent || 0;
-              const points = message.arguments?.covered_points || '';
+              const progress = args.progress_percent || 0;
+              const points = args.covered_points || '';
               console.log('📊 Progress update:', progress + '%', '-', points);
               setAiProgress(progress);
 
@@ -105,7 +116,7 @@ export function useRealtimeSpeech() {
                 }));
               }
             } else if (functionName === 'advance_slide') {
-              const reason = message.arguments?.reason || 'AI decision';
+              const reason = args.reason || 'AI decision';
               console.log('🤖 AI Model called advance_slide:', reason);
 
               // Send function response back to model

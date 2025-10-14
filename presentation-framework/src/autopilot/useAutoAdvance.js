@@ -27,10 +27,26 @@ export function useAutoAdvance(options) {
 
   // Monitor transcript and decide when to advance
   useEffect(() => {
-    if (!enabled || !deckId || !transcript || !notesBySlide) return;
+    if (!enabled) {
+      console.log('⏸️ Auto-advance disabled');
+      return;
+    }
+
+    if (!deckId || !bearer) {
+      console.log('❌ Missing deckId or bearer token');
+      return;
+    }
+
+    if (!notesBySlide || !transcript) {
+      console.log('⏳ Waiting for notes or transcript...');
+      return;
+    }
 
     const notes = notesBySlide[currentSlide];
-    if (!notes) return;
+    if (!notes) {
+      console.log('⚠️ No notes for slide', currentSlide);
+      return;
+    }
 
     const score = computeScore(transcript, notes);
     setCurrentScore(score);
@@ -41,17 +57,17 @@ export function useAutoAdvance(options) {
     const okCooldown = now - lastAdvanceAt.current > cooldownMs;
     const okScore = score >= threshold;
 
-    console.log('Auto-advance check:', {
+    console.log('🔍 Auto-advance check:', {
+      currentSlide,
       score: score.toFixed(3),
       threshold,
       okScore,
       transcriptLength,
       minChars,
       okChars,
-      cooldown: now - lastAdvanceAt.current,
+      cooldownRemaining: Math.max(0, cooldownMs - (now - lastAdvanceAt.current)),
       okCooldown,
-      enabled,
-      hasBearer: !!bearer,
+      transcript: transcript.substring(0, 50) + '...',
     });
 
     // Log blocking reasons
