@@ -129,13 +129,12 @@ EXAMPLES
     error: speech.error,
     currentScore,
     countdown,
+    threshold, // Return actual threshold state, not hardcoded
 
     // Controls
     toggle,
     cancelCountdown,
-
-    // Display
-    threshold: 0.55,
+    setThreshold, // Return the setter function
   };
 }
 
