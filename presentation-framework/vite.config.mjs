@@ -26,6 +26,10 @@ export default defineConfig({
     fs: {
       strict: false
     },
+    host: true,
+    allowedHosts: [
+      'motivelessly-stalactiform-tracie.ngrok-free.dev'
+    ],
     proxy: {
       // forward /api to vercel dev server
       '/api': 'http://localhost:3000',
