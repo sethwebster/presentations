@@ -29,8 +29,16 @@ export function useAutopilot({ deckId, currentSlide, slides, bearer, enabled = f
     enabled: autopilotEnabled && enabled,
   });
 
-  // Use AI progress if available, otherwise use deterministic
-  const currentScore = speech.aiProgress > 0 ? speech.aiProgress / 100 : deterministicScore;
+  // Use whichever score is higher (AI or deterministic)
+  // This way if AI functions aren't working, deterministic still works
+  const aiScore = speech.aiProgress / 100;
+  const currentScore = Math.max(aiScore, deterministicScore);
+
+  console.log('📊 Score comparison:', {
+    aiScore: (aiScore * 100).toFixed(0) + '%',
+    deterministicScore: (deterministicScore * 100).toFixed(0) + '%',
+    using: currentScore === aiScore ? 'AI' : 'deterministic',
+  });
 
   // Update slide context when slide changes
   useSlideContextUpdate({
