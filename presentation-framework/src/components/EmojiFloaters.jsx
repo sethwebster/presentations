@@ -24,6 +24,7 @@ export function EmojiFloaters({ reactions }) {
         x: Math.random() * 80 + 10, // 10-90% of screen width
         duration: 1400 + Math.random() * 400, // 1.4s - 1.8s
         size: 24 + Math.random() * 12, // 24px - 36px
+        distance: 120 + Math.random() * 80, // 120px - 200px travel distance
       };
 
       setActiveFloaters(prev => [...prev, floater]);
@@ -47,6 +48,7 @@ export function EmojiFloaters({ reactions }) {
             bottom: '10%',
             fontSize: `${floater.size}px`,
             animationDuration: `${floater.duration}ms`,
+            '--rise-distance': `${floater.distance}px`,
           }}
         >
           {floater.emoji}
