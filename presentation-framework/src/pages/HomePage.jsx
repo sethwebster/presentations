@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { presentations } from '../presentations/index.js';
+import { presentationLoaderService } from '../services/PresentationLoaderService';
 import { PresentationThumbnail } from '../components/PresentationThumbnail';
 import { Card, CardContent } from '../components/ui/card';
 import { Separator } from '../components/ui/separator';
@@ -11,28 +12,19 @@ export function HomePage() {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [loadedPresentations, setLoadedPresentations] = useState({});
 
-  // Preload all presentations on mount
+  // Preload all presentations on mount (delegate to PresentationLoaderService)
   useEffect(() => {
-    const loadAllPresentations = async () => {
+    presentationLoaderService.preloadAll(presentations).then(() => {
+      // Update state with cached presentations
       const loaded = {};
-      for (const name of Object.keys(presentations)) {
-        try {
-          const module = await presentations[name]();
-          const assetsDir = `/presentations/${name}-assets`;
-          const slides = module.getSlides(assetsDir);
-          loaded[name] = {
-            slides,
-            assetsPath: assetsDir,
-            customStyles: module.customStyles
-          };
-        } catch (err) {
-          console.error(`Failed to load ${name}:`, err);
+      Object.keys(presentations).forEach(name => {
+        const cached = presentationLoaderService.getCached(name);
+        if (cached) {
+          loaded[name] = cached;
         }
-      }
+      });
       setLoadedPresentations(loaded);
-    };
-
-    loadAllPresentations();
+    });
   }, []);
 
   return (
@@ -65,19 +57,13 @@ export function HomePage() {
                   e.currentTarget.style.background = 'rgba(22, 194, 199, 0.05)';
                   e.currentTarget.style.borderColor = 'var(--lume-primary)';
 
-                  // Load presentation data if not already loaded
+                  // Load presentation data if not already loaded (delegate to service)
                   if (!loadedPresentations[name]) {
                     try {
-                      const module = await presentations[name]();
-                      const assetsDir = `/presentations/${name}-assets`;
-                      const slides = module.getSlides(assetsDir);
+                      const data = await presentationLoaderService.loadPresentation(name, presentations);
                       setLoadedPresentations(prev => ({
                         ...prev,
-                        [name]: {
-                          slides,
-                          assetsPath: assetsDir,
-                          customStyles: module.customStyles
-                        }
+                        [name]: data
                       }));
                     } catch (err) {
                       console.error('Failed to load presentation preview:', err);

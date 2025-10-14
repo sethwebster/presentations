@@ -1,23 +1,19 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
+import { reactionService } from '../services/ReactionService';
 
 const REACTIONS = ['👏', '❤️', '🔥', '🎉', '👍', '🤯'];
-const RATE_LIMIT_MS = 200; // Max 5 reactions/sec
 
 export function ReactionButtons({ onReact, isVisible }) {
   const [expanded, setExpanded] = useState(false);
   const [activeButton, setActiveButton] = useState(null);
-  const lastReactionTime = useRef(0);
 
   const handleReact = (emoji) => {
-    const now = Date.now();
-
-    // Rate limit check
-    if (now - lastReactionTime.current < RATE_LIMIT_MS) {
+    // Check rate limit via service
+    if (reactionService.isRateLimited()) {
       console.log('Rate limited - too fast!');
       return;
     }
 
-    lastReactionTime.current = now;
     onReact(emoji);
 
     // Visual feedback that persists

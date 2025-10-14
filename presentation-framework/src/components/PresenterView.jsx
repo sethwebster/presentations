@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { windowSyncService } from '../services/WindowSyncService';
+import { reactionService } from '../services/ReactionService';
 import '../styles/PresenterView.css';
 import { AutopilotHUD } from '../autopilot/ui/AutopilotHUD';
 import { EmojiFloaters } from './EmojiFloaters';
@@ -38,9 +40,8 @@ export function PresenterView({
   }, []);
 
   const handleSlideClick = (index) => {
-    const channel = new BroadcastChannel('presentation-sync');
-    channel.postMessage({ type: 'SLIDE_CHANGE', slideIndex: index });
-    channel.close();
+    // Delegate to WindowSyncService
+    windowSyncService.broadcastSlideChange(index);
   };
 
   // Track reactions - update count and keep last 10 seconds for floaters
@@ -48,9 +49,8 @@ export function PresenterView({
     if (reactions.length > 0) {
       setReactionCount(reactions.length);
 
-      // Keep only reactions from last 10 seconds for animation
-      const now = Date.now();
-      const recent = reactions.filter(r => (now - r.ts) < 10000);
+      // Delegate filtering to ReactionService
+      const recent = reactionService.filterRecentReactions(reactions);
       setRecentReactions(recent);
     }
   }, [reactions]);

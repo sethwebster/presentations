@@ -1,28 +1,16 @@
 import { useState, useCallback, useTransition, useEffect } from 'react';
+import { navigationService } from '../services/NavigationService';
 
 export const usePresentation = (totalSlides) => {
-  // Initialize from URL if present
-  const getInitialSlide = () => {
-    const params = new URLSearchParams(window.location.search);
-    const slideParam = params.get('slide');
-    if (slideParam) {
-      const slideNum = parseInt(slideParam, 10);
-      if (!isNaN(slideNum) && slideNum >= 1 && slideNum <= totalSlides) {
-        return slideNum - 1; // Convert 1-based to 0-based
-      }
-    }
-    return 0;
-  };
-
-  const [currentSlide, setCurrentSlide] = useState(getInitialSlide);
+  // Initialize from URL using NavigationService
+  const [currentSlide, setCurrentSlide] = useState(() =>
+    navigationService.getInitialSlide(totalSlides)
+  );
   const [isPending, startTransition] = useTransition();
 
-  // Update URL when slide changes
+  // Update URL when slide changes (delegate to NavigationService)
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    params.set('slide', (currentSlide + 1).toString());
-    const newUrl = `${window.location.pathname}?${params.toString()}`;
-    window.history.replaceState({}, '', newUrl);
+    navigationService.updateSlideInURL(currentSlide);
   }, [currentSlide]);
 
   const navigateWithTransition = useCallback((newSlideIndex) => {

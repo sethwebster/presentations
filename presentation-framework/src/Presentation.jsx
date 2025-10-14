@@ -8,6 +8,7 @@ import { useWindowSync } from './hooks/useWindowSync';
 import { useMouseIdle } from './hooks/useMouseIdle';
 import { useRealtimePresentation } from './hooks/useRealtimePresentation';
 import { usePresenterAuth } from './hooks/usePresenterAuth';
+import { navigationService } from './services/NavigationService';
 import { PresenterView } from './components/PresenterView';
 import { SlideQRCode } from './components/SlideQRCode';
 import { QRCodePreloader } from './components/QRCodePreloader';
@@ -37,22 +38,12 @@ export function Presentation({ slides, config = {} }) {
   const [rememberKey, setRememberKey] = useState(true);
   const [showWelcomeToast, setShowWelcomeToast] = useState(false);
 
-  // Get deckId from URL, or generate one based on presentation name
-  let deckId = searchParams.get('deckId');
+  // Get deckId from NavigationService
+  const deckId = navigationService.getDeckId();
 
-  // If no deckId provided, generate from URL path (for simple single-presenter mode)
-  if (!deckId && typeof window !== 'undefined') {
-    const pathParts = window.location.pathname.split('/');
-    const presentationName = pathParts[pathParts.length - 1];
-    if (presentationName) {
-      deckId = `default-${presentationName}`;
-      console.log('Generated deckId:', deckId);
-    }
-  }
-
+  // Check if in presenter mode window
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setIsPresenterMode(params.get('presenter') === 'true');
+    setIsPresenterMode(navigationService.isPresenterModeWindow());
   }, []);
 
   // Authentication (business logic in AuthService)
