@@ -19,8 +19,11 @@ export function useAutopilot({ deckId, currentSlide, slides, bearer, enabled = f
   const [threshold, setThresholdState] = useState(() => {
     try {
       const saved = localStorage.getItem('lume-autopilot-threshold');
-      return saved ? parseFloat(saved) : 0.50;
-    } catch {
+      const value = saved ? parseFloat(saved) : 0.50;
+      console.log('🔄 Loading threshold from localStorage:', saved, '→', value);
+      return value;
+    } catch (err) {
+      console.error('Failed to load threshold:', err);
       return 0.50;
     }
   });
