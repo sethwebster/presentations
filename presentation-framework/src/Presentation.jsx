@@ -11,6 +11,7 @@ import { PresenterView } from './components/PresenterView';
 import { SlideQRCode } from './components/SlideQRCode';
 import { QRCodePreloader } from './components/QRCodePreloader';
 import { EmojiFloaters } from './components/EmojiFloaters';
+import { ReactionButtons } from './components/ReactionButtons';
 
 /**
  * Main Presentation component - framework core
@@ -173,6 +174,11 @@ export function Presentation({ slides, config = {} }) {
 
       {/* Emoji reaction floaters */}
       {deckId && <EmojiFloaters reactions={reactions} />}
+
+      {/* Reaction buttons for viewers */}
+      {deckId && isViewer && (
+        <ReactionButtons onReact={sendReaction} isVisible={!isIdle} />
+      )}
     </div>
   );
 }
