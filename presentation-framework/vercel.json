@@ -1,8 +1,0 @@
-{
-  "rewrites": [
-    {
-      "source": "/((?!api|src|assets|presentations|@vite|@react-refresh|node_modules).*)",
-      "destination": "/index.html"
-    }
-  ]
-}
