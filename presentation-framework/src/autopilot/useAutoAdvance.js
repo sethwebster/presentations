@@ -54,18 +54,14 @@ export function useAutoAdvance(options) {
       return;
     }
 
-    if (!notesBySlide || !transcript) {
-      console.log('⏳ Waiting for notes or transcript...');
-      return;
+    // Calculate deterministic score if we have transcript
+    let score = 0;
+    if (notesBySlide && transcript) {
+      const notes = notesBySlide[currentSlide];
+      if (notes) {
+        score = computeScore(transcript, notes);
+      }
     }
-
-    const notes = notesBySlide[currentSlide];
-    if (!notes) {
-      console.log('⚠️ No notes for slide', currentSlide);
-      return;
-    }
-
-    const score = computeScore(transcript, notes);
     setCurrentScore(score);
 
     const now = Date.now();

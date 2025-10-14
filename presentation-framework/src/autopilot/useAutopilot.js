@@ -100,7 +100,18 @@ EXAMPLES
     aiScore: (aiScore * 100).toFixed(0) + '%',
     deterministicScore: (deterministicScore * 100).toFixed(0) + '%',
     using: currentScore === aiScore ? 'AI' : 'deterministic',
+    threshold: Math.round(threshold * 100) + '%',
   });
+
+  // Trigger advance when score (AI or deterministic) exceeds threshold
+  useEffect(() => {
+    if (!autopilotEnabled || !enabled) return;
+    if (currentScore >= threshold && currentScore > 0) {
+      console.log('🎯 Score threshold reached:', (currentScore * 100).toFixed(0) + '% >=', (threshold * 100) + '%');
+      cancelCountdown(); // Cancel any existing countdown
+      // Trigger will happen in useAutoAdvance hook
+    }
+  }, [currentScore, threshold, autopilotEnabled, enabled, cancelCountdown]);
 
   // Update slide context when slide changes
   useSlideContextUpdate({
