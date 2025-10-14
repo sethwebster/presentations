@@ -99,13 +99,12 @@ export function AutopilotHUD({
                   Threshold: {thresholdPercentage}%
                 </label>
                 <input
-                  key={`threshold-${thresholdPercentage}`}
                   id="threshold-slider"
                   type="range"
                   min="30"
                   max="80"
                   step="5"
-                  defaultValue={thresholdPercentage}
+                  value={thresholdPercentage}
                   onChange={(e) => {
                     const newVal = parseInt(e.target.value) / 100;
                     console.log('🎚️ Slider onChange - raw value:', e.target.value, '→', newVal, 'hasCallback:', !!onThresholdChange);
