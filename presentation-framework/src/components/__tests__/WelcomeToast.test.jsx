@@ -1,57 +1,58 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { WelcomeToast } from '../WelcomeToast';
 import { authService } from '../../services/AuthService';
 
 describe('WelcomeToast', () => {
   beforeEach(() => {
     authService.authStateListeners.clear();
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
   });
 
   it('does not render initially', () => {
-    render(<WelcomeToast isPresenterMode={false} />);
-    expect(screen.queryByText(/you are now presenting/i)).not.toBeInTheDocument();
+    const { container } = render(<WelcomeToast isPresenterMode={false} />);
+    expect(container.firstChild).toBe(null);
   });
 
   it('shows toast when authenticated event is emitted', async () => {
     render(<WelcomeToast isPresenterMode={false} />);
 
-    // Emit authenticated event
-    authService.emitAuthState({ type: 'authenticated', token: 'test-token' });
-
-    // Use real timers for React updates
-    vi.runOnlyPendingTimers();
+    // Emit authenticated event wrapped in act
+    await act(async () => {
+      authService.emitAuthState({ type: 'authenticated', token: 'test-token' });
+    });
 
     // Toast should appear
-    expect(screen.getByText(/you are now presenting/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/you are now presenting/i)).toBeInTheDocument();
+    });
   });
 
   it('hides toast after 3 seconds', async () => {
     render(<WelcomeToast isPresenterMode={false} />);
 
-    authService.emitAuthState({ type: 'authenticated', token: 'test-token' });
-    vi.runOnlyPendingTimers();
+    await act(async () => {
+      authService.emitAuthState({ type: 'authenticated', token: 'test-token' });
+    });
 
-    expect(screen.getByText(/you are now presenting/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/you are now presenting/i)).toBeInTheDocument();
+    });
 
-    // Advance time by 3 seconds
-    vi.advanceTimersByTime(3000);
-
-    expect(screen.queryByText(/you are now presenting/i)).not.toBeInTheDocument();
+    // Wait for toast to auto-hide (3 seconds + buffer)
+    await waitFor(() => {
+      expect(screen.queryByText(/you are now presenting/i)).not.toBeInTheDocument();
+    }, { timeout: 4000 });
   });
 
   it('does not show in presenter mode window', () => {
-    render(<WelcomeToast isPresenterMode={true} />);
+    const { container } = render(<WelcomeToast isPresenterMode={true} />);
 
-    authService.emitAuthState({ type: 'authenticated', token: 'test-token' });
-    vi.runOnlyPendingTimers();
+    act(() => {
+      authService.emitAuthState({ type: 'authenticated', token: 'test-token' });
+    });
 
-    expect(screen.queryByText(/you are now presenting/i)).not.toBeInTheDocument();
+    // Should not render
+    expect(container.firstChild).toBe(null);
   });
 
   it('cleans up subscription on unmount', () => {
