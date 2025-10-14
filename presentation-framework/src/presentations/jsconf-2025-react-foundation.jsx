@@ -454,9 +454,9 @@ export const getSlides = (assetsPath) => {
             {partners.map((partner, index) => (
               <Reveal
                 key={partner.id}
-                delay={200 * (index + 1)}
+                delay={3000 * (index + 1)}
                 animation="scale"
-                duration={600}
+                duration={3000}
                 className="partner-logo-box"
                 data-company={partner.id}
               >
@@ -469,9 +469,9 @@ export const getSlides = (assetsPath) => {
               </Reveal>
             ))}
             <Reveal
-              delay={1600}
+              delay={21000}
               animation="bounce"
-              duration={800}
+              duration={3000}
               className="partner-logo-box community"
               data-company="community"
               placeholder={
