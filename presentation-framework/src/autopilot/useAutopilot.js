@@ -30,10 +30,35 @@ export function useAutopilot({ deckId, currentSlide, slides, bearer, enabled = f
     try {
       localStorage.setItem('lume-autopilot-threshold', newThreshold.toString());
       console.log('💾 Saved threshold to localStorage:', newThreshold);
+
+      // Update AI session with new threshold
+      const thresholdPercent = Math.round(newThreshold * 100);
+      speech.updateSessionInstructions(`You are controlling slide auto-advance for a live talk. You must be EARLY, not perfect.
+
+CADENCE & LATENCY
+- Emit update_progress EVERY 1.0 second while the speaker is talking, even if the value barely changes.
+- Keep tool calls small; avoid verbose strings. Prefer terse summaries (5-12 words max).
+
+EARLY ADVANCE RULES (FIRST-HIT WINS):
+- If progress >= ${thresholdPercent}%, IMMEDIATELY call advance_slide. Do not wait to be surer.
+- If seconds_remaining <= 5s (based on pace and notes length), IMMEDIATELY call advance_slide.
+- If both apply, advance once (idempotent).
+
+PROGRESS ESTIMATION
+- Be generous: paraphrase counts. Summarize essence, not exact wording.
+- Consider overlap with notes: if the essence is covered, count it.
+- Never decrease progress. Progress is monotonic (only goes up).
+- Round UP optimistically: ${thresholdPercent - 3}%? Call it ${thresholdPercent}% and advance.
+
+EXAMPLES
+- Notes ≈ 120 words, pace 150 WPM → ~48s total. When progress hits ${thresholdPercent}%, CALL advance_slide.
+- Progress ${thresholdPercent - 3}-${thresholdPercent - 1}% and moving quickly? Round to ${thresholdPercent}% and CALL advance_slide.
+- Seconds_remaining = 4.8s? CALL advance_slide immediately.
+- After advance_slide, pause updates until new set_context arrives.`);
     } catch (err) {
       console.error('Failed to save threshold:', err);
     }
-  }, []);
+  }, [speech]);
 
   const notesBySlide = useMemo(() => extractSpeakerNotes(slides), [slides]);
 

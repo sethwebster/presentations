@@ -315,6 +315,24 @@ export function useRealtimeSpeech() {
     lastProgressRef.current = 0;
   }, []);
 
+  const updateSessionInstructions = useCallback((instructions) => {
+    if (dcRef.current && dcRef.current.readyState === 'open') {
+      try {
+        dcRef.current.send(JSON.stringify({
+          type: 'session.update',
+          session: {
+            instructions,
+          },
+        }));
+        console.log('🔄 Updated session instructions');
+      } catch (err) {
+        console.error('Failed to update session instructions:', err);
+      }
+    } else {
+      console.warn('Cannot update session - data channel not ready');
+    }
+  }, []);
+
   return {
     connected,
     finalTranscript,
@@ -325,5 +343,6 @@ export function useRealtimeSpeech() {
     disconnect,
     sendSlideContext,
     resetTranscript,
+    updateSessionInstructions,
   };
 }
