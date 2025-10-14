@@ -4,8 +4,11 @@ export const config = {
   runtime: 'edge',
 };
 
-export default async function handler(req, context) {
-  const { deckId } = context.params;
+export default async function handler(req) {
+  // Extract deckId from URL path
+  const url = new URL(req.url);
+  const pathParts = url.pathname.split('/');
+  const deckId = pathParts[pathParts.length - 1];
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
