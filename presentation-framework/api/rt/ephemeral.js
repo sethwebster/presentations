@@ -98,7 +98,7 @@ If you hesitate, advance pre-emptively.
           {
             type: 'function',
             name: 'update_progress',
-            description: 'Report progress every ~1s while speaker talks.',
+            description: 'Report progress every ~0.5s while speaker talks.',
             parameters: {
               type: 'object',
               properties: {
