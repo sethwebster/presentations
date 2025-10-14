@@ -65,7 +65,7 @@ export function useAutopilot({ deckId, currentSlide, slides, bearer, enabled = f
     cancelCountdown,
 
     // Display
-    threshold: 0.65,
+    threshold: 0.60,
   };
 }
 

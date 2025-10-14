@@ -12,9 +12,9 @@ export function useAutoAdvance(options) {
     transcript,
     notesBySlide,
     bearer,
-    threshold = 0.65, // Lowered - model should trigger most advances
-    minChars = 100, // Reduced - don't require as much text
-    cooldownMs = 3000, // Reduced from 4s to 3s
+    threshold = 0.60, // Lowered - model should trigger most advances
+    minChars = 80, // Reduced - don't require as much text
+    cooldownMs = 2500, // Reduced from 3s to 2.5s
     enabled = true,
   } = options;
 
