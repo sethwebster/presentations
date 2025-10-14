@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSSE } from './useSSE';
 
 /**
@@ -40,8 +40,8 @@ export function useRealtimePresentation(deckId, currentSlide, goToSlide, isPrese
     }
   }, [events, goToSlide, isPresenter]);
 
-  // Publish slide change (presenter only)
-  const publishSlideChange = async (slideIndex) => {
+  // Publish slide change (presenter only) - MUST be useCallback to prevent infinite loop
+  const publishSlideChange = useCallback(async (slideIndex) => {
     if (!isPresenter || !deckId) {
       console.log('Not publishing - isPresenter:', isPresenter, 'deckId:', deckId);
       return;
@@ -54,7 +54,7 @@ export function useRealtimePresentation(deckId, currentSlide, goToSlide, isPrese
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_LUME_CONTROL_SECRET || 'dev-secret'}`,
+          'Authorization': `Bearer ${import.meta.env.VITE_LUME_CONTROL_SECRET || 'your_super_secret_key_here'}`,
         },
         body: JSON.stringify({ slide: slideIndex }),
       });
@@ -62,11 +62,13 @@ export function useRealtimePresentation(deckId, currentSlide, goToSlide, isPrese
     } catch (err) {
       console.error('Failed to publish slide change:', err);
     }
-  };
+  }, [isPresenter, deckId]);
 
   // Send reaction (viewer only)
-  const sendReaction = async (emoji) => {
+  const sendReaction = useCallback(async (emoji) => {
     if (!deckId) return;
+
+    console.log('Sending reaction:', emoji, 'to deck:', deckId);
 
     try {
       await fetch(`/api/react/${deckId}`, {
@@ -76,10 +78,11 @@ export function useRealtimePresentation(deckId, currentSlide, goToSlide, isPrese
         },
         body: JSON.stringify({ emoji }),
       });
+      console.log('Reaction sent successfully');
     } catch (err) {
       console.error('Failed to send reaction:', err);
     }
-  };
+  }, [deckId]);
 
   return {
     reactions,
