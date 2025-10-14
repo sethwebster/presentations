@@ -34,10 +34,22 @@ export function useAutopilot({ deckId, currentSlide, slides, bearer, enabled = f
   const speech = useRealtimeSpeech();
 
   const setThreshold = useCallback((newThreshold) => {
+    console.log('🎯 setThreshold called with:', newThreshold);
     setThresholdState(newThreshold);
+
     try {
-      localStorage.setItem('lume-autopilot-threshold', newThreshold.toString());
-      console.log('💾 Saved threshold to localStorage:', newThreshold);
+      const key = 'lume-autopilot-threshold';
+      const value = newThreshold.toString();
+      localStorage.setItem(key, value);
+
+      // Verify it was saved
+      const verified = localStorage.getItem(key);
+      console.log('💾 Saved threshold to localStorage:', {
+        key,
+        savedValue: value,
+        verifiedValue: verified,
+        match: verified === value
+      });
 
       // Update AI session with new threshold
       const thresholdPercent = Math.round(newThreshold * 100);
