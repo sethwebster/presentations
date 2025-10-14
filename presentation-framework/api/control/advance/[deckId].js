@@ -4,7 +4,7 @@ export const config = {
   runtime: 'edge',
 };
 
-export default async function handler(req, context) {
+export async function POST(req) {
   // Extract deckId from URL path
   const url = new URL(req.url);
   const pathParts = url.pathname.split('/');

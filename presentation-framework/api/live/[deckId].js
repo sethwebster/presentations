@@ -4,7 +4,7 @@ export const config = {
   runtime: 'edge',
 };
 
-export default async function handler(req) {
+export async function GET(req) {
   const url = new URL(req.url);
   const pathParts = url.pathname.split('/');
   const deckId = pathParts[pathParts.length - 1];
