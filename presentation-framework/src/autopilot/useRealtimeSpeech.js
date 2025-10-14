@@ -78,6 +78,7 @@ export function useRealtimeSpeech() {
           } else if (message.type === 'response.function_call_arguments.done') {
             // Model called a function
             const functionName = message.name;
+            const callId = message.call_id;
             console.log('🤖 AI called function:', functionName, message.arguments);
 
             if (functionName === 'update_progress') {
@@ -85,9 +86,34 @@ export function useRealtimeSpeech() {
               const points = message.arguments?.covered_points || '';
               console.log('📊 Progress update:', progress + '%', '-', points);
               setAiProgress(progress);
+
+              // Send function response back to model
+              if (callId && dcRef.current?.readyState === 'open') {
+                dcRef.current.send(JSON.stringify({
+                  type: 'conversation.item.create',
+                  item: {
+                    type: 'function_call_output',
+                    call_id: callId,
+                    output: JSON.stringify({ status: 'acknowledged' }),
+                  },
+                }));
+              }
             } else if (functionName === 'advance_slide') {
               const reason = message.arguments?.reason || 'AI decision';
               console.log('🤖 AI Model called advance_slide:', reason);
+
+              // Send function response back to model
+              if (callId && dcRef.current?.readyState === 'open') {
+                dcRef.current.send(JSON.stringify({
+                  type: 'conversation.item.create',
+                  item: {
+                    type: 'function_call_output',
+                    call_id: callId,
+                    output: JSON.stringify({ status: 'advancing' }),
+                  },
+                }));
+              }
+
               window.dispatchEvent(new CustomEvent('lume-autopilot-advance', {
                 detail: { source: 'model', reason }
               }));
