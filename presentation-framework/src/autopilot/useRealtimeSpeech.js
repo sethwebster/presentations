@@ -13,6 +13,7 @@ export function useRealtimeSpeech() {
 
   const pcRef = useRef(null);
   const dcRef = useRef(null);
+  const functionCallArgsRef = useRef({}); // Track accumulating function arguments
 
   const connect = async () => {
     if (pcRef.current) {
@@ -67,7 +68,17 @@ export function useRealtimeSpeech() {
           }
 
           // Handle different event types
-          if (message.type === 'response.audio_transcript.delta') {
+          if (message.type === 'response.function_call_arguments.delta') {
+            // Accumulate function arguments
+            const itemId = message.item_id;
+            if (!functionCallArgsRef.current[itemId]) {
+              functionCallArgsRef.current[itemId] = {
+                name: message.name,
+                arguments: '',
+              };
+            }
+            functionCallArgsRef.current[itemId].arguments += message.delta || '';
+          } else if (message.type === 'response.audio_transcript.delta') {
             // Partial transcript update
             setPartialTranscript(prev => prev + (message.delta || ''));
           } else if (message.type === 'response.audio_transcript.done') {
@@ -82,21 +93,31 @@ export function useRealtimeSpeech() {
             console.log('Input transcription:', text);
             setFinalTranscript(prev => (prev ? prev + ' ' : '') + text);
           } else if (message.type === 'response.function_call_arguments.done') {
-            // Model called a function
-            const functionName = message.name;
+            // Function call complete - get accumulated arguments
+            const itemId = message.item_id;
             const callId = message.call_id;
+            const accumulated = functionCallArgsRef.current[itemId];
 
-            // Parse arguments - they come as a JSON string in the `arguments` field
+            if (!accumulated) {
+              console.warn('No accumulated arguments for item:', itemId);
+              return;
+            }
+
+            const functionName = accumulated.name;
+
+            // Parse the accumulated JSON arguments
             let args = {};
             try {
-              args = typeof message.arguments === 'string'
-                ? JSON.parse(message.arguments)
-                : message.arguments || {};
+              args = JSON.parse(accumulated.arguments);
             } catch (e) {
-              console.error('Failed to parse function arguments:', message.arguments);
+              console.error('Failed to parse function arguments:', accumulated.arguments, e);
+              return;
             }
 
             console.log('🤖 AI called function:', functionName, args);
+
+            // Clean up
+            delete functionCallArgsRef.current[itemId];
 
             if (functionName === 'update_progress') {
               const progress = args.progress_percent || 0;

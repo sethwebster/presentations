@@ -76,7 +76,7 @@ export function AutopilotHUD({
             <>
               <div className="confidence-bar">
                 <div className="confidence-label">
-                  Progress: {progressPercentage}%
+                  Slide Progress: {progressPercentage}%
                 </div>
                 <div className="confidence-track">
                   <div
