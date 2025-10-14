@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import '../styles/QRCode.css';
 
 export function SlideQRCode({ currentSlide, totalSlides }) {
   // Generate URL for current slide (viewer URL)
