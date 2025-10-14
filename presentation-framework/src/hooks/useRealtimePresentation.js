@@ -31,10 +31,15 @@ export function useRealtimePresentation(deckId, currentSlide, goToSlide, isPrese
 
   // Publish slide change (presenter only)
   const publishSlideChange = async (slideIndex) => {
-    if (!isPresenter || !deckId) return;
+    if (!isPresenter || !deckId) {
+      console.log('Not publishing - isPresenter:', isPresenter, 'deckId:', deckId);
+      return;
+    }
+
+    console.log('Publishing slide to API:', slideIndex, 'deck:', deckId);
 
     try {
-      await fetch(`/api/control/advance/${deckId}`, {
+      const response = await fetch(`/api/control/advance/${deckId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -42,6 +47,7 @@ export function useRealtimePresentation(deckId, currentSlide, goToSlide, isPrese
         },
         body: JSON.stringify({ slide: slideIndex }),
       });
+      console.log('Publish response:', response.status, response.statusText);
     } catch (err) {
       console.error('Failed to publish slide change:', err);
     }
