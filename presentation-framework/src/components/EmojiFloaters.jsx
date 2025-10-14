@@ -29,10 +29,10 @@ export function EmojiFloaters({ reactions }) {
 
       setActiveFloaters(prev => [...prev, floater]);
 
-      // Remove after animation completes
+      // Remove after animation completes (but keep ID in processedIds to prevent re-animation)
       setTimeout(() => {
         setActiveFloaters(prev => prev.filter(f => f.id !== reaction.id));
-        processedIdsRef.current.delete(reaction.id);
+        // Don't delete from processedIdsRef - keep it to prevent duplicates
       }, floater.duration + 200);
     });
   }, [reactions]);

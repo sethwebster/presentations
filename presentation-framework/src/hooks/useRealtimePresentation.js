@@ -15,6 +15,26 @@ export function useRealtimePresentation(deckId, currentSlide, goToSlide, isPrese
   const processedCountRef = useRef(0);
   const seenReactionIdsRef = useRef(new Set());
 
+  // Clear old reactions periodically to prevent memory buildup
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      setReactions(prev => {
+        // Keep only reactions from last 10 seconds
+        const filtered = prev.filter(r => (now - r.ts) < 10000);
+        // Clean up the seen IDs set for old reactions
+        if (filtered.length < prev.length) {
+          const filteredIds = new Set(filtered.map(r => r.id));
+          const currentIds = Array.from(seenReactionIdsRef.current);
+          seenReactionIdsRef.current = new Set(currentIds.filter(id => filteredIds.has(id)));
+        }
+        return filtered;
+      });
+    }, 5000); // Cleanup every 5 seconds
+
+    return () => clearInterval(cleanupInterval);
+  }, []);
+
   // Process only NEW events (not all events every time)
   useEffect(() => {
     const newEvents = events.slice(processedCountRef.current);
