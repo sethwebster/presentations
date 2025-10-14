@@ -1,7 +1,8 @@
 import { useState, useCallback, useTransition, useEffect } from 'react';
 import { navigationService } from '../services/NavigationService';
+import type { UsePresentationReturn } from '../types/hooks';
 
-export const usePresentation = (totalSlides) => {
+export const usePresentation = (totalSlides: number): UsePresentationReturn => {
   // Initialize from URL using NavigationService
   const [currentSlide, setCurrentSlide] = useState(() =>
     navigationService.getInitialSlide(totalSlides)
@@ -13,7 +14,7 @@ export const usePresentation = (totalSlides) => {
     navigationService.updateSlideInURL(currentSlide);
   }, [currentSlide]);
 
-  const navigateWithTransition = useCallback((newSlideIndex) => {
+  const navigateWithTransition = useCallback((newSlideIndex: number) => {
     if (newSlideIndex < 0 || newSlideIndex >= totalSlides) return;
 
     startTransition(() => {
@@ -39,7 +40,7 @@ export const usePresentation = (totalSlides) => {
     });
   }, [totalSlides, startTransition]);
 
-  const goToSlide = useCallback((index) => {
+  const goToSlide = useCallback((index: number) => {
     navigateWithTransition(index);
   }, [navigateWithTransition]);
 

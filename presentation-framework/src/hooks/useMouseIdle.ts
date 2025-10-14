@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
+import { UseMouseIdleReturn } from '../types/hooks';
 
-export const useMouseIdle = (idleDelay = 500) => {
-  const [isIdle, setIsIdle] = useState(false);
-  const [hasMouseMoved, setHasMouseMoved] = useState(false);
+export const useMouseIdle = (idleTimeMs: number): UseMouseIdleReturn => {
+  const [isIdle, setIsIdle] = useState<boolean>(false);
+  const [hasMouseMoved, setHasMouseMoved] = useState<boolean>(false);
 
   useEffect(() => {
-    let timeout;
+    let timeout: NodeJS.Timeout;
 
     const handleMouseMove = () => {
       setHasMouseMoved(true);
@@ -14,7 +15,7 @@ export const useMouseIdle = (idleDelay = 500) => {
       clearTimeout(timeout);
       timeout = setTimeout(() => {
         setIsIdle(true);
-      }, idleDelay);
+      }, idleTimeMs);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -23,7 +24,7 @@ export const useMouseIdle = (idleDelay = 500) => {
       window.removeEventListener('mousemove', handleMouseMove);
       clearTimeout(timeout);
     };
-  }, [idleDelay]);
+  }, [idleTimeMs]);
 
   return { isIdle, hasMouseMoved };
 };

@@ -1,12 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { windowSyncService } from '../services/WindowSyncService';
 import { navigationService } from '../services/NavigationService';
+import { UseWindowSyncReturn } from '../types/hooks';
 
 /**
  * useWindowSync - Syncs presentation state across windows
  * Thin wrapper around WindowSyncService
  */
-export const useWindowSync = (currentSlide, setCurrentSlide) => {
+export const useWindowSync = (
+  currentSlide: number,
+  setCurrentSlide: (index: number) => void
+): UseWindowSyncReturn => {
   const [presenterWindowOpen, setPresenterWindowOpen] = useState(false);
 
   // Broadcast slide changes to other windows

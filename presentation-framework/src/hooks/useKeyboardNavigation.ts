@@ -1,8 +1,13 @@
 import { useEffect } from 'react';
 
-export const useKeyboardNavigation = (nextSlide, prevSlide, goToSlide, totalSlides) => {
+export const useKeyboardNavigation = (
+  nextSlide: () => void,
+  prevSlide: () => void,
+  goToSlide: (index: number) => void,
+  totalSlides: number
+): void => {
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       switch (e.key) {
         case 'ArrowRight':
         case ' ':

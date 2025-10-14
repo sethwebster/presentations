@@ -4,21 +4,34 @@ import { useAutoAdvanceSubscription } from '../hooks/useAutoAdvanceSubscription'
 import { autoAdvanceService } from '../services/AutoAdvanceService';
 import { autopilotService } from '../services/AutopilotService';
 import { extractSpeakerNotes } from './extractSpeakerNotes';
+import type { SlideData, SpeakerNotes } from '../types/presentation';
+import type { UseAutopilotReturn } from '../types/hooks';
+import type { SpeechEvent } from '../types/services';
+
+/**
+ * Parameters for the useAutopilot hook
+ */
+export interface UseAutopilotParams {
+  /** Deck identifier */
+  deckId: string | null;
+  /** Current slide index */
+  currentSlide: number;
+  /** Slide data with notes */
+  slides: SlideData[];
+  /** Auth presenter token */
+  token: string | null;
+  /** Whether autopilot can be used */
+  enabled?: boolean;
+}
 
 /**
  * Main autopilot hook - manages speech recognition and auto-advance
- * @param {Object} options
- * @param {string} options.deckId - Deck identifier
- * @param {number} options.currentSlide - Current slide index
- * @param {Array} options.slides - Slide data with notes
- * @param {string} options.token - Auth presenter token
- * @param {boolean} options.enabled - Whether autopilot can be used
  */
-export function useAutopilot({ deckId, currentSlide, slides, token, enabled = false }) {
-  const [autopilotEnabled, setAutopilotEnabled] = useState(false);
-  const [threshold, setThreshold] = useState(() => autopilotService.getThreshold());
+export function useAutopilot({ deckId, currentSlide, slides, token: _token, enabled = false }: UseAutopilotParams): UseAutopilotReturn {
+  const [autopilotEnabled, setAutopilotEnabled] = useState<boolean>(false);
+  const [threshold, setThreshold] = useState<number>(() => autopilotService.getThreshold());
 
-  const notesBySlide = useMemo(() => extractSpeakerNotes(slides), [slides]);
+  const notesBySlide: SpeakerNotes = useMemo(() => extractSpeakerNotes(slides), [slides]);
 
   // Initialize autopilot service
   useEffect(() => {
@@ -33,7 +46,7 @@ export function useAutopilot({ deckId, currentSlide, slides, token, enabled = fa
   // Auto-advance (using new subscription-based hook)
   const autoAdvance = useAutoAdvanceSubscription();
 
-  const handleSetThreshold = useCallback((newThreshold) => {
+  const handleSetThreshold = useCallback((newThreshold: number): void => {
     autopilotService.setThreshold(newThreshold);
     setThreshold(newThreshold);
   }, []);
@@ -43,7 +56,7 @@ export function useAutopilot({ deckId, currentSlide, slides, token, enabled = fa
     if (!autopilotEnabled || !enabled) return;
 
     const decision = autoAdvanceService.checkShouldAdvance({
-      deckId,
+      deckId: deckId!,
       currentSlide,
       transcript: speech.finalTranscript,
       notesBySlide,
@@ -54,7 +67,7 @@ export function useAutopilot({ deckId, currentSlide, slides, token, enabled = fa
 
     if (decision.shouldAdvance) {
       autoAdvanceService.startAdvance(
-        deckId,
+        deckId!,
         currentSlide,
         'deterministic',
         decision.reason,
@@ -67,11 +80,11 @@ export function useAutopilot({ deckId, currentSlide, slides, token, enabled = fa
   useEffect(() => {
     if (!autopilotEnabled || !enabled) return;
 
-    const unsubscribe = speech.onEvent((event) => {
+    const unsubscribe = speech.onEvent((event: SpeechEvent) => {
       if (event.type === 'advance') {
         const immediate = event.data.progress >= 100;
         autoAdvanceService.startAdvance(
-          deckId,
+          deckId!,
           currentSlide,
           'model',
           event.data.reason,
@@ -91,7 +104,7 @@ export function useAutopilot({ deckId, currentSlide, slides, token, enabled = fa
   }, [autopilotEnabled, speech.connected, enabled, currentSlide]);
 
   // Toggle autopilot on/off (delegate to AutopilotService)
-  const toggle = useCallback(async () => {
+  const toggle = useCallback(async (): Promise<{ enabled: boolean; error?: string }> => {
     const result = await autopilotService.toggle();
     setAutopilotEnabled(result.enabled);
     return result;

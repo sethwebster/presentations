@@ -1,28 +1,35 @@
 import { useState, useEffect, useCallback } from 'react';
 import { realtimeService } from '../services/RealtimeService';
 import { reactionService } from '../services/ReactionService';
+import { UseRealtimePresentationReturn } from '../types/hooks';
+import { ReactionData } from '../types/services';
 
 /**
  * useRealtimePresentation - Handles realtime presentation sync and reactions
  * Thin wrapper around RealtimeService and ReactionService
  *
- * @param {string} deckId - Unique deck identifier
- * @param {number} currentSlide - Current slide index
- * @param {Function} goToSlide - Function to navigate to a slide
- * @param {boolean} isPresenter - Whether this is the presenter view
+ * @param deckId - Unique deck identifier
+ * @param currentSlide - Current slide index
+ * @param goToSlide - Function to navigate to a slide
+ * @param isPresenter - Whether this is the presenter view
  */
-export function useRealtimePresentation(deckId, currentSlide, goToSlide, isPresenter = false) {
-  const [reactions, setReactions] = useState([]);
+export function useRealtimePresentation(
+  deckId: string | null,
+  currentSlide: number,
+  goToSlide: (index: number) => void,
+  isPresenter: boolean = false
+): UseRealtimePresentationReturn {
+  const [reactions, setReactions] = useState<ReactionData[]>([]);
 
   // Subscribe to realtime events
   useEffect(() => {
     if (!deckId) return;
 
     const callbacks = {
-      onSlideChange: (slideIndex) => {
+      onSlideChange: (slideIndex: number) => {
         goToSlide(slideIndex);
       },
-      onReaction: (reaction) => {
+      onReaction: (reaction: ReactionData) => {
         setReactions(prev => [...prev, reaction]);
       },
     };
@@ -33,7 +40,7 @@ export function useRealtimePresentation(deckId, currentSlide, goToSlide, isPrese
   }, [deckId, goToSlide, isPresenter]);
 
   // Publish slide changes (presenter only)
-  const publishSlideChange = useCallback(async (slideIndex) => {
+  const publishSlideChange = useCallback(async (slideIndex: number): Promise<void> => {
     if (!isPresenter || !deckId) return;
 
     console.log('Publishing slide:', slideIndex);
@@ -41,7 +48,7 @@ export function useRealtimePresentation(deckId, currentSlide, goToSlide, isPrese
   }, [isPresenter, deckId]);
 
   // Send reaction (viewer only)
-  const sendReaction = useCallback(async (emoji) => {
+  const sendReaction = useCallback(async (emoji: string): Promise<void> => {
     if (!deckId) return;
 
     await reactionService.sendReaction(deckId, emoji);
