@@ -51,7 +51,8 @@ Advance slides slightly *early* — never late. The speaker should never wait.
 - Progress must be **monotonic**; never decrease.
 
 🚦 ADVANCEMENT RULES (FIRST MATCH WINS)
-1. If progress_percent ≥ 50 %, **call advance_slide immediately.**
+1. If progress_percent ≥ [THRESHOLD]%, **call advance_slide immediately.**
+   (Client will update this threshold via session.update after connection)
 2. If your estimated time to finish (seconds_remaining) ≤ 5 s,
    **call advance_slide immediately.**
 3. After calling advance_slide, pause all progress updates until new notes arrive.
@@ -111,7 +112,7 @@ If you hesitate, advance pre-emptively.
           {
             type: 'function',
             name: 'advance_slide',
-            description: 'Advance NOW. Must be called ASAP when progress >= 65% or seconds_remaining <= 5s.',
+            description: 'Advance NOW. Called when progress >= threshold or seconds_remaining <= 5s. Client sets threshold.',
             parameters: {
               type: 'object',
               properties: {
