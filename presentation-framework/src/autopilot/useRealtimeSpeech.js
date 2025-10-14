@@ -14,6 +14,7 @@ export function useRealtimeSpeech() {
   const pcRef = useRef(null);
   const dcRef = useRef(null);
   const functionCallArgsRef = useRef({}); // Track accumulating function arguments
+  const lastProgressRef = useRef(0); // For monotonic progress
 
   const connect = async () => {
     if (pcRef.current) {
@@ -136,8 +137,13 @@ export function useRealtimeSpeech() {
             if (functionName === 'update_progress') {
               const progress = args.progress_percent || 0;
               const points = args.covered_points || '';
-              console.log('📊 Progress update:', progress + '%', '-', points);
-              setAiProgress(progress);
+
+              // Make progress monotonic - never decrease
+              const monotonicProgress = Math.max(lastProgressRef.current, progress);
+              lastProgressRef.current = monotonicProgress;
+
+              console.log('📊 Progress update:', monotonicProgress + '%', '(raw:', progress + '%)', '-', points);
+              setAiProgress(monotonicProgress);
 
               // Send function response back to model
               if (callId && dcRef.current?.readyState === 'open') {
@@ -252,25 +258,30 @@ export function useRealtimeSpeech() {
     }
   };
 
-  const sendSlideContext = useCallback((slideIndex, notes) => {
+  const sendSlideContext = useCallback((slideIndex, notes, targetWPM = 145) => {
     if (dcRef.current && dcRef.current.readyState === 'open') {
       try {
-        // Update session instructions with current slide's expected content
+        // Calculate word count
+        const notesWordCount = notes.trim().split(/\s+/).length;
+
+        // Use set_context tool to provide slide info with timing
         dcRef.current.send(JSON.stringify({
-          type: 'session.update',
-          session: {
-            instructions: `You are assisting a live presentation. Provide accurate live transcripts of the speaker's words.
-
-CURRENT SLIDE ${slideIndex}:
-The speaker should say: "${notes}"
-
-Listen carefully. When the speaker has clearly finished discussing these talking points, send ONLY {"type":"advance"} over the data channel.
-
-Be conservative - only advance when confident the slide is complete. Look for natural conclusions and transitions.`,
+          type: 'conversation.item.create',
+          item: {
+            type: 'function_call',
+            name: 'set_context',
+            call_id: `set_context_${slideIndex}_${Date.now()}`,
+            arguments: JSON.stringify({
+              slide_index: slideIndex,
+              notes_text: notes,
+              notes_word_count: notesWordCount,
+              target_wpm: targetWPM,
+            }),
           },
         }));
-        console.log('📄 Updated session for slide', slideIndex);
-        console.log('   Expecting:', notes.substring(0, 120) + '...');
+
+        console.log('📄 Set context for slide', slideIndex);
+        console.log('   Words:', notesWordCount, '| Pace:', targetWPM, 'WPM | Est time:', Math.round((notesWordCount / targetWPM) * 60), 's');
       } catch (err) {
         console.error('Failed to send slide context:', err);
       }
@@ -301,6 +312,7 @@ Be conservative - only advance when confident the slide is complete. Look for na
     setFinalTranscript('');
     setPartialTranscript('');
     setAiProgress(0);
+    lastProgressRef.current = 0;
   }, []);
 
   return {

@@ -24,11 +24,28 @@ export function useAutoAdvance(options) {
   const [countdown, setCountdown] = useState(null); // { secondsRemaining, source, reason }
   const countdownTimerRef = useRef(null);
   const advanceTimeoutRef = useRef(null);
+  const hasAdvancedForSlideRef = useRef(currentSlide); // Idempotence
+  const slideStartTimeRef = useRef(Date.now());
+
+  // Reset idempotence flag when slide changes
+  useEffect(() => {
+    if (hasAdvancedForSlideRef.current !== currentSlide) {
+      hasAdvancedForSlideRef.current = currentSlide;
+      slideStartTimeRef.current = Date.now();
+      console.log('🔄 New slide - reset advance flag');
+    }
+  }, [currentSlide]);
 
   // Monitor transcript and decide when to advance
   useEffect(() => {
     if (!enabled) {
       console.log('⏸️ Auto-advance disabled');
+      return;
+    }
+
+    // Idempotence check
+    if (hasAdvancedForSlideRef.current !== currentSlide) {
+      console.log('⏭️ Already advanced for this slide, skipping');
       return;
     }
 
@@ -127,6 +144,15 @@ export function useAutoAdvance(options) {
 
   // Countdown logic
   const startCountdown = (source, reason) => {
+    // Idempotence - only start countdown once per slide
+    if (hasAdvancedForSlideRef.current !== currentSlide) {
+      console.log('⏭️ Already advancing for this slide');
+      return;
+    }
+
+    // Mark as advancing (prevents double-trigger)
+    hasAdvancedForSlideRef.current = -1; // Sentinel value
+
     // Clear any existing countdown
     if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
     if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
