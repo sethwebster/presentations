@@ -1,38 +1,31 @@
+import { useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 
 /**
- * Preloads QR codes for upcoming slides
- * Renders them hidden so they're ready instantly
+ * Preloads QR codes for next slide only
+ * Renders hidden so it's ready instantly
  */
 export function QRCodePreloader({ currentSlide, totalSlides }) {
-  const baseUrl = window.location.origin + window.location.pathname;
-  const params = new URLSearchParams(window.location.search);
+  const nextSlideUrl = useMemo(() => {
+    const nextIndex = currentSlide + 1;
+    if (nextIndex >= totalSlides) return null;
 
-  // Preload next 3 slides
-  const slidesToPreload = [];
-  for (let i = 1; i <= 3; i++) {
-    const nextIndex = currentSlide + i;
-    if (nextIndex < totalSlides) {
-      const slideParams = new URLSearchParams(params);
-      slideParams.set('slide', nextIndex + 1);
-      slidesToPreload.push({
-        index: nextIndex,
-        url: `${baseUrl}?${slideParams.toString()}`
-      });
-    }
-  }
+    const baseUrl = window.location.origin + window.location.pathname;
+    const params = new URLSearchParams(window.location.search);
+    params.set('slide', nextIndex + 1);
+    return `${baseUrl}?${params.toString()}`;
+  }, [currentSlide, totalSlides]);
+
+  if (!nextSlideUrl) return null;
 
   return (
-    <div style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none' }}>
-      {slidesToPreload.map(({ index, url }) => (
-        <QRCodeSVG
-          key={index}
-          value={url}
-          size={80}
-          level="M"
-          includeMargin={false}
-        />
-      ))}
+    <div style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none', width: 0, height: 0 }}>
+      <QRCodeSVG
+        value={nextSlideUrl}
+        size={80}
+        level="M"
+        includeMargin={false}
+      />
     </div>
   );
 }
