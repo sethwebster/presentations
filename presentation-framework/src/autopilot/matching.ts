@@ -6,7 +6,7 @@
 /**
  * Normalize text for comparison: lowercase, strip punctuation, collapse whitespace
  */
-export function normalize(text) {
+export function normalize(text: string | null | undefined): string {
   if (!text) return '';
   return text
     .toLowerCase()
@@ -18,7 +18,7 @@ export function normalize(text) {
 /**
  * Extract the last N characters from text (emphasizes slide conclusion)
  */
-export function tail(text, n = 300) {
+export function tail(text: string | null | undefined, n: number = 300): string {
   if (!text) return '';
   return text.slice(Math.max(0, text.length - n));
 }
@@ -27,9 +27,9 @@ export function tail(text, n = 300) {
  * Compute cosine similarity between two strings using bag-of-words
  * Returns 0-1 where 1 is perfect match
  */
-export function cosineSimilarity(a, b) {
-  const A = new Map();
-  const B = new Map();
+export function cosineSimilarity(a: string, b: string): number {
+  const A = new Map<string, number>();
+  const B = new Map<string, number>();
 
   // Build word frequency maps
   normalize(a).split(' ').forEach(word => {
@@ -67,7 +67,7 @@ export function cosineSimilarity(a, b) {
  * Compute match score between transcript and slide notes
  * Emphasizes the end of the transcript (tail window)
  */
-export function computeScore(transcript, notes) {
+export function computeScore(transcript: string | null | undefined, notes: string | null | undefined): number {
   if (!transcript || !notes) return 0;
   return cosineSimilarity(tail(transcript), tail(notes));
 }

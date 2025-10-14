@@ -1,12 +1,21 @@
 import { speechService } from './SpeechService';
 import { autoAdvanceService } from './AutoAdvanceService';
 import { extractSpeakerNotes } from '../autopilot/extractSpeakerNotes';
+import type { AutopilotState, AutopilotToggleResult, ConnectResult } from '../types/services';
+import type { SlideData } from '../types/presentation';
 
 /**
  * AutopilotService - Orchestrates speech recognition and auto-advance
  * Manages threshold settings, coordinates between Speech and AutoAdvance services
  */
 class AutopilotService {
+  private threshold: number;
+  private enabled: boolean;
+  private notesBySlide: Record<number, string | undefined>;
+  private currentSlide: number;
+  private deckId: string | null;
+  private stateListeners: Set<(state: AutopilotState) => void>;
+
   constructor() {
     this.threshold = this.loadThreshold();
     this.enabled = false;
@@ -20,9 +29,8 @@ class AutopilotService {
 
   /**
    * Load threshold from localStorage
-   * @returns {number}
    */
-  loadThreshold() {
+  private loadThreshold(): number {
     try {
       const saved = localStorage.getItem('lume-autopilot-threshold');
       const value = saved ? parseFloat(saved) : 0.50;
@@ -36,9 +44,8 @@ class AutopilotService {
 
   /**
    * Save threshold to localStorage
-   * @param {number} value
    */
-  saveThreshold(value) {
+  private saveThreshold(value: number): void {
     try {
       localStorage.setItem('lume-autopilot-threshold', value.toString());
       console.log('💾 Saved threshold:', value);
@@ -49,9 +56,8 @@ class AutopilotService {
 
   /**
    * Set threshold and update AI
-   * @param {number} newThreshold
    */
-  setThreshold(newThreshold) {
+  setThreshold(newThreshold: number): void {
     this.threshold = newThreshold;
     this.saveThreshold(newThreshold);
 
@@ -66,7 +72,7 @@ class AutopilotService {
   /**
    * Build AI instructions with threshold
    */
-  buildInstructions(thresholdPercent) {
+  private buildInstructions(thresholdPercent: number): string {
     return `You are controlling slide auto-advance for a live talk. You must be EARLY, not perfect.
 
 CADENCE & LATENCY
@@ -91,10 +97,8 @@ EXAMPLES
 
   /**
    * Initialize autopilot for presentation
-   * @param {string} deckId
-   * @param {Array} slides
    */
-  initialize(deckId, slides) {
+  initialize(deckId: string, slides: SlideData[]): void {
     this.deckId = deckId;
     this.notesBySlide = extractSpeakerNotes(slides);
     console.log('Autopilot initialized for deck:', deckId);
@@ -103,7 +107,7 @@ EXAMPLES
   /**
    * Enable autopilot
    */
-  async enable() {
+  async enable(): Promise<ConnectResult> {
     if (this.enabled) {
       console.log('Autopilot already enabled');
       return { success: true };
@@ -123,7 +127,7 @@ EXAMPLES
   /**
    * Disable autopilot
    */
-  disable() {
+  disable(): void {
     if (!this.enabled) return;
 
     speechService.disconnect();
@@ -135,7 +139,7 @@ EXAMPLES
   /**
    * Toggle autopilot on/off
    */
-  async toggle() {
+  async toggle(): Promise<AutopilotToggleResult> {
     if (this.enabled) {
       this.disable();
       return { enabled: false };
@@ -148,7 +152,7 @@ EXAMPLES
   /**
    * Update context when slide changes
    */
-  updateSlideContext(slideIndex) {
+  updateSlideContext(slideIndex: number): void {
     this.currentSlide = slideIndex;
 
     if (!this.enabled) return;
@@ -171,20 +175,22 @@ EXAMPLES
   /**
    * Get current threshold
    */
-  getThreshold() {
+  getThreshold(): number {
     return this.threshold;
   }
 
   /**
    * Check if enabled
    */
-  isEnabled() {
+  isEnabled(): boolean {
     return this.enabled;
   }
 
-  // Event emitter
-  emitState() {
-    const state = {
+  /**
+   * Emit state to listeners
+   */
+  private emitState(): void {
+    const state: AutopilotState = {
       enabled: this.enabled,
       threshold: this.threshold,
     };
@@ -194,7 +200,7 @@ EXAMPLES
   /**
    * Subscribe to state changes
    */
-  onStateChange(callback) {
+  onStateChange(callback: (state: AutopilotState) => void): () => void {
     this.stateListeners.add(callback);
     // Emit current state immediately
     callback({
@@ -207,7 +213,7 @@ EXAMPLES
   /**
    * Cleanup
    */
-  cleanup() {
+  cleanup(): void {
     this.disable();
     autoAdvanceService.cleanup();
     this.stateListeners.clear();

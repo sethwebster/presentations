@@ -5,10 +5,10 @@
 class NavigationService {
   /**
    * Get initial slide from URL
-   * @param {number} totalSlides
-   * @returns {number} - 0-based slide index
+   * @param totalSlides - Total number of slides in the presentation
+   * @returns 0-based slide index
    */
-  getInitialSlide(totalSlides) {
+  getInitialSlide(totalSlides: number): number {
     const params = new URLSearchParams(window.location.search);
     const slideParam = params.get('slide');
 
@@ -24,9 +24,9 @@ class NavigationService {
 
   /**
    * Update URL with current slide
-   * @param {number} slideIndex - 0-based
+   * @param slideIndex - 0-based slide index
    */
-  updateSlideInURL(slideIndex) {
+  updateSlideInURL(slideIndex: number): void {
     const params = new URLSearchParams(window.location.search);
     params.set('slide', (slideIndex + 1).toString());
     const newUrl = `${window.location.pathname}?${params.toString()}`;
@@ -35,13 +35,13 @@ class NavigationService {
 
   /**
    * Generate viewer URL for a specific slide
-   * @param {number} slideIndex - 0-based
-   * @returns {string}
+   * @param slideIndex - 0-based slide index
+   * @returns Full viewer URL with parameters
    */
-  getViewerURL(slideIndex) {
+  getViewerURL(slideIndex: number): string {
     const baseUrl = window.location.origin + window.location.pathname;
     const params = new URLSearchParams(window.location.search);
-    params.set('slide', slideIndex + 1);
+    params.set('slide', (slideIndex + 1).toString());
     params.set('viewer', 'true');
     // Remove presenter key if present
     params.delete('presenterKey');
@@ -50,9 +50,9 @@ class NavigationService {
 
   /**
    * Get deckId from URL or generate from path
-   * @returns {string|null}
+   * @returns Deck ID or null if not available
    */
-  getDeckId() {
+  getDeckId(): string | null {
     const params = new URLSearchParams(window.location.search);
     let deckId = params.get('deckId');
 
@@ -70,18 +70,18 @@ class NavigationService {
 
   /**
    * Check if in presenter mode window
-   * @returns {boolean}
+   * @returns True if in presenter mode
    */
-  isPresenterModeWindow() {
+  isPresenterModeWindow(): boolean {
     const params = new URLSearchParams(window.location.search);
     return params.get('presenter') === 'true';
   }
 
   /**
    * Build presenter window URL
-   * @returns {string}
+   * @returns Full presenter window URL
    */
-  getPresenterWindowURL() {
+  getPresenterWindowURL(): string {
     const params = new URLSearchParams(window.location.search);
     params.set('presenter', 'true');
     return `${window.location.origin}${window.location.pathname}?${params.toString()}`;

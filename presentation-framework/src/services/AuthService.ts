@@ -1,36 +1,31 @@
+import type { AuthEvent, LoginResult } from '../types/services';
+
 /**
  * AuthService - Manages presenter authentication state and operations
  * All authentication business logic lives here, outside of React
  */
 class AuthService {
-  constructor() {
-    this.TOKEN_KEY = 'lume-presenter-token';
-    this.authStateListeners = new Set();
-  }
+  private readonly TOKEN_KEY = 'lume-presenter-token';
+  private authStateListeners = new Set<(event: AuthEvent) => void>();
 
   /**
    * Get the current auth token
-   * @returns {string|null}
    */
-  getToken() {
+  getToken(): string | null {
     return localStorage.getItem(this.TOKEN_KEY);
   }
 
   /**
    * Check if user is authenticated
-   * @returns {boolean}
    */
-  isAuthenticated() {
+  isAuthenticated(): boolean {
     return !!this.getToken();
   }
 
   /**
    * Login with password
-   * @param {string} password
-   * @param {boolean} remember - Whether to persist the token
-   * @returns {Promise<{success: boolean, error?: string}>}
    */
-  async login(password, remember = true) {
+  async login(password: string, remember = true): Promise<LoginResult> {
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -41,7 +36,7 @@ class AuthService {
       });
 
       if (response.ok) {
-        const { token } = await response.json();
+        const { token } = await response.json() as { token: string };
 
         // Store token if remember is true
         if (remember) {
@@ -56,25 +51,24 @@ class AuthService {
         return { success: false, error: 'Invalid password' };
       }
     } catch (err) {
-      console.error('Login error:', err);
-      return { success: false, error: err.message };
+      const error = err as Error;
+      console.error('Login error:', error);
+      return { success: false, error: error.message };
     }
   }
 
   /**
    * Logout
    */
-  logout() {
+  logout(): void {
     localStorage.removeItem(this.TOKEN_KEY);
     this.emitAuthState({ type: 'logged_out' });
   }
 
   /**
    * Subscribe to auth state changes
-   * @param {Function} callback - Called with {type: 'authenticated' | 'logged_out', token?: string}
-   * @returns {Function} unsubscribe function
    */
-  onAuthStateChange(callback) {
+  onAuthStateChange(callback: (event: AuthEvent) => void): () => void {
     this.authStateListeners.add(callback);
     return () => this.authStateListeners.delete(callback);
   }
@@ -82,7 +76,7 @@ class AuthService {
   /**
    * Emit auth state change to all listeners
    */
-  emitAuthState(event) {
+  emitAuthState(event: AuthEvent): void {
     this.authStateListeners.forEach(listener => listener(event));
   }
 }

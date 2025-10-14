@@ -1,8 +1,15 @@
+import type { WindowSyncMessage, WindowSyncCallback, WindowStatusCallback } from '../types/services';
+
 /**
  * WindowSyncService - Manages BroadcastChannel for cross-window sync
  * Handles presenter window lifecycle and slide synchronization
  */
 class WindowSyncService {
+  private channel: BroadcastChannel | null;
+  private presenterWindow: Window | null;
+  private listeners: Set<WindowSyncCallback>;
+  private checkClosedInterval: ReturnType<typeof setInterval> | null;
+
   constructor() {
     this.channel = null;
     this.presenterWindow = null;
@@ -13,10 +20,10 @@ class WindowSyncService {
   /**
    * Initialize the broadcast channel
    */
-  init() {
+  init(): void {
     if (!this.channel) {
       this.channel = new BroadcastChannel('presentation-sync');
-      this.channel.onmessage = (event) => {
+      this.channel.onmessage = (event: MessageEvent<WindowSyncMessage>) => {
         this.listeners.forEach(listener => listener(event.data));
       };
     }
@@ -24,10 +31,10 @@ class WindowSyncService {
 
   /**
    * Subscribe to sync messages
-   * @param {Function} callback
-   * @returns {Function} unsubscribe function
+   * @param callback - Callback function to handle sync messages
+   * @returns unsubscribe function
    */
-  subscribe(callback) {
+  subscribe(callback: WindowSyncCallback): () => void {
     this.init();
     this.listeners.add(callback);
 
@@ -41,19 +48,21 @@ class WindowSyncService {
 
   /**
    * Broadcast slide change to all windows
-   * @param {number} slideIndex
+   * @param slideIndex - Index of the slide to broadcast
    */
-  broadcastSlideChange(slideIndex) {
+  broadcastSlideChange(slideIndex: number): void {
     this.init();
-    this.channel.postMessage({ type: 'SLIDE_CHANGE', slideIndex });
+    if (this.channel) {
+      this.channel.postMessage({ type: 'SLIDE_CHANGE', slideIndex });
+    }
   }
 
   /**
    * Open presenter view window
-   * @param {string} url - Full URL for presenter window
-   * @param {Function} onStatusChange - Callback when window opens/closes
+   * @param url - Full URL for presenter window
+   * @param onStatusChange - Callback when window opens/closes
    */
-  openPresenterWindow(url, onStatusChange) {
+  openPresenterWindow(url: string, onStatusChange: WindowStatusCallback): void {
     // If window already exists and is open, just focus it
     if (this.presenterWindow && !this.presenterWindow.closed) {
       this.presenterWindow.focus();
@@ -73,15 +82,21 @@ class WindowSyncService {
       // Notify that window opened
       onStatusChange(true);
       this.init();
-      this.channel.postMessage({ type: 'PRESENTER_OPENED' });
+      if (this.channel) {
+        this.channel.postMessage({ type: 'PRESENTER_OPENED' });
+      }
 
       // Monitor when window is closed
       this.checkClosedInterval = setInterval(() => {
         if (presenterWindow.closed) {
-          clearInterval(this.checkClosedInterval);
+          if (this.checkClosedInterval) {
+            clearInterval(this.checkClosedInterval);
+          }
           this.presenterWindow = null;
           onStatusChange(false);
-          this.channel.postMessage({ type: 'PRESENTER_CLOSED' });
+          if (this.channel) {
+            this.channel.postMessage({ type: 'PRESENTER_CLOSED' });
+          }
         }
       }, 1000);
     }
@@ -89,16 +104,16 @@ class WindowSyncService {
 
   /**
    * Check if presenter window is open
-   * @returns {boolean}
+   * @returns true if presenter window is open
    */
-  isPresenterWindowOpen() {
-    return this.presenterWindow && !this.presenterWindow.closed;
+  isPresenterWindowOpen(): boolean {
+    return this.presenterWindow !== null && !this.presenterWindow.closed;
   }
 
   /**
    * Cleanup resources
    */
-  cleanup() {
+  cleanup(): void {
     if (this.checkClosedInterval) {
       clearInterval(this.checkClosedInterval);
     }

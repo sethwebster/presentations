@@ -1,20 +1,39 @@
+import { SSEEvent, SSEStatus } from '../types/services';
+
+/**
+ * Connection object stored in the connections Map
+ */
+interface ConnectionObject {
+  es: EventSource | null;
+  reconnectTimeout: ReturnType<typeof setTimeout> | null;
+  reconnectAttempts: number;
+  isCleaningUp: boolean;
+  listeners: Set<(event: SSEEvent) => void>;
+}
+
 /**
  * SSEService - Manages Server-Sent Events connections with auto-reconnect
  * Handles connection lifecycle, reconnection logic, and event parsing
  */
 class SSEService {
+  private connections: Map<string, ConnectionObject>;
+
   constructor() {
-    this.connections = new Map(); // url -> connection object
+    this.connections = new Map();
   }
 
   /**
    * Subscribe to SSE endpoint
-   * @param {string} url
-   * @param {Function} onEvent - Callback for parsed events
-   * @param {Function} onStatusChange - Callback for connection status changes
-   * @returns {Function} cleanup function
+   * @param url - SSE endpoint URL
+   * @param onEvent - Callback for parsed events
+   * @param onStatusChange - Callback for connection status changes
+   * @returns cleanup function
    */
-  subscribe(url, onEvent, onStatusChange) {
+  subscribe(
+    url: string,
+    onEvent: (event: SSEEvent) => void,
+    onStatusChange?: (status: SSEStatus) => void
+  ): () => void {
     if (!url) {
       console.warn('SSE: No URL provided');
       return () => {};
@@ -22,7 +41,7 @@ class SSEService {
 
     // Check if already connected
     if (this.connections.has(url)) {
-      const existing = this.connections.get(url);
+      const existing = this.connections.get(url)!;
       existing.listeners.add(onEvent);
 
       return () => {
@@ -34,7 +53,7 @@ class SSEService {
     }
 
     // Create new connection
-    const connection = {
+    const connection: ConnectionObject = {
       es: null,
       reconnectTimeout: null,
       reconnectAttempts: 0,
@@ -44,7 +63,7 @@ class SSEService {
 
     this.connections.set(url, connection);
 
-    const connect = () => {
+    const connect = (): void => {
       if (connection.isCleaningUp) return;
 
       console.log('🔌 SSE connecting:', url, '(attempt', connection.reconnectAttempts + 1, ')');
@@ -53,24 +72,24 @@ class SSEService {
       const es = new EventSource(url, { withCredentials: false });
       connection.es = es;
 
-      es.onopen = () => {
+      es.onopen = (): void => {
         console.log('✅ SSE connected');
         connection.reconnectAttempts = 0;
         onStatusChange?.({ status: 'connected' });
       };
 
       // Handle init event
-      es.addEventListener('init', (e) => {
+      es.addEventListener('init', (e: MessageEvent): void => {
         const data = JSON.parse(e.data);
-        const event = { type: 'init', ...data };
+        const event: SSEEvent = { type: 'init', ...data };
         connection.listeners.forEach(listener => listener(event));
       });
 
       // Handle all other messages
-      es.onmessage = (e) => {
+      es.onmessage = (e: MessageEvent): void => {
         console.log('SSE message:', e.data);
         try {
-          const data = JSON.parse(e.data);
+          const data: SSEEvent = JSON.parse(e.data);
           connection.listeners.forEach(listener => listener(data));
         } catch (err) {
           console.error('Failed to parse SSE message:', err);
@@ -78,7 +97,7 @@ class SSEService {
       };
 
       // Handle errors and reconnect
-      es.onerror = (err) => {
+      es.onerror = (err: Event): void => {
         console.error('❌ SSE error, will reconnect...', err);
         es.close();
 
@@ -108,9 +127,9 @@ class SSEService {
 
   /**
    * Disconnect from URL
-   * @param {string} url
+   * @param url - URL to disconnect from
    */
-  disconnect(url) {
+  disconnect(url: string): void {
     const connection = this.connections.get(url);
     if (!connection) return;
 
@@ -131,7 +150,7 @@ class SSEService {
   /**
    * Disconnect all connections
    */
-  disconnectAll() {
+  disconnectAll(): void {
     for (const url of this.connections.keys()) {
       this.disconnect(url);
     }

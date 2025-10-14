@@ -1,18 +1,18 @@
+import type { ReactionData, SendReactionResult } from '../types/services';
+
 /**
  * ReactionService - Manages emoji reactions with rate limiting and deduplication
  */
 class ReactionService {
-  constructor() {
-    this.RATE_LIMIT_MS = 200; // Max 5 reactions/sec
-    this.lastReactionTime = 0;
-    this.seenReactionIds = new Set();
-  }
+  private readonly RATE_LIMIT_MS: number = 200; // Max 5 reactions/sec
+  private lastReactionTime: number = 0;
+  private seenReactionIds: Set<string> = new Set();
 
   /**
    * Check if reaction is rate limited
    * @returns {boolean}
    */
-  isRateLimited() {
+  isRateLimited(): boolean {
     const now = Date.now();
     return (now - this.lastReactionTime) < this.RATE_LIMIT_MS;
   }
@@ -21,9 +21,9 @@ class ReactionService {
    * Send a reaction (with rate limiting)
    * @param {string} deckId
    * @param {string} emoji
-   * @returns {Promise<{success: boolean, rateLimited?: boolean}>}
+   * @returns {Promise<SendReactionResult>}
    */
-  async sendReaction(deckId, emoji) {
+  async sendReaction(deckId: string, emoji: string): Promise<SendReactionResult> {
     if (!deckId) {
       return { success: false, error: 'No deckId' };
     }
@@ -49,7 +49,8 @@ class ReactionService {
       return { success: true };
     } catch (err) {
       console.error('Failed to send reaction:', err);
-      return { success: false, error: err.message };
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      return { success: false, error: errorMessage };
     }
   }
 
@@ -58,7 +59,7 @@ class ReactionService {
    * @param {string} reactionId
    * @returns {boolean}
    */
-  hasSeenReaction(reactionId) {
+  hasSeenReaction(reactionId: string): boolean {
     return this.seenReactionIds.has(reactionId);
   }
 
@@ -66,15 +67,15 @@ class ReactionService {
    * Mark reaction as seen
    * @param {string} reactionId
    */
-  markReactionAsSeen(reactionId) {
+  markReactionAsSeen(reactionId: string): void {
     this.seenReactionIds.add(reactionId);
   }
 
   /**
    * Clean up old reaction IDs
-   * @param {Set} currentValidIds
+   * @param {Set<string>} currentValidIds
    */
-  cleanupSeenReactions(currentValidIds) {
+  cleanupSeenReactions(currentValidIds: Set<string>): void {
     const idsToKeep = new Set(
       Array.from(this.seenReactionIds).filter(id => currentValidIds.has(id))
     );
@@ -83,11 +84,11 @@ class ReactionService {
 
   /**
    * Filter reactions to keep only recent ones
-   * @param {Array} reactions
+   * @param {ReactionData[]} reactions
    * @param {number} maxAgeMs - Default 10 seconds
-   * @returns {Array}
+   * @returns {ReactionData[]}
    */
-  filterRecentReactions(reactions, maxAgeMs = 10000) {
+  filterRecentReactions(reactions: ReactionData[], maxAgeMs: number = 10000): ReactionData[] {
     const now = Date.now();
     return reactions.filter(r => (now - r.ts) < maxAgeMs);
   }
@@ -95,7 +96,7 @@ class ReactionService {
   /**
    * Reset service state
    */
-  reset() {
+  reset(): void {
     this.lastReactionTime = 0;
     this.seenReactionIds.clear();
   }

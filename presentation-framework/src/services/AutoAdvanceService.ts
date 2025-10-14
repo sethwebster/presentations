@@ -1,28 +1,25 @@
 import { computeScore } from '../autopilot/matching';
 import { authService } from './AuthService';
+import type { AdvanceDecision, AutoAdvanceParams, CountdownState } from '../types/services';
 
 /**
  * AutoAdvanceService - Manages automatic slide advancement logic
  * Handles scoring, timing, cooldowns, and countdown management
  */
 class AutoAdvanceService {
-  constructor() {
-    this.lastAdvanceAt = 0;
-    this.hasAdvancedForSlide = null;
-    this.slideStartTime = Date.now();
-    this.countdownTimer = null;
-    this.advanceTimeout = null;
+  private lastAdvanceAt = 0;
+  private hasAdvancedForSlide: number | null = null;
+  private slideStartTime = Date.now();
+  private countdownTimer: ReturnType<typeof setInterval> | null = null;
+  private advanceTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    // Listeners
-    this.scoreListeners = new Set();
-    this.countdownListeners = new Set();
-    this.decisionListeners = new Set();
-  }
+  // Listeners
+  private scoreListeners = new Set<(score: number) => void>();
+  private countdownListeners = new Set<(countdown: CountdownState | null) => void>();
+  private decisionListeners = new Set<(decision: AdvanceDecision | null) => void>();
 
   /**
    * Check if should advance based on transcript and notes
-   * @param {Object} params
-   * @returns {Object} decision
    */
   checkShouldAdvance({
     deckId,
@@ -32,7 +29,7 @@ class AutoAdvanceService {
     threshold = 0.55,
     minChars = 50,
     cooldownMs = 2500,
-  }) {
+  }: AutoAdvanceParams): AdvanceDecision {
     // Idempotence check
     if (this.hasAdvancedForSlide === currentSlide) {
       return { shouldAdvance: false, reason: 'already_advanced' };
@@ -82,13 +79,19 @@ class AutoAdvanceService {
 
   /**
    * Start countdown and advance slide
-   * @param {string} deckId
-   * @param {number} currentSlide
-   * @param {string} source - 'deterministic' or 'model'
-   * @param {string} reason
-   * @param {boolean} immediate - Skip countdown
+   * @param deckId - Deck identifier
+   * @param currentSlide - Current slide index
+   * @param source - 'deterministic' or 'model'
+   * @param reason - Reason for advancement
+   * @param immediate - Skip countdown
    */
-  async startAdvance(deckId, currentSlide, source, reason, immediate = false) {
+  async startAdvance(
+    deckId: string,
+    currentSlide: number,
+    source: 'deterministic' | 'model',
+    reason: string,
+    immediate = false
+  ): Promise<void> {
     // Idempotence
     if (this.hasAdvancedForSlide === currentSlide) {
       console.log('⏭️ Already advancing for this slide');
@@ -114,7 +117,7 @@ class AutoAdvanceService {
       this.emitCountdown(remaining > 0 ? { secondsRemaining: remaining, source, reason } : null);
 
       if (remaining <= 0) {
-        clearInterval(this.countdownTimer);
+        clearInterval(this.countdownTimer!);
       }
     }, 1000);
 
@@ -129,7 +132,7 @@ class AutoAdvanceService {
   /**
    * Advance to a slide via API
    */
-  async advanceSlide(deckId, slideIndex) {
+  async advanceSlide(deckId: string, slideIndex: number): Promise<{ success: boolean; error?: string }> {
     const token = authService.getToken();
     if (!token) {
       console.error('No token available');
@@ -153,15 +156,16 @@ class AutoAdvanceService {
       console.log('✅ Advance successful');
       return { success: true };
     } catch (err) {
-      console.error('Advance error:', err);
-      return { success: false, error: err.message };
+      const error = err as Error;
+      console.error('Advance error:', error);
+      return { success: false, error: error.message };
     }
   }
 
   /**
    * Cancel pending countdown
    */
-  cancelCountdown() {
+  cancelCountdown(): void {
     if (this.countdownTimer) {
       clearInterval(this.countdownTimer);
       this.countdownTimer = null;
@@ -176,7 +180,7 @@ class AutoAdvanceService {
   /**
    * Reset state for new slide
    */
-  resetForSlide(slideIndex) {
+  resetForSlide(slideIndex: number): void {
     console.log('🔄 Reset for slide:', slideIndex);
     this.cancelCountdown();
     this.hasAdvancedForSlide = null;
@@ -186,7 +190,7 @@ class AutoAdvanceService {
   /**
    * Reset for manual navigation
    */
-  resetForManualNavigation(slideIndex) {
+  resetForManualNavigation(slideIndex: number): void {
     console.log('🔄 Manual navigation detected');
     this.cancelCountdown();
     this.hasAdvancedForSlide = null;
@@ -195,30 +199,30 @@ class AutoAdvanceService {
   }
 
   // Event emitters
-  emitScore(score) {
+  emitScore(score: number): void {
     this.scoreListeners.forEach(listener => listener(score));
   }
 
-  emitCountdown(countdown) {
+  emitCountdown(countdown: CountdownState | null): void {
     this.countdownListeners.forEach(listener => listener(countdown));
   }
 
-  emitDecision(decision) {
+  emitDecision(decision: AdvanceDecision | null): void {
     this.decisionListeners.forEach(listener => listener(decision));
   }
 
   // Subscription methods
-  onScore(callback) {
+  onScore(callback: (score: number) => void): () => void {
     this.scoreListeners.add(callback);
     return () => this.scoreListeners.delete(callback);
   }
 
-  onCountdown(callback) {
+  onCountdown(callback: (countdown: CountdownState | null) => void): () => void {
     this.countdownListeners.add(callback);
     return () => this.countdownListeners.delete(callback);
   }
 
-  onDecision(callback) {
+  onDecision(callback: (decision: AdvanceDecision | null) => void): () => void {
     this.decisionListeners.add(callback);
     return () => this.decisionListeners.delete(callback);
   }
@@ -226,7 +230,7 @@ class AutoAdvanceService {
   /**
    * Cleanup
    */
-  cleanup() {
+  cleanup(): void {
     this.cancelCountdown();
     this.scoreListeners.clear();
     this.countdownListeners.clear();

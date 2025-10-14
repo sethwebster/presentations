@@ -2,27 +2,43 @@
  * SpeechService - Manages WebRTC connection to OpenAI Realtime API
  * Handles speech recognition, transcription, and AI function calls
  */
-class SpeechService {
-  constructor() {
-    this.pc = null; // RTCPeerConnection
-    this.dc = null; // RTCDataChannel
-    this.audioStream = null;
-    this.functionCallArgs = {}; // Accumulate function arguments
-    this.lastProgress = 0; // For monotonic progress
 
-    // Listeners
-    this.statusListeners = new Set();
-    this.transcriptListeners = new Set();
-    this.progressListeners = new Set();
-    this.eventListeners = new Set();
-  }
+import type {
+  SpeechStatus,
+  TranscriptEvent,
+  SpeechEvent,
+  ConnectResult,
+} from '../types/services';
+
+// Callback type definitions
+type StatusCallback = (status: SpeechStatus) => void;
+type TranscriptCallback = (event: TranscriptEvent) => void;
+type ProgressCallback = (progress: number) => void;
+type EventCallback = (event: SpeechEvent) => void;
+
+// Internal function call tracking
+interface FunctionCallAccumulator {
+  name: string;
+  arguments: string;
+}
+
+class SpeechService {
+  private pc: RTCPeerConnection | null = null;
+  private dc: RTCDataChannel | null = null;
+  private audioStream: MediaStream | null = null;
+  private functionCallArgs: Record<string, FunctionCallAccumulator> = {};
+  private lastProgress: number = 0;
+
+  // Listeners
+  private statusListeners: Set<StatusCallback> = new Set();
+  private transcriptListeners: Set<TranscriptCallback> = new Set();
+  private progressListeners: Set<ProgressCallback> = new Set();
+  private eventListeners: Set<EventCallback> = new Set();
 
   /**
    * Connect to OpenAI Realtime API
-   * @param {number} thresholdPercent
-   * @returns {Promise<{success: boolean, error?: string}>}
    */
-  async connect(thresholdPercent = 50) {
+  async connect(thresholdPercent: number = 50): Promise<ConnectResult> {
     if (this.pc) {
       console.log('Already connected');
       return { success: true };
@@ -64,7 +80,7 @@ class SpeechService {
             autoGainControl: true,
           },
         });
-      } catch (micError) {
+      } catch (micError: any) {
         if (micError.name === 'NotAllowedError') {
           throw new Error('Microphone access denied');
         } else if (micError.name === 'NotFoundError') {
@@ -74,7 +90,7 @@ class SpeechService {
         }
       }
 
-      this.audioStream.getTracks().forEach(track => this.pc.addTrack(track, this.audioStream));
+      this.audioStream.getTracks().forEach(track => this.pc!.addTrack(track, this.audioStream!));
 
       // Create and send offer
       const offer = await this.pc.createOffer();
@@ -101,17 +117,17 @@ class SpeechService {
 
       // Monitor connection state
       this.pc.onconnectionstatechange = () => {
-        console.log('Connection state:', this.pc.connectionState);
-        const isConnected = this.pc.connectionState === 'connected';
-        this.emitStatus(isConnected ? 'connected' : this.pc.connectionState);
+        console.log('Connection state:', this.pc!.connectionState);
+        const isConnected = this.pc!.connectionState === 'connected';
+        this.emitStatus(isConnected ? 'connected' : this.pc!.connectionState as any);
 
-        if (['disconnected', 'failed', 'closed'].includes(this.pc.connectionState)) {
+        if (['disconnected', 'failed', 'closed'].includes(this.pc!.connectionState)) {
           this.cleanup();
         }
       };
 
       return { success: true };
-    } catch (err) {
+    } catch (err: any) {
       console.error('Connection error:', err);
       this.emitStatus('error', err.message);
       this.cleanup();
@@ -122,7 +138,9 @@ class SpeechService {
   /**
    * Setup data channel event handlers
    */
-  setupDataChannelHandlers() {
+  private setupDataChannelHandlers(): void {
+    if (!this.dc) return;
+
     this.dc.onopen = () => {
       console.log('Data channel opened');
     };
@@ -144,7 +162,7 @@ class SpeechService {
   /**
    * Handle incoming data channel messages
    */
-  handleDataChannelMessage(message) {
+  private handleDataChannelMessage(message: any): void {
     if (message.type?.includes('function')) {
       console.log('🔧 Function event:', message.type, message);
     }
@@ -185,7 +203,7 @@ class SpeechService {
   /**
    * Handle completed function call
    */
-  handleFunctionCallComplete(message) {
+  private handleFunctionCallComplete(message: any): void {
     const itemId = message.item_id;
     const callId = message.call_id;
     const accumulated = this.functionCallArgs[itemId];
@@ -195,7 +213,7 @@ class SpeechService {
     const functionName = accumulated.name;
 
     // Parse arguments
-    let args = {};
+    let args: any = {};
     try {
       args = JSON.parse(accumulated.arguments);
     } catch (e) {
@@ -229,7 +247,7 @@ class SpeechService {
   /**
    * Send function call response back to AI
    */
-  sendFunctionResponse(callId, output) {
+  private sendFunctionResponse(callId: string, output: any): void {
     if (callId && this.dc?.readyState === 'open') {
       this.dc.send(JSON.stringify({
         type: 'conversation.item.create',
@@ -245,7 +263,7 @@ class SpeechService {
   /**
    * Send slide context to AI
    */
-  sendSlideContext(slideIndex, notes, targetWPM = 145) {
+  sendSlideContext(slideIndex: number, notes: string, targetWPM: number = 145): void {
     if (!this.dc || this.dc.readyState !== 'open') {
       console.warn('Cannot send slide context - data channel not ready');
       return;
@@ -274,7 +292,7 @@ class SpeechService {
   /**
    * Update session instructions
    */
-  updateSessionInstructions(instructions) {
+  updateSessionInstructions(instructions: string): void {
     if (!this.dc || this.dc.readyState !== 'open') {
       console.warn('Cannot update session - data channel not ready');
       return;
@@ -291,7 +309,7 @@ class SpeechService {
   /**
    * Reset transcript for new slide
    */
-  resetTranscript() {
+  resetTranscript(): void {
     console.log('🔄 Resetting transcript');
     this.lastProgress = 0;
     this.emitTranscript('reset', '');
@@ -301,7 +319,7 @@ class SpeechService {
   /**
    * Disconnect
    */
-  disconnect() {
+  disconnect(): void {
     console.log('Disconnecting speech service...');
     this.cleanup();
   }
@@ -309,7 +327,7 @@ class SpeechService {
   /**
    * Cleanup resources
    */
-  cleanup() {
+  private cleanup(): void {
     if (this.audioStream) {
       this.audioStream.getTracks().forEach(track => track.stop());
       this.audioStream = null;
@@ -328,39 +346,39 @@ class SpeechService {
   }
 
   // Event emitters
-  emitStatus(status, error = null) {
+  private emitStatus(status: SpeechStatus['status'], error: string | null = null): void {
     this.statusListeners.forEach(listener => listener({ status, error }));
   }
 
-  emitTranscript(type, text) {
+  private emitTranscript(type: TranscriptEvent['type'], text: string): void {
     this.transcriptListeners.forEach(listener => listener({ type, text }));
   }
 
-  emitProgress(progress) {
+  private emitProgress(progress: number): void {
     this.progressListeners.forEach(listener => listener(progress));
   }
 
-  emitEvent(type, data) {
+  private emitEvent(type: string, data: any): void {
     this.eventListeners.forEach(listener => listener({ type, data }));
   }
 
   // Subscription methods
-  onStatus(callback) {
+  onStatus(callback: StatusCallback): () => void {
     this.statusListeners.add(callback);
     return () => this.statusListeners.delete(callback);
   }
 
-  onTranscript(callback) {
+  onTranscript(callback: TranscriptCallback): () => void {
     this.transcriptListeners.add(callback);
     return () => this.transcriptListeners.delete(callback);
   }
 
-  onProgress(callback) {
+  onProgress(callback: ProgressCallback): () => void {
     this.progressListeners.add(callback);
     return () => this.progressListeners.delete(callback);
   }
 
-  onEvent(callback) {
+  onEvent(callback: EventCallback): () => void {
     this.eventListeners.add(callback);
     return () => this.eventListeners.delete(callback);
   }

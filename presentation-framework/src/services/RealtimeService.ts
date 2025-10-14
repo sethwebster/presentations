@@ -1,28 +1,30 @@
 import { sseService } from './SSEService';
 import { reactionService } from './ReactionService';
 import { authService } from './AuthService';
+import type { ReactionData, RealtimeCallbacks, SSEEvent } from '../types/services';
+
+interface PublishSlideChangeResult {
+  success: boolean;
+  error?: string;
+}
 
 /**
  * RealtimeService - Manages realtime presentation sync and reactions
  * Orchestrates SSE events, reactions, and slide synchronization
  */
 class RealtimeService {
-  constructor() {
-    this.reactions = [];
-    this.listeners = new Set();
-    this.cleanupInterval = null;
-  }
+  private reactions: ReactionData[] = [];
+  private listeners: Set<(event: SSEEvent) => void> = new Set();
+  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
 
   /**
    * Subscribe to realtime updates for a deck
-   * @param {string} deckId
-   * @param {Object} callbacks
-   * @param {Function} callbacks.onSlideChange - Called when presenter changes slide
-   * @param {Function} callbacks.onReaction - Called when reaction received
-   * @param {boolean} isPresenter - Whether this client is the presenter
-   * @returns {Function} cleanup function
+   * @param deckId - Deck identifier
+   * @param callbacks - Callback functions for slide changes and reactions
+   * @param isPresenter - Whether this client is the presenter
+   * @returns cleanup function
    */
-  subscribe(deckId, callbacks, isPresenter = false) {
+  subscribe(deckId: string, callbacks: RealtimeCallbacks, isPresenter: boolean = false): () => void {
     if (!deckId) {
       console.warn('RealtimeService: No deckId provided');
       return () => {};
@@ -31,7 +33,7 @@ class RealtimeService {
     const url = `/api/live/${deckId}`;
 
     // Handle SSE events
-    const handleEvent = (event) => {
+    const handleEvent = (event: SSEEvent): void => {
       if (event.type === 'init' && !isPresenter) {
         console.log('VIEWER: Syncing to initial slide:', event.slide);
         callbacks.onSlideChange?.(event.slide);
@@ -44,8 +46,14 @@ class RealtimeService {
           console.log('NEW REACTION:', event.emoji, 'id:', event.id);
           reactionService.markReactionAsSeen(event.id);
 
-          this.reactions.push(event);
-          callbacks.onReaction?.(event);
+          const reactionData: ReactionData = {
+            id: event.id,
+            emoji: event.emoji,
+            ts: event.ts
+          };
+
+          this.reactions.push(reactionData);
+          callbacks.onReaction?.(reactionData);
         } else {
           console.log('DUPLICATE: Ignoring reaction', event.emoji);
         }
@@ -83,10 +91,11 @@ class RealtimeService {
 
   /**
    * Publish slide change (presenter only)
-   * @param {string} deckId
-   * @param {number} slideIndex
+   * @param deckId - Deck identifier
+   * @param slideIndex - Index of slide to publish
+   * @returns Result object with success status
    */
-  async publishSlideChange(deckId, slideIndex) {
+  async publishSlideChange(deckId: string, slideIndex: number): Promise<PublishSlideChangeResult> {
     if (!deckId) {
       console.error('No deckId provided');
       return { success: false };
@@ -115,23 +124,24 @@ class RealtimeService {
       console.log('Published slide change:', slideIndex);
       return { success: true };
     } catch (err) {
-      console.error('Failed to publish slide change:', err);
-      return { success: false, error: err.message };
+      const error = err as Error;
+      console.error('Failed to publish slide change:', error);
+      return { success: false, error: error.message };
     }
   }
 
   /**
    * Get current reactions
-   * @returns {Array}
+   * @returns Array of current reactions
    */
-  getReactions() {
+  getReactions(): ReactionData[] {
     return this.reactions;
   }
 
   /**
    * Reset service state
    */
-  reset() {
+  reset(): void {
     this.reactions = [];
     reactionService.reset();
   }
