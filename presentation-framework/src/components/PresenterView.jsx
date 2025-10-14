@@ -1,8 +1,16 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/PresenterView.css';
+import { AutopilotHUD } from '../autopilot/ui/AutopilotHUD';
 
-export function PresenterView({ currentSlide, nextSlide, slides, onSlideClick }) {
+export function PresenterView({
+  currentSlide,
+  nextSlide,
+  slides,
+  onSlideClick,
+  // Autopilot props
+  autopilot = null,
+}) {
   const current = slides[currentSlide];
   const next = currentSlide < slides.length - 1 ? slides[currentSlide + 1] : null;
   const navigate = useNavigate();
@@ -33,10 +41,25 @@ export function PresenterView({ currentSlide, nextSlide, slides, onSlideClick })
   return (
     <div className="presenter-view">
       <div className="presenter-header">
-        <h1>Presenter View</h1>
-        <div className="slide-counter">
-          Slide {currentSlide + 1} of {slides.length}
+        <div className="presenter-header-left">
+          <h1>Presenter View</h1>
+          <div className="slide-counter">
+            Slide {currentSlide + 1} of {slides.length}
+          </div>
         </div>
+        {/* Autopilot HUD in header */}
+        {autopilot && (
+          <div className="presenter-header-right">
+            <AutopilotHUD
+              connected={autopilot.connected}
+              enabled={autopilot.enabled}
+              currentScore={autopilot.currentScore}
+              threshold={autopilot.threshold}
+              error={autopilot.error}
+              onToggle={autopilot.onToggle}
+            />
+          </div>
+        )}
       </div>
 
       <div className="presenter-content">

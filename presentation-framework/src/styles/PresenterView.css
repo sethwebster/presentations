@@ -15,6 +15,18 @@
   justify-content: space-between;
   align-items: center;
   border-bottom: 2px solid #333;
+  gap: 2rem;
+}
+
+.presenter-header-left {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.presenter-header-right {
+  display: flex;
+  align-items: center;
 }
 
 .presenter-header h1 {

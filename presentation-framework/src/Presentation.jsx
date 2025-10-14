@@ -12,6 +12,8 @@ import { SlideQRCode } from './components/SlideQRCode';
 import { QRCodePreloader } from './components/QRCodePreloader';
 import { EmojiFloaters } from './components/EmojiFloaters';
 import { ReactionButtons } from './components/ReactionButtons';
+import { AutopilotHUD } from './autopilot/ui/AutopilotHUD';
+import { useAutopilot } from './autopilot/useAutopilot';
 
 /**
  * Main Presentation component - framework core
@@ -120,12 +122,34 @@ export function Presentation({ slides, config = {} }) {
     });
   }, [deckId, isViewer, isPresenterMode, isPresenter, currentSlide]);
 
+  // Autopilot - Voice-driven auto-advance (works in presenter mode window OR main presenter)
+  const canUseAutopilot = deckId && (isPresenter || isPresenterMode);
+
+  const autopilot = useAutopilot({
+    deckId,
+    currentSlide,
+    slides,
+    bearer: import.meta.env.VITE_LUME_CONTROL_SECRET,
+    enabled: canUseAutopilot,
+  });
+
+  // Prepare autopilot props for PresenterView and HUD
+  const autopilotProps = canUseAutopilot ? {
+    connected: autopilot.connected,
+    enabled: autopilot.enabled,
+    currentScore: autopilot.currentScore,
+    threshold: autopilot.threshold,
+    error: autopilot.error,
+    onToggle: autopilot.toggle,
+  } : null;
+
   if (isPresenterMode) {
     return (
       <PresenterView
         currentSlide={currentSlide}
         nextSlide={slides[currentSlide + 1]}
         slides={slides}
+        autopilot={autopilotProps}
       />
     );
   }
