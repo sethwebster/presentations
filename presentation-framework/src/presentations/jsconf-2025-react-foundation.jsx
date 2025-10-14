@@ -7,6 +7,7 @@
  */
 
 import { Reveal } from '../components/Reveal.jsx';
+import { FadeOut } from '../components/FadeOut.jsx';
 
 // ============================================================================
 // CONFIGURATION
@@ -439,12 +440,14 @@ export const getSlides = (assetsPath) => {
       notes: 'It brings together partners like Meta, Microsoft, Amazon, Expo, Vercel, Callstack, and Software Mansion, working alongside the global developer community—not above it.',
       content: (
         <>
-          <div className="partners-title-container whitespace-nowrap">
-            <Reveal delay={0} animation="slide-up" duration={800}>
+          <div className="partners-title-container">
+            <FadeOut delay={1200} duration={400}>
               <h1>Building Together</h1>
-            </Reveal>
-            <Reveal delay={1500} animation="slide-up" duration={800}>
-              <h1 className="partners-title-better">Better Together</h1>
+            </FadeOut>
+            <Reveal delay={1500} animation="fade" duration={800}>
+              <h1 style={{ position: 'absolute', top: 0, left: 0, width: '100%', whiteSpace: 'nowrap' }}>
+                Better Together
+              </h1>
             </Reveal>
           </div>
           <div className="partners-logo-grid" key="partners-grid">
