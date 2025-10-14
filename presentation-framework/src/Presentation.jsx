@@ -64,7 +64,13 @@ export function Presentation({ slides, config = {} }) {
     progress
   } = usePresentation(slides.length);
 
-  useKeyboardNavigation(nextSlide, prevSlide, goToSlide, slides.length);
+  // Only enable keyboard navigation for non-viewers
+  useKeyboardNavigation(
+    isViewer ? () => {} : nextSlide,
+    isViewer ? () => {} : prevSlide,
+    isViewer ? () => {} : goToSlide,
+    slides.length
+  );
   const { openPresenterView, presenterWindowOpen } = useWindowSync(currentSlide, goToSlide);
   const { isIdle, hasMouseMoved } = useMouseIdle(500);
 
