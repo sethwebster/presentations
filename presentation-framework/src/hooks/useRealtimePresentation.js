@@ -15,15 +15,19 @@ export function useRealtimePresentation(deckId, currentSlide, goToSlide, isPrese
 
   // Process incoming events
   useEffect(() => {
+    console.log('SSE events received:', events.length, 'events, isPresenter:', isPresenter);
+
     events.forEach(event => {
+      console.log('Processing event:', event);
+
       if (event.type === 'init' && !isPresenter) {
-        // Sync to presenter's slide on init
+        console.log('VIEWER: Syncing to initial slide:', event.slide);
         goToSlide(event.slide);
       } else if (event.type === 'slide' && !isPresenter) {
-        // Follow presenter's slide changes
+        console.log('VIEWER: Following presenter to slide:', event.slide);
         goToSlide(event.slide);
       } else if (event.type === 'reaction') {
-        // Show reaction floater
+        console.log('ALL: Showing reaction:', event.emoji);
         setReactions(prev => [...prev, event]);
       }
     });

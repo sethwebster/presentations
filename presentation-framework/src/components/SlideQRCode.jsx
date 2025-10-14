@@ -2,11 +2,12 @@ import { useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 
 export function SlideQRCode({ currentSlide, totalSlides }) {
-  // Generate URL for current slide
+  // Generate URL for current slide (viewer URL)
   const currentUrl = useMemo(() => {
     const baseUrl = window.location.origin + window.location.pathname;
     const params = new URLSearchParams(window.location.search);
     params.set('slide', currentSlide + 1);
+    params.set('viewer', 'true');
     return `${baseUrl}?${params.toString()}`;
   }, [currentSlide]);
 
