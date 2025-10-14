@@ -2,7 +2,7 @@ export const config = {
   runtime: 'edge',
 };
 
-export default async function handler() {
+export default async function handler(req) {
   try {
     // Check if API key is configured
     if (!process.env.OPENAI_API_KEY) {
@@ -19,7 +19,27 @@ export default async function handler() {
       });
     }
 
-    console.log('Creating ephemeral session...');
+    // Get threshold from query params or request body
+    const url = new URL(req.url);
+    let threshold = 50; // Default
+
+    try {
+      // Check query params
+      const thresholdParam = url.searchParams.get('threshold');
+      if (thresholdParam) {
+        threshold = parseInt(thresholdParam);
+      } else if (req.method === 'POST') {
+        // Check request body
+        const body = await req.json().catch(() => ({}));
+        if (body.threshold) {
+          threshold = parseInt(body.threshold);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse threshold, using default:', e);
+    }
+
+    console.log('Creating ephemeral session with threshold:', threshold + '%');
 
     const response = await fetch('https://api.openai.com/v1/realtime/sessions', {
       method: 'POST',
@@ -51,8 +71,7 @@ Advance slides slightly *early* — never late. The speaker should never wait.
 - Progress must be **monotonic**; never decrease.
 
 🚦 ADVANCEMENT RULES (FIRST MATCH WINS)
-1. If progress_percent ≥ [THRESHOLD]%, **call advance_slide immediately.**
-   (Client will update this threshold via session.update after connection)
+1. If progress_percent ≥ ${threshold}%, **call advance_slide immediately.**
 2. If your estimated time to finish (seconds_remaining) ≤ 5 s,
    **call advance_slide immediately.**
 3. After calling advance_slide, pause all progress updates until new notes arrive.
@@ -112,7 +131,7 @@ If you hesitate, advance pre-emptively.
           {
             type: 'function',
             name: 'advance_slide',
-            description: 'Advance NOW. Called when progress >= threshold or seconds_remaining <= 5s. Client sets threshold.',
+            description: `Advance NOW. Called when progress >= ${threshold}% or seconds_remaining <= 5s.`,
             parameters: {
               type: 'object',
               properties: {

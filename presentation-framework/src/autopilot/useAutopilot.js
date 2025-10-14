@@ -143,15 +143,9 @@ EXAMPLES
   // Toggle autopilot on/off
   const toggle = async () => {
     if (!autopilotEnabled) {
-      await speech.connect();
+      const thresholdPercent = Math.round(threshold * 100);
+      await speech.connect(thresholdPercent); // Pass threshold to ephemeral endpoint
       setAutopilotEnabled(true);
-
-      // Update session with current threshold after connection
-      setTimeout(() => {
-        const thresholdPercent = Math.round(threshold * 100);
-        console.log('🔄 Updating initial session with threshold:', thresholdPercent + '%');
-        speech.updateSessionInstructions(buildInstructions(thresholdPercent));
-      }, 500); // Wait for connection to establish
     } else {
       speech.disconnect();
       setAutopilotEnabled(false);

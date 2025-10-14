@@ -16,7 +16,7 @@ export function useRealtimeSpeech() {
   const functionCallArgsRef = useRef({}); // Track accumulating function arguments
   const lastProgressRef = useRef(0); // For monotonic progress
 
-  const connect = async () => {
+  const connect = async (thresholdPercent = 50) => {
     if (pcRef.current) {
       console.log('Already connected');
       return;
@@ -24,10 +24,10 @@ export function useRealtimeSpeech() {
 
     try {
       setError(null);
-      console.log('Fetching ephemeral token...');
+      console.log('Fetching ephemeral token with threshold:', thresholdPercent + '%');
 
-      // Get ephemeral session token
-      const sessionResponse = await fetch('/api/rt/ephemeral');
+      // Get ephemeral session token with threshold
+      const sessionResponse = await fetch(`/api/rt/ephemeral?threshold=${thresholdPercent}`);
       if (!sessionResponse.ok) {
         const errorData = await sessionResponse.json().catch(() => ({}));
         const errorMsg = errorData.details || errorData.error || `HTTP ${sessionResponse.status}`;
