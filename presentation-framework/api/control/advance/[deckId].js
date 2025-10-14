@@ -1,12 +1,4 @@
-// Use dev pub/sub if KV not available
-let kvClient;
-try {
-  const { kv } = await import('@vercel/kv');
-  kvClient = kv;
-} catch (e) {
-  const { devPubSub } = await import('../../_dev-pubsub.js');
-  kvClient = devPubSub;
-}
+import { kv } from '@vercel/kv';
 
 export const config = {
   runtime: 'edge',
@@ -32,7 +24,7 @@ export default async function handler(req, context) {
   console.log('Updating deck state:', deckId, 'slide:', slide);
 
   // Update current state
-  await kvClient.hset(`deck:${deckId}:state`, { slide });
+  await kv.hset(`deck:${deckId}:state`, { slide });
 
   // Publish event to all subscribers
   const evt = JSON.stringify({
@@ -41,7 +33,7 @@ export default async function handler(req, context) {
     ts: Date.now()
   });
 
-  await kvClient.publish(`deck:${deckId}:events`, evt);
+  await kv.publish(`deck:${deckId}:events`, evt);
   console.log('Published slide event:', evt);
 
   return new Response('ok', {
