@@ -226,24 +226,10 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
   };
 
   // Default navigation renderer
-  const defaultNavigationRenderer = (): React.ReactElement => {
-    // For viewers, show a "Become Presenter" button
-    if (isViewer && deckId) {
-      return (
-        <button
-          className={`presenter-button become-presenter ${!hasMouseMoved ? 'initial' : isIdle ? 'hidden' : 'visible'}`}
-          onClick={() => setShowPasswordPrompt(true)}
-          aria-label="Become presenter"
-          style={{
-            bottom: '140px', // Position above reaction buttons (which are at ~80px)
-            padding: '12px 24px',
-            fontSize: '14px',
-            borderRadius: '8px',
-          }}
-        >
-          🎤 Become Presenter
-        </button>
-      );
+  const defaultNavigationRenderer = (): React.ReactElement | null => {
+    // Viewers don't see navigation controls
+    if (isViewer) {
+      return null;
     }
 
     // For presenters, show full navigation
