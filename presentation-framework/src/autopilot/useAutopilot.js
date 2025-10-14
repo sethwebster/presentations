@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRealtimeSpeech } from './useRealtimeSpeech';
 import { useAutoAdvance } from './useAutoAdvance';
 import { extractSpeakerNotes } from './extractSpeakerNotes';
