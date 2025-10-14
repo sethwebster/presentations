@@ -136,6 +136,8 @@ export function useAutoAdvance(options) {
     if (!enabled || !deckId || !bearer) return;
 
     const handleModelAdvance = (event) => {
+      console.log('📨 Received lume-autopilot-advance event:', event.detail);
+
       const now = Date.now();
       const cooldownRemaining = cooldownMs - (now - lastAdvanceAt.current);
 
@@ -146,8 +148,10 @@ export function useAutoAdvance(options) {
 
       // Check if AI reported 100% progress - advance immediately
       const aiProgressPercent = event?.detail?.progress || 0;
+      const reason = event?.detail?.reason || 'AI decision';
+
       if (aiProgressPercent >= 100) {
-        console.log('✅ [AI MODEL] 100% progress - advancing immediately!');
+        console.log('✅✅✅ [100% COMPLETE] Advancing immediately - NO countdown!');
         lastAdvanceAt.current = now;
         hasAdvancedForSlideRef.current = -1;
 
@@ -160,10 +164,10 @@ export function useAutoAdvance(options) {
           body: JSON.stringify({ slide: currentSlide + 1 }),
         }).catch(err => console.error('Advance error:', err));
       } else {
-        console.log('✅ [AI MODEL] Starting 5s countdown to slide', currentSlide + 1);
+        console.log('⏰⏰⏰ [COUNTDOWN STARTING] 5 seconds to slide', currentSlide + 1, '- Reason:', reason);
         lastAdvanceAt.current = now;
         setLastDecision({ type: 'model', timestamp: now });
-        startCountdown('model', 'AI decision');
+        startCountdown('model', reason);
       }
     };
 

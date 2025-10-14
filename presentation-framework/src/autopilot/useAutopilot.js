@@ -116,13 +116,15 @@ EXAMPLES
     // Only trigger once per threshold crossing
     if (aiProgressValue >= thresholdValue && aiProgressValue > lastTriggeredProgressRef.current) {
       lastTriggeredProgressRef.current = aiProgressValue;
-      console.log('🎯 AI Progress threshold reached:', aiProgressValue + '% >=', thresholdValue + '% - triggering advance');
+      console.log('🎯🎯🎯 THRESHOLD HIT! AI Progress:', aiProgressValue + '% >=', thresholdValue + '% - COUNTDOWN MUST START NOW');
 
       // Manually trigger the advance event (AI should have done this but didn't)
       // Pass progress so handler knows whether to show countdown
       window.dispatchEvent(new CustomEvent('lume-autopilot-advance', {
-        detail: { source: 'progress_threshold', reason: `AI: ${aiProgressValue}%`, progress: aiProgressValue }
+        detail: { source: 'progress_threshold', reason: `${aiProgressValue}%`, progress: aiProgressValue }
       }));
+
+      console.log('🚀 Dispatched lume-autopilot-advance event - countdown should begin');
     }
   }, [speech.aiProgress, threshold, autopilotEnabled, enabled]);
 
