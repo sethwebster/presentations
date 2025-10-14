@@ -117,8 +117,9 @@ EXAMPLES
       console.log('🎯 AI Progress threshold reached:', aiProgressValue + '% >=', thresholdValue + '% - triggering advance');
 
       // Manually trigger the advance event (AI should have done this but didn't)
+      // Pass progress so handler knows whether to show countdown
       window.dispatchEvent(new CustomEvent('lume-autopilot-advance', {
-        detail: { source: 'progress_threshold', reason: `AI: ${aiProgressValue}%` }
+        detail: { source: 'progress_threshold', reason: `AI: ${aiProgressValue}%`, progress: aiProgressValue }
       }));
     }
   }, [speech.aiProgress, threshold, autopilotEnabled, enabled]);
