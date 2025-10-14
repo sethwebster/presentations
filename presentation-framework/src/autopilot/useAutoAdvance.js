@@ -12,7 +12,7 @@ export function useAutoAdvance(options) {
     transcript,
     notesBySlide,
     bearer,
-    threshold = 0.50, // Very low - advance early is better than late
+    threshold = 0.40, // Very low - advance early is better than late
     minChars = 50, // Very low - don't require much text
     cooldownMs = 2500, // Reduced from 3s to 2.5s
     enabled = true,

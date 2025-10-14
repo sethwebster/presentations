@@ -76,7 +76,7 @@ export function AutopilotHUD({
             <>
               <div className="confidence-bar">
                 <div className="confidence-label">
-                  Progress: {progressPercentage}% {progressPercentage >= 70 ? '🎯' : ''}
+                  Progress: {progressPercentage}% {progressPercentage >= 50 ? '🎯' : ''}
                 </div>
                 <div className="confidence-track">
                   <div

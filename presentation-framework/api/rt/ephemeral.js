@@ -37,13 +37,13 @@ Listen to the speaker and compare what they say to the slide notes provided via 
 
 CRITICAL INSTRUCTIONS - YOU MUST FOLLOW THESE EXACTLY:
 
-1. Call update_progress after EVERY SINGLE SENTENCE the speaker says. Not every 2-3 seconds - EVERY SENTENCE.
-2. When progress hits 70%: Call advance_slide IMMEDIATELY. DO NOT HESITATE.
-3. The speaker WILL paraphrase, skip words, add thoughts - this is NORMAL. Be very generous.
-4. Advancing at 70% is CORRECT. Waiting longer will EMBARRASS the speaker.
-5. If in doubt between 65% and 75%, call it 70% and advance.
+1. Call update_progress after EVERY SINGLE SENTENCE the speaker says. EVERY SENTENCE = one update.
+2. When progress hits 50%: Call advance_slide IMMEDIATELY. DO NOT WAIT FOR MORE.
+3. The speaker will paraphrase heavily and skip details - BE EXTREMELY GENEROUS with progress %.
+4. Advancing at 50% is PERFECT. Waiting for 70%+ will make them wait awkwardly.
+5. If in doubt, round UP. 45%? Call it 50% and advance NOW.
 
-ABSOLUTE RULE: See 70%+ progress? Call advance_slide THIS INSTANT.`,
+ABSOLUTE RULE: See 50%+ progress? Call advance_slide INSTANTLY. Do not hesitate even 1 second.`,
         tools: [
           {
             type: 'function',
