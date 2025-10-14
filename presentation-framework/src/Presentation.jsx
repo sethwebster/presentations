@@ -14,6 +14,7 @@ import { SlideQRCode } from './components/SlideQRCode';
 import { QRCodePreloader } from './components/QRCodePreloader';
 import { EmojiFloaters } from './components/EmojiFloaters';
 import { ReactionButtons } from './components/ReactionButtons';
+import { WelcomeToast } from './components/WelcomeToast';
 import { AutopilotHUD } from './autopilot/ui/AutopilotHUD';
 import { useAutopilot } from './autopilot/useAutopilot';
 
@@ -36,7 +37,6 @@ export function Presentation({ slides, config = {} }) {
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState(false);
   const [rememberKey, setRememberKey] = useState(true);
-  const [showWelcomeToast, setShowWelcomeToast] = useState(false);
 
   // Get deckId from NavigationService
   const deckId = navigationService.getDeckId();
@@ -51,23 +51,6 @@ export function Presentation({ slides, config = {} }) {
 
   // By default, everyone is a viewer unless authenticated
   const isViewer = !auth.isAuthenticated;
-
-  // Show welcome toast when becoming a presenter (observe auth state changes)
-  useEffect(() => {
-    // Don't show in presenter mode window
-    if (isPresenterMode) return;
-
-    // Only show when we first become authenticated
-    if (auth.isAuthenticated) {
-      setShowWelcomeToast(true);
-
-      const timer = setTimeout(() => {
-        setShowWelcomeToast(false);
-      }, 3000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [auth.isAuthenticated, isPresenterMode]);
 
   // Handle password submission (delegates to AuthService)
   const handlePasswordSubmit = async (e) => {
@@ -308,30 +291,8 @@ export function Presentation({ slides, config = {} }) {
     <div className="app">
       <div className="progress-bar" style={{ width: `${progress}%` }} />
 
-      {/* Presenter welcome toast */}
-      {showWelcomeToast && (
-        <div style={{
-          position: 'fixed',
-          top: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          padding: '12px 24px',
-          backgroundColor: 'rgba(34, 197, 94, 0.95)',
-          borderRadius: '8px',
-          color: 'white',
-          fontSize: '14px',
-          fontWeight: '600',
-          zIndex: 10000,
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-          animation: 'slideDown 0.3s ease-out',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-        }}>
-          <span style={{ fontSize: '18px' }}>✓</span>
-          You are now presenting
-        </div>
-      )}
+      {/* Welcome toast - subscribes to auth events */}
+      <WelcomeToast isPresenterMode={isPresenterMode} />
 
       <div className="slide-container">
         <ViewTransition>

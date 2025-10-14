@@ -5,7 +5,7 @@
 class AuthService {
   constructor() {
     this.TOKEN_KEY = 'lume-presenter-token';
-    this.hasShownWelcomeToast = false;
+    this.authStateListeners = new Set();
   }
 
   /**
@@ -48,6 +48,9 @@ class AuthService {
           localStorage.setItem(this.TOKEN_KEY, token);
         }
 
+        // Emit authenticated event
+        this.emitAuthState({ type: 'authenticated', token });
+
         return { success: true };
       } else {
         return { success: false, error: 'Invalid password' };
@@ -63,22 +66,24 @@ class AuthService {
    */
   logout() {
     localStorage.removeItem(this.TOKEN_KEY);
-    this.hasShownWelcomeToast = false;
+    this.emitAuthState({ type: 'logged_out' });
   }
 
   /**
-   * Check if we should show the welcome toast
-   * @returns {boolean}
+   * Subscribe to auth state changes
+   * @param {Function} callback - Called with {type: 'authenticated' | 'logged_out', token?: string}
+   * @returns {Function} unsubscribe function
    */
-  shouldShowWelcomeToast() {
-    return this.isAuthenticated() && !this.hasShownWelcomeToast;
+  onAuthStateChange(callback) {
+    this.authStateListeners.add(callback);
+    return () => this.authStateListeners.delete(callback);
   }
 
   /**
-   * Mark welcome toast as shown
+   * Emit auth state change to all listeners
    */
-  markWelcomeToastShown() {
-    this.hasShownWelcomeToast = true;
+  emitAuthState(event) {
+    this.authStateListeners.forEach(listener => listener(event));
   }
 }
 
