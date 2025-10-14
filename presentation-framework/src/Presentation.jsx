@@ -9,6 +9,7 @@ import { useMouseIdle } from './hooks/useMouseIdle';
 import { useRealtimePresentation } from './hooks/useRealtimePresentation';
 import { usePresenterAuth } from './hooks/usePresenterAuth';
 import { navigationService } from './services/NavigationService';
+import { keyboardService } from './services/KeyboardService';
 import { PresenterView } from './components/PresenterView';
 import { SlideQRCode } from './components/SlideQRCode';
 import { QRCodePreloader } from './components/QRCodePreloader';
@@ -32,7 +33,6 @@ export function Presentation({ slides, config = {} }) {
   const [isPresenterMode, setIsPresenterMode] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const lastEscapeTime = useRef(0);
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState(false);
@@ -71,7 +71,16 @@ export function Presentation({ slides, config = {} }) {
     }
   };
 
-  // Double-Escape to return to homepage
+  // Subscribe to double-escape events from KeyboardService
+  useEffect(() => {
+    const unsubscribe = keyboardService.onDoubleEscape(() => {
+      navigate('/');
+    });
+
+    return unsubscribe;
+  }, [navigate]);
+
+  // Handle escape key
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape') {
@@ -80,21 +89,18 @@ export function Presentation({ slides, config = {} }) {
           setShowPasswordPrompt(false);
           setPasswordInput('');
           setPasswordError(false);
+          keyboardService.resetEscapeTiming();
           return;
         }
 
-        const now = Date.now();
-        if (now - lastEscapeTime.current < 500) {
-          // Double escape pressed within 500ms
-          navigate('/');
-        }
-        lastEscapeTime.current = now;
+        // Check for double-escape via service
+        keyboardService.checkDoubleEscape();
       }
     };
 
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [navigate, showPasswordPrompt, searchParams, setSearchParams]);
+  }, [showPasswordPrompt]);
 
   const {
     currentSlide,

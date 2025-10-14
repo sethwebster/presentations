@@ -1,6 +1,8 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useRealtimeSpeech } from './useRealtimeSpeech';
-import { useAutoAdvance } from './useAutoAdvance';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSpeech } from '../hooks/useSpeech';
+import { useAutoAdvanceSubscription } from '../hooks/useAutoAdvanceSubscription';
+import { autoAdvanceService } from '../services/AutoAdvanceService';
+import { autopilotService } from '../services/AutopilotService';
 import { extractSpeakerNotes } from './extractSpeakerNotes';
 
 /**
@@ -14,145 +16,90 @@ import { extractSpeakerNotes } from './extractSpeakerNotes';
  */
 export function useAutopilot({ deckId, currentSlide, slides, token, enabled = false }) {
   const [autopilotEnabled, setAutopilotEnabled] = useState(false);
-
-  // Load threshold from localStorage, default to 0.50
-  const [threshold, setThresholdState] = useState(() => {
-    try {
-      const saved = localStorage.getItem('lume-autopilot-threshold');
-      const value = saved ? parseFloat(saved) : 0.50;
-      console.log('🔄 Loading threshold from localStorage:', saved, '→', value);
-      return value;
-    } catch (err) {
-      console.error('Failed to load threshold:', err);
-      return 0.50;
-    }
-  });
+  const [threshold, setThreshold] = useState(() => autopilotService.getThreshold());
 
   const notesBySlide = useMemo(() => extractSpeakerNotes(slides), [slides]);
 
-  // Speech recognition
-  const speech = useRealtimeSpeech();
-
-  // Helper to build instructions with current threshold
-  const buildInstructions = (thresholdPercent) => `You are controlling slide auto-advance for a live talk. You must be EARLY, not perfect.
-
-CADENCE & LATENCY
-- Emit update_progress CONSTANTLY - after every word or short phrase (0.5-1 second intervals).
-- Keep tool calls extremely terse (covered_points: 3-5 words max).
-
-EARLY ADVANCE RULES (FIRST-HIT WINS):
-- If progress >= ${thresholdPercent}%, IMMEDIATELY call advance_slide.
-- If seconds_remaining <= 5s (based on pace and notes), IMMEDIATELY call advance_slide.
-- If both apply, advance once (idempotent).
-
-PROGRESS ESTIMATION
-- Be generous: paraphrase counts. Essence > exact wording.
-- Never decrease progress. Monotonic only.
-- Round UP optimistically: ${thresholdPercent - 3}%? → ${thresholdPercent}% and advance NOW.
-
-EXAMPLES
-- Notes ≈ 120 words, 150 WPM → ~48s. At ~${Math.round((thresholdPercent/100) * 48)}s (${thresholdPercent}%), CALL advance_slide.
-- Progress ${thresholdPercent - 3}-${thresholdPercent - 1}%? Round to ${thresholdPercent}% and advance.
-- After advance_slide, pause until new set_context.`;
-
-  const setThreshold = useCallback((newThreshold) => {
-    console.log('🎯 setThreshold called with:', newThreshold);
-    setThresholdState(newThreshold);
-
-    try {
-      const key = 'lume-autopilot-threshold';
-      const value = newThreshold.toString();
-      localStorage.setItem(key, value);
-
-      // Verify it was saved
-      const verified = localStorage.getItem(key);
-      console.log('💾 Saved threshold to localStorage:', {
-        key,
-        savedValue: value,
-        verifiedValue: verified,
-        match: verified === value
-      });
-
-      // Update AI session with new threshold
-      const thresholdPercent = Math.round(newThreshold * 100);
-      speech.updateSessionInstructions(buildInstructions(thresholdPercent));
-    } catch (err) {
-      console.error('Failed to save threshold:', err);
+  // Initialize autopilot service
+  useEffect(() => {
+    if (deckId && slides) {
+      autopilotService.initialize(deckId, slides);
     }
-  }, [speech]);
+  }, [deckId, slides]);
 
-  // Auto-advance logic (deterministic fallback)
-  const { currentScore: deterministicScore, countdown, cancelCountdown, resetForManualNavigation } = useAutoAdvance({
-    deckId,
-    currentSlide,
-    transcript: speech.finalTranscript,
-    notesBySlide,
-    token,
-    threshold,
-    enabled: autopilotEnabled && enabled,
-  });
+  // Speech recognition (using new subscription-based hook)
+  const speech = useSpeech();
 
-  // Use whichever score is higher (AI or deterministic)
-  // This way if AI functions aren't working, deterministic still works
-  const aiScore = speech.aiProgress / 100;
-  const currentScore = Math.max(aiScore, deterministicScore);
+  // Auto-advance (using new subscription-based hook)
+  const autoAdvance = useAutoAdvanceSubscription();
 
-  // Only log when score changes significantly
-  // console.log('📊 Score comparison:', {
-  //   aiScore: (aiScore * 100).toFixed(0) + '%',
-  //   deterministicScore: (deterministicScore * 100).toFixed(0) + '%',
-  //   using: currentScore === aiScore ? 'AI' : 'deterministic',
-  //   threshold: Math.round(threshold * 100) + '%',
-  // });
+  const handleSetThreshold = useCallback((newThreshold) => {
+    autopilotService.setThreshold(newThreshold);
+    setThreshold(newThreshold);
+  }, []);
 
-  // Trigger advance when AI progress exceeds threshold (fallback if AI doesn't call advance_slide)
-  const lastTriggeredProgressRef = useRef(0);
+  // Check for auto-advance when transcript changes
   useEffect(() => {
     if (!autopilotEnabled || !enabled) return;
 
-    const aiProgressValue = speech.aiProgress;
-    const thresholdValue = threshold * 100;
+    const decision = autoAdvanceService.checkShouldAdvance({
+      deckId,
+      currentSlide,
+      transcript: speech.finalTranscript,
+      notesBySlide,
+      threshold,
+      minChars: 50,
+      cooldownMs: 2500,
+    });
 
-    // Only trigger once per threshold crossing
-    if (aiProgressValue >= thresholdValue && aiProgressValue > lastTriggeredProgressRef.current) {
-      lastTriggeredProgressRef.current = aiProgressValue;
-      console.log('🎯🎯🎯 THRESHOLD HIT! AI Progress:', aiProgressValue + '% >=', thresholdValue + '% - COUNTDOWN MUST START NOW');
-
-      // Manually trigger the advance event (AI should have done this but didn't)
-      // Pass progress so handler knows whether to show countdown
-      window.dispatchEvent(new CustomEvent('lume-autopilot-advance', {
-        detail: { source: 'progress_threshold', reason: `${aiProgressValue}%`, progress: aiProgressValue }
-      }));
-
-      console.log('🚀 Dispatched lume-autopilot-advance event - countdown should begin');
+    if (decision.shouldAdvance) {
+      autoAdvanceService.startAdvance(
+        deckId,
+        currentSlide,
+        'deterministic',
+        decision.reason,
+        decision.immediate
+      );
     }
-  }, [speech.aiProgress, threshold, autopilotEnabled, enabled]);
+  }, [speech.finalTranscript, autopilotEnabled, enabled, deckId, currentSlide, notesBySlide, threshold]);
 
-  // Reset trigger ref on slide change
+  // Listen for AI advance requests
   useEffect(() => {
-    lastTriggeredProgressRef.current = 0;
-  }, [currentSlide]);
+    if (!autopilotEnabled || !enabled) return;
 
-  // Update slide context when slide changes
-  useSlideContextUpdate({
-    enabled: autopilotEnabled && speech.connected && enabled,
-    currentSlide,
-    notesBySlide,
-    resetTranscript: speech.resetTranscript,
-    sendSlideContext: speech.sendSlideContext,
-  });
+    const unsubscribe = speech.onEvent((event) => {
+      if (event.type === 'advance') {
+        const immediate = event.data.progress >= 100;
+        autoAdvanceService.startAdvance(
+          deckId,
+          currentSlide,
+          'model',
+          event.data.reason,
+          immediate
+        );
+      }
+    });
 
-  // Toggle autopilot on/off
-  const toggle = async () => {
-    if (!autopilotEnabled) {
-      const thresholdPercent = Math.round(threshold * 100);
-      await speech.connect(thresholdPercent); // Pass threshold to ephemeral endpoint
-      setAutopilotEnabled(true);
-    } else {
-      speech.disconnect();
-      setAutopilotEnabled(false);
+    return unsubscribe;
+  }, [autopilotEnabled, enabled, deckId, currentSlide, speech]);
+
+  // Update slide context when slide changes (delegate to AutopilotService)
+  useEffect(() => {
+    if (autopilotEnabled && speech.connected && enabled) {
+      autopilotService.updateSlideContext(currentSlide);
     }
-  };
+  }, [autopilotEnabled, speech.connected, enabled, currentSlide]);
+
+  // Toggle autopilot on/off (delegate to AutopilotService)
+  const toggle = useCallback(async () => {
+    const result = await autopilotService.toggle();
+    setAutopilotEnabled(result.enabled);
+    return result;
+  }, []);
+
+  // Use AI score if available, otherwise use deterministic
+  const aiScore = speech.aiProgress / 100;
+  const currentScore = Math.max(aiScore, autoAdvance.currentScore);
 
   return {
     // State
@@ -160,39 +107,12 @@ EXAMPLES
     connected: speech.connected,
     error: speech.error,
     currentScore,
-    countdown,
-    threshold, // Return actual threshold state, not hardcoded
+    countdown: autoAdvance.countdown,
+    threshold,
 
     // Controls
     toggle,
-    cancelCountdown,
-    setThreshold, // Return the setter function
+    cancelCountdown: autoAdvance.cancelCountdown,
+    setThreshold: handleSetThreshold,
   };
-}
-
-/**
- * Hook to manage slide context updates
- * Separated to keep dependencies clean
- */
-function useSlideContextUpdate({
-  enabled,
-  currentSlide,
-  notesBySlide,
-  resetTranscript,
-  sendSlideContext,
-}) {
-  useEffect(() => {
-    if (enabled) {
-      const notes = notesBySlide[currentSlide];
-      if (notes) {
-        console.log('🎯 Slide changed to', currentSlide, '- Updating model context and resetting transcript');
-        resetTranscript();
-
-        // Wait a moment for data channel to be ready
-        setTimeout(() => {
-          sendSlideContext(currentSlide, notes);
-        }, 100);
-      }
-    }
-  }, [enabled, currentSlide, notesBySlide, resetTranscript, sendSlideContext]);
 }

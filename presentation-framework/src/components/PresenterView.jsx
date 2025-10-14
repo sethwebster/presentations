@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { windowSyncService } from '../services/WindowSyncService';
 import { reactionService } from '../services/ReactionService';
+import { keyboardService } from '../services/KeyboardService';
 import '../styles/PresenterView.css';
 import { AutopilotHUD } from '../autopilot/ui/AutopilotHUD';
 import { EmojiFloaters } from './EmojiFloaters';
@@ -21,17 +22,21 @@ export function PresenterView({
   const current = slides[currentSlide];
   const next = currentSlide < slides.length - 1 ? slides[currentSlide + 1] : null;
   const navigate = useNavigate();
-  const lastEscapeTime = useRef(0);
 
+  // Subscribe to double-escape events from KeyboardService
+  useEffect(() => {
+    const unsubscribe = keyboardService.onDoubleEscape(() => {
+      window.close();
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // Handle escape key presses
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape') {
-        const now = Date.now();
-        if (now - lastEscapeTime.current < 500) {
-          // Double escape pressed within 500ms - close presenter window
-          window.close();
-        }
-        lastEscapeTime.current = now;
+        keyboardService.checkDoubleEscape();
       }
     };
 
