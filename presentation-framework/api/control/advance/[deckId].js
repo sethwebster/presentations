@@ -19,27 +19,38 @@ export async function POST(req) {
   if (auth !== expectedAuth) {
     return new Response('Unauthorized', { status: 401 });
   }
-  const { slide } = await req.json();
+  try {
+    const { slide } = await req.json();
+    console.log('Updating deck state:', deckId, 'slide:', slide);
 
-  console.log('Updating deck state:', deckId, 'slide:', slide);
+    // Update current state
+    await kv.hset(`deck:${deckId}:state`, { slide });
+    console.log('State updated successfully');
 
-  // Update current state
-  await kv.hset(`deck:${deckId}:state`, { slide });
+    // Publish event to all subscribers
+    const evt = JSON.stringify({
+      type: 'slide',
+      slide,
+      ts: Date.now()
+    });
 
-  // Publish event to all subscribers
-  const evt = JSON.stringify({
-    type: 'slide',
-    slide,
-    ts: Date.now()
-  });
+    await kv.publish(`deck:${deckId}:events`, evt);
+    console.log('Published slide event:', evt);
 
-  await kv.publish(`deck:${deckId}:events`, evt);
-  console.log('Published slide event:', evt);
-
-  return new Response('ok', {
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Content-Type': 'text/plain',
-    },
-  });
+    return new Response('ok', {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'text/plain',
+      },
+    });
+  } catch (err) {
+    console.error('Control API error:', err, err.stack);
+    return new Response(JSON.stringify({ error: err.message, stack: err.stack }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      }
+    });
+  }
 }
