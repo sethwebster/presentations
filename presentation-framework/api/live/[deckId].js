@@ -58,12 +58,17 @@ export async function GET(req) {
               // Check for new reactions
               const reactions = await kv.lrange(`deck:${deckId}:reactions`, 0, -1) || [];
               for (const reactionStr of reactions) {
-                const reaction = JSON.parse(reactionStr);
-                if (!processedReactionIds.has(reaction.id)) {
-                  controller.enqueue(encoder.encode(`data: ${reactionStr}\n\n`));
-                  processedReactionIds.add(reaction.id);
-                  hasChanges = true;
-                  console.log('Sent reaction:', reaction.emoji);
+                try {
+                  const reaction = typeof reactionStr === 'string' ? JSON.parse(reactionStr) : reactionStr;
+                  if (!processedReactionIds.has(reaction.id)) {
+                    const reactionJson = typeof reactionStr === 'string' ? reactionStr : JSON.stringify(reaction);
+                    controller.enqueue(encoder.encode(`data: ${reactionJson}\n\n`));
+                    processedReactionIds.add(reaction.id);
+                    hasChanges = true;
+                    console.log('Sent reaction:', reaction.emoji);
+                  }
+                } catch (parseErr) {
+                  console.error('Failed to parse reaction:', reactionStr, parseErr);
                 }
               }
 
