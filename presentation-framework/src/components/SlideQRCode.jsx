@@ -12,16 +12,21 @@ export function SlideQRCode({ currentSlide, totalSlides }) {
   }, [currentSlide]);
 
   return (
-    <div className="absolute bottom-4 left-4 p-2 rounded-lg backdrop-blur-md z-20"
-         style={{
-           background: 'rgba(255, 255, 255, 0.9)',
-         }}>
+    <a
+      href={currentUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="absolute bottom-4 left-4 p-2 rounded-lg backdrop-blur-md z-20 cursor-pointer hover:scale-105 transition-transform"
+      style={{
+        background: 'rgba(255, 255, 255, 0.9)',
+      }}
+    >
       <QRCodeSVG
         value={currentUrl}
         size={80}
         level="M"
         includeMargin={false}
       />
-    </div>
+    </a>
   );
 }
