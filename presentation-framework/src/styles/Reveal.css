@@ -7,9 +7,12 @@
 
 .reveal.hidden {
   opacity: 0;
+  visibility: hidden;
 }
 
 .reveal.revealed {
+  opacity: 1;
+  visibility: visible;
   animation-duration: var(--reveal-duration);
   animation-timing-function: ease-out;
   animation-fill-mode: forwards;
