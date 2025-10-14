@@ -102,8 +102,17 @@ export function AutopilotHUD({
                   max="80"
                   step="5"
                   value={thresholdPercentage}
-                  onChange={(e) => onThresholdChange(parseInt(e.target.value) / 100)}
+                  onChange={(e) => {
+                    const newVal = parseInt(e.target.value) / 100;
+                    console.log('🎚️ Threshold changed to:', newVal);
+                    onThresholdChange?.(newVal);
+                  }}
+                  onInput={(e) => {
+                    const newVal = parseInt(e.target.value) / 100;
+                    onThresholdChange?.(newVal);
+                  }}
                   className="threshold-slider"
+                  style={{ touchAction: 'none' }}
                 />
               </div>
             </>
