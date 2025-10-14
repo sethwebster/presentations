@@ -1,14 +1,16 @@
 import './styles/Presentation.css';
 import { useState, useEffect, useRef } from 'react';
 import { ViewTransition } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { usePresentation } from './hooks/usePresentation';
 import { useKeyboardNavigation } from './hooks/useKeyboardNavigation';
 import { useWindowSync } from './hooks/useWindowSync';
 import { useMouseIdle } from './hooks/useMouseIdle';
+import { useRealtimePresentation } from './hooks/useRealtimePresentation';
 import { PresenterView } from './components/PresenterView';
 import { SlideQRCode } from './components/SlideQRCode';
 import { QRCodePreloader } from './components/QRCodePreloader';
+import { EmojiFloaters } from './components/EmojiFloaters';
 
 /**
  * Main Presentation component - framework core
@@ -22,8 +24,12 @@ import { QRCodePreloader } from './components/QRCodePreloader';
  */
 export function Presentation({ slides, config = {} }) {
   const [isPresenterMode, setIsPresenterMode] = useState(false);
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const lastEscapeTime = useRef(0);
+
+  const deckId = searchParams.get('deckId');
+  const isViewer = searchParams.get('viewer') === 'true';
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -60,6 +66,21 @@ export function Presentation({ slides, config = {} }) {
   useKeyboardNavigation(nextSlide, prevSlide, goToSlide, slides.length);
   const { openPresenterView, presenterWindowOpen } = useWindowSync(currentSlide, goToSlide);
   const { isIdle, hasMouseMoved } = useMouseIdle(500);
+
+  // Realtime features
+  const { reactions, publishSlideChange, sendReaction } = useRealtimePresentation(
+    deckId,
+    currentSlide,
+    goToSlide,
+    !isViewer && !isPresenterMode
+  );
+
+  // Publish slide changes when presenter navigates
+  useEffect(() => {
+    if (deckId && !isViewer && !isPresenterMode) {
+      publishSlideChange(currentSlide);
+    }
+  }, [currentSlide, deckId, isViewer, isPresenterMode, publishSlideChange]);
 
   if (isPresenterMode) {
     return (
@@ -149,6 +170,9 @@ export function Presentation({ slides, config = {} }) {
 
       {/* Preload QR codes for upcoming slides */}
       <QRCodePreloader currentSlide={currentSlide} totalSlides={slides.length} />
+
+      {/* Emoji reaction floaters */}
+      {deckId && <EmojiFloaters reactions={reactions} />}
     </div>
   );
 }
