@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/PresenterView.css';
 import { AutopilotHUD } from '../autopilot/ui/AutopilotHUD';
+import { EmojiFloaters } from './EmojiFloaters';
 
 export function PresenterView({
   currentSlide,
@@ -10,7 +11,11 @@ export function PresenterView({
   onSlideClick,
   // Autopilot props
   autopilot = null,
+  // Reactions
+  reactions = [],
 }) {
+  const [reactionCount, setReactionCount] = useState(0);
+  const [recentReactions, setRecentReactions] = useState([]);
   const current = slides[currentSlide];
   const next = currentSlide < slides.length - 1 ? slides[currentSlide + 1] : null;
   const navigate = useNavigate();
@@ -37,6 +42,18 @@ export function PresenterView({
     channel.postMessage({ type: 'SLIDE_CHANGE', slideIndex: index });
     channel.close();
   };
+
+  // Track reactions - update count and keep last 10 seconds for floaters
+  useEffect(() => {
+    if (reactions.length > 0) {
+      setReactionCount(reactions.length);
+
+      // Keep only reactions from last 10 seconds for animation
+      const now = Date.now();
+      const recent = reactions.filter(r => (now - r.ts) < 10000);
+      setRecentReactions(recent);
+    }
+  }, [reactions]);
 
   return (
     <div className="presenter-view">
@@ -67,6 +84,11 @@ export function PresenterView({
           <div className="slide-counter">
             Slide {currentSlide + 1} of {slides.length}
           </div>
+          {reactionCount > 0 && (
+            <div className="reaction-counter">
+              🎉 {reactionCount} {reactionCount === 1 ? 'reaction' : 'reactions'}
+            </div>
+          )}
         </div>
         {/* Autopilot HUD in header */}
         {autopilot && (
@@ -132,6 +154,9 @@ export function PresenterView({
           </div>
         </div>
       </div>
+
+      {/* Emoji reaction floaters */}
+      <EmojiFloaters reactions={recentReactions} />
     </div>
   );
 }

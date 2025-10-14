@@ -153,6 +153,7 @@ export function Presentation({ slides, config = {} }) {
         nextSlide={slides[currentSlide + 1]}
         slides={slides}
         autopilot={autopilotProps}
+        reactions={reactions}
       />
     );
   }

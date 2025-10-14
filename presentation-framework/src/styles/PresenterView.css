@@ -115,6 +115,26 @@
   font-weight: 600;
 }
 
+.reaction-counter {
+  font-size: 1rem;
+  color: var(--lume-primary, #16c2c7);
+  font-weight: 600;
+  padding: 0.25rem 0.75rem;
+  background: rgba(22, 194, 199, 0.1);
+  border-radius: 0.5rem;
+  border: 1px solid rgba(22, 194, 199, 0.3);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(22, 194, 199, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(22, 194, 199, 0.6);
+  }
+}
+
 .presenter-content {
   display: flex;
   flex: 1;
