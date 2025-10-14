@@ -439,7 +439,7 @@ export const getSlides = (assetsPath) => {
       content: (
         <>
           <h1>Building Together</h1>
-          <div className="partners-logo-grid">
+          <div className="partners-logo-grid" key="partners-grid">
             {partners.map((partner, index) => (
               <Reveal
                 key={partner.id}
