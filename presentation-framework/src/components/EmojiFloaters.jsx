@@ -5,7 +5,10 @@ export function EmojiFloaters({ reactions }) {
   const [activeFloaters, setActiveFloaters] = useState([]);
 
   useEffect(() => {
+    console.log('EmojiFloaters received reactions:', reactions);
+
     reactions.forEach(reaction => {
+      console.log('Processing reaction for floater:', reaction);
       // Add floater with random position
       const floater = {
         id: reaction.id,
