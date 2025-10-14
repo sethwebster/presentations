@@ -241,8 +241,8 @@ export function Presentation({ slides, config = {} }) {
       {/* Preload QR codes for upcoming slides */}
       <QRCodePreloader currentSlide={currentSlide} totalSlides={slides.length} />
 
-      {/* Emoji reaction floaters */}
-      {deckId && <EmojiFloaters reactions={reactions} />}
+      {/* Emoji reaction floaters - show on both presenter and viewer */}
+      {deckId && !isPresenterMode && <EmojiFloaters reactions={reactions} />}
 
       {/* Reaction buttons for viewers */}
       {deckId && isViewer && (
