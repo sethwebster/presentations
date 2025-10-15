@@ -17,6 +17,7 @@ export function HomePage() {
   const [selectedPresentation, setSelectedPresentation] = useState<string | null>(null);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState(false);
+  const [liveDecks, setLiveDecks] = useState<Set<string>>(new Set());
 
   // Preload all presentations on mount (delegate to PresentationLoaderService)
   useEffect(() => {
@@ -31,6 +32,37 @@ export function HomePage() {
       });
       setLoadedPresentations(loaded);
     });
+  }, []);
+
+  // Check which presentations are live (being presented)
+  useEffect(() => {
+    const checkLiveStatus = async () => {
+      const live = new Set<string>();
+
+      for (const name of Object.keys(presentations)) {
+        try {
+          const deckId = `default-${name}`;
+          // Try to fetch the SSE endpoint - if it responds, the deck is live
+          const response = await fetch(`/api/live/${deckId}`, {
+            method: 'HEAD',
+            signal: AbortSignal.timeout(1000)
+          });
+          if (response.ok) {
+            live.add(name);
+          }
+        } catch {
+          // Deck not live or error - ignore
+        }
+      }
+
+      setLiveDecks(live);
+    };
+
+    checkLiveStatus();
+
+    // Recheck every 10 seconds
+    const interval = setInterval(checkLiveStatus, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -122,7 +154,7 @@ export function HomePage() {
                           e.stopPropagation();
                           navigate(`/present/${name}?viewer=true`);
                         }}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all hover:scale-105"
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all hover:scale-105 relative"
                         style={{
                           background: 'rgba(255, 255, 255, 0.05)',
                           border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -134,6 +166,11 @@ export function HomePage() {
                           <polygon points="5 3 19 12 5 21 5 3"/>
                         </svg>
                         <span className="text-sm">Watch</span>
+                        {liveDecks.has(name) && (
+                          <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-red-500 text-white animate-pulse">
+                            LIVE
+                          </span>
+                        )}
                       </button>
                       <button
                         onClick={(e) => {
