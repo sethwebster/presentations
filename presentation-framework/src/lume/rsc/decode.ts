@@ -1,15 +1,8 @@
-import { createFromReadableStream } from 'react-server-dom-webpack/client.node';
-
-function uint8ArrayToStream(bytes: Uint8Array): ReadableStream<Uint8Array> {
-  return new ReadableStream({
-    start(controller) {
-      controller.enqueue(bytes);
-      controller.close();
-    },
-  });
-}
-
-export async function decodeLumeRsc(bytes: Uint8Array): Promise<any> {
-  const stream = uint8ArrayToStream(bytes);
-  return createFromReadableStream(stream);
+export async function decodeLumeRsc(bytes: Uint8Array): Promise<Record<string, unknown>> {
+  const text = new TextDecoder().decode(bytes);
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error('Failed to decode lume.rsc payload: ' + (error as Error).message);
+  }
 }

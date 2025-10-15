@@ -45,7 +45,7 @@ export async function exportSlidesAsLume(
       console.warn('Skipping RSC payload export in browser environment. Use CLI for canonical exports.');
     } else {
       try {
-        const { renderDeckToRSC } = await import('../lume/rsc/renderDeck.ts');
+        const { renderDeckToRSC } = await import('../lume/rsc/renderDeck');
 
         const rscStream = await renderDeckToRSC(enhancements.presentationModule, {
           presentationName: options.deckId,
