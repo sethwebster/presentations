@@ -6,11 +6,13 @@ import { presentationLoaderService } from '../services/PresentationLoaderService
 import { PresentationThumbnail } from '../components/PresentationThumbnail';
 import { Card, CardContent } from '../components/ui/card';
 import { LoadedPresentation } from '../types/presentation';
+import { usePresenterAuth } from '../hooks/usePresenterAuth';
 
 export function HomePage() {
   const navigate = useNavigate();
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [loadedPresentations, setLoadedPresentations] = useState<Record<string, LoadedPresentation>>({});
+  const auth = usePresenterAuth();
 
   // Preload all presentations on mount (delegate to PresentationLoaderService)
   useEffect(() => {
@@ -132,6 +134,31 @@ export function HomePage() {
           </div>
         )}
       </main>
+
+      {/* Logout button (bottom-right) if authenticated */}
+      {auth.isAuthenticated && (
+        <button
+          onClick={() => {
+            auth.logout();
+            window.location.reload();
+          }}
+          className="fixed bottom-8 right-8 p-3 rounded-lg transition-all hover:scale-105"
+          style={{
+            backgroundColor: 'rgba(239, 68, 68, 0.2)',
+            border: '2px solid rgba(239, 68, 68, 0.4)',
+            color: 'var(--lume-mist)',
+            backdropFilter: 'blur(10px)',
+          }}
+          aria-label="Logout"
+          title="End presenter session"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+        </button>
+      )}
     </div>
   );
 }
