@@ -154,7 +154,7 @@ export function HomePage() {
                           e.stopPropagation();
                           navigate(`/present/${name}?viewer=true`);
                         }}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all hover:scale-105 relative"
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all hover:scale-105 relative cursor-pointer"
                         style={{
                           background: 'rgba(255, 255, 255, 0.05)',
                           border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -182,7 +182,7 @@ export function HomePage() {
                             setShowPasswordPrompt(true);
                           }
                         }}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all hover:scale-105"
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all hover:scale-105 cursor-pointer"
                         style={{
                           background: 'var(--lume-primary, #16c2c7)',
                           border: '1px solid rgba(22, 194, 199, 0.4)',
