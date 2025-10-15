@@ -13,7 +13,8 @@
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "lume:export": "node ./tools/lume/export.mjs"
   },
   "dependencies": {
     "@radix-ui/react-hover-card": "^1.1.15",
@@ -24,10 +25,12 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "ioredis": "^5.8.1",
+    "jszip": "^3.10.1",
     "qrcode.react": "^4.2.0",
     "react": "^19.3.0-canary-d7215b49-20251013",
     "react-dom": "^19.3.0-canary-d7215b49-20251013",
     "react-router-dom": "^7.9.4",
+    "react-server-dom-webpack": "^19.3.0-canary-5f2b5718-20251014",
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
@@ -39,6 +42,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@types/jsdom": "^27.0.0",
+    "@types/jszip": "^3.4.1",
     "@types/node": "^24.7.2",
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",
@@ -56,6 +60,7 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.14",
     "tailwindcss-animate": "^1.0.7",
+    "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vite": "^7.1.7",
     "vitest": "^3.2.4"
