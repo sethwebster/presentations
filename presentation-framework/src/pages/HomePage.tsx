@@ -13,6 +13,11 @@ export function HomePage() {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [loadedPresentations, setLoadedPresentations] = useState<Record<string, LoadedPresentation>>({});
   const auth = usePresenterAuth();
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
+  const [selectedPresentation, setSelectedPresentation] = useState<string | null>(null);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState(false);
+  const [liveDecks, setLiveDecks] = useState<Set<string>>(new Set());
 
   // Preload all presentations on mount (delegate to PresentationLoaderService)
   useEffect(() => {
@@ -27,6 +32,37 @@ export function HomePage() {
       });
       setLoadedPresentations(loaded);
     });
+  }, []);
+
+  // Check which presentations are live (being presented)
+  useEffect(() => {
+    const checkLiveStatus = async () => {
+      const live = new Set<string>();
+
+      for (const name of Object.keys(presentations)) {
+        try {
+          const deckId = `default-${name}`;
+          // Try to fetch the SSE endpoint - if it responds, the deck is live
+          const response = await fetch(`/api/live/${deckId}`, {
+            method: 'HEAD',
+            signal: AbortSignal.timeout(1000)
+          });
+          if (response.ok) {
+            live.add(name);
+          }
+        } catch {
+          // Deck not live or error - ignore
+        }
+      }
+
+      setLiveDecks(live);
+    };
+
+    checkLiveStatus();
+
+    // Recheck every 10 seconds
+    const interval = setInterval(checkLiveStatus, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -53,7 +89,6 @@ export function HomePage() {
             return (
               <Card
                 key={name}
-                onClick={() => navigate(`/present/${name}`)}
                 onMouseEnter={async (e) => {
                   setHoveredCard(name);
                   e.currentTarget.style.background = 'rgba(22, 194, 199, 0.05)';
@@ -103,20 +138,71 @@ export function HomePage() {
 
                   {/* Card footer */}
                   <div className="p-6">
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="text-xl font-medium" style={{ color: 'var(--lume-mist)' }}>
+                    <div className="mb-3">
+                      <h3 className="text-xl font-medium mb-2" style={{ color: 'var(--lume-mist)' }}>
                         {name.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                       </h3>
-                      <span
-                        className="text-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                        style={{ color: 'var(--lume-primary)' }}
-                      >
-                        →
-                      </span>
+                      <p className="text-sm opacity-50">
+                        {presentationData ? `${presentationData.slides.length} slides` : 'Loading...'}
+                      </p>
                     </div>
-                    <p className="text-sm opacity-50">
-                      {presentationData ? `${presentationData.slides.length} slides` : 'Click to present'}
-                    </p>
+
+                    {/* Action buttons */}
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/present/${name}?viewer=true`);
+                        }}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all hover:scale-105 relative"
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          color: 'var(--lume-mist)',
+                        }}
+                        title="Watch presentation"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
+                          <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                        <span className="text-sm">Watch</span>
+                        {liveDecks.has(name) && (
+                          <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-red-500 text-white animate-pulse">
+                            LIVE
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (auth.isAuthenticated) {
+                            navigate(`/present/${name}`);
+                          } else {
+                            setSelectedPresentation(name);
+                            setShowPasswordPrompt(true);
+                          }
+                        }}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all hover:scale-105"
+                        style={{
+                          background: 'var(--lume-primary, #16c2c7)',
+                          border: '1px solid rgba(22, 194, 199, 0.4)',
+                          color: 'white',
+                        }}
+                        title={auth.isAuthenticated ? "Present (authenticated)" : "Present (login required)"}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
+                          <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+                          <path d="M21 3v5h-5"/>
+                        </svg>
+                        <span className="text-sm font-medium">Present</span>
+                        {!auth.isAuthenticated && (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '14px', height: '14px', marginLeft: '-4px' }}>
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                          </svg>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -158,6 +244,96 @@ export function HomePage() {
             <line x1="21" y1="12" x2="9" y2="12"/>
           </svg>
         </button>
+      )}
+
+      {/* Password prompt modal */}
+      {showPasswordPrompt && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-[10000]"
+          onClick={() => {
+            setShowPasswordPrompt(false);
+            setPasswordInput('');
+            setPasswordError(false);
+          }}
+        >
+          <div
+            className="bg-[var(--lume-midnight)] p-8 rounded-xl shadow-2xl max-w-md w-[90%]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-2xl mb-4" style={{ color: 'var(--lume-mist)' }}>
+              Enter Presenter Password
+            </h2>
+            {passwordError && (
+              <div className="p-3 mb-4 rounded-lg bg-red-500/10 border-2 border-red-500 text-red-500 text-sm">
+                Incorrect password. Please try again.
+              </div>
+            )}
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (passwordInput.trim()) {
+                const result = await auth.login(passwordInput.trim(), true);
+                if (result.success) {
+                  setShowPasswordPrompt(false);
+                  setPasswordInput('');
+                  setPasswordError(false);
+                  // Navigate to presentation as presenter
+                  if (selectedPresentation) {
+                    navigate(`/present/${selectedPresentation}`);
+                  }
+                } else {
+                  setPasswordError(true);
+                  setPasswordInput('');
+                }
+              }
+            }}>
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={(e) => {
+                  setPasswordInput(e.target.value);
+                  setPasswordError(false);
+                }}
+                placeholder="Password"
+                autoFocus
+                className="w-full p-3 text-base rounded-lg mb-4"
+                style={{
+                  border: `2px solid ${passwordError ? 'rgb(239, 68, 68)' : 'var(--lume-cobalt, #4a5568)'}`,
+                  backgroundColor: 'var(--lume-shadow, #0f0f1e)',
+                  color: 'var(--lume-mist)',
+                }}
+              />
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordPrompt(false);
+                    setPasswordInput('');
+                    setPasswordError(false);
+                  }}
+                  className="px-5 py-2 text-sm rounded-lg border-2 bg-transparent cursor-pointer"
+                  style={{
+                    borderColor: 'var(--lume-cobalt, #4a5568)',
+                    color: 'var(--lume-mist)',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!passwordInput.trim()}
+                  className="px-5 py-2 text-sm rounded-lg border-none text-white"
+                  style={{
+                    backgroundColor: 'var(--lume-cobalt, #3b82f6)',
+                    cursor: passwordInput.trim() ? 'pointer' : 'not-allowed',
+                    opacity: passwordInput.trim() ? 1 : 0.5,
+                  }}
+                >
+                  Login & Present
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
