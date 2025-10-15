@@ -36,7 +36,7 @@ export function createLumePackageFromSlides(
             customCSS: `.${slide.className} { /* TODO: capture computed styles */ }`,
           }
         : undefined,
-      elements: extractElementsFromSlideContent(slide.content),
+      ...extractElementsFromSlideContent(slide.content),
       notes: slide.notes
         ? {
             speaker: slide.notes,

@@ -14,7 +14,8 @@
     "test:run": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "lume:export": "node ./tools/lume/export.mjs"
+    "lume:export": "node ./tools/lume/export.mjs",
+    "build:rsc": "webpack --config webpack.rsc.config.cjs"
   },
   "dependencies": {
     "@radix-ui/react-hover-card": "^1.1.15",
@@ -30,7 +31,6 @@
     "react": "^19.3.0-canary-d7215b49-20251013",
     "react-dom": "^19.3.0-canary-d7215b49-20251013",
     "react-router-dom": "^7.9.4",
-    "react-server-dom-webpack": "^19.3.0-canary-5f2b5718-20251014",
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
@@ -46,6 +46,7 @@
     "@types/node": "^24.7.2",
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",
+    "@types/webpack": "^5.28.5",
     "@vitejs/plugin-react": "^5.0.4",
     "@vitest/coverage-v8": "^3.2.4",
     "@vitest/ui": "^3.2.4",
@@ -58,11 +59,15 @@
     "globals": "^16.4.0",
     "jsdom": "^27.0.0",
     "postcss": "^8.5.6",
+    "react-server-dom-webpack": "^19.3.0-canary-1873ad79-20251015",
     "tailwindcss": "^4.1.14",
     "tailwindcss-animate": "^1.0.7",
+    "ts-loader": "^9.5.4",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vite": "^7.1.7",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "webpack": "^5.102.1",
+    "webpack-cli": "^6.0.1"
   }
 }

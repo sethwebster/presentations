@@ -4,6 +4,9 @@ import { Presentation } from '../Presentation';
 import { loadPresentation } from '../presentations/index.js';
 import { PresentationModule } from '../types/presentation';
 import { exportSlidesAsLume, downloadLumeArchive } from '../services/LumePackageService';
+import { fetchDeckSummary } from '../rsc/client';
+import type { DeckDefinition } from '../rsc/types';
+import { DeckSummaryPanel } from '../components/DeckSummaryPanel';
 
 interface PresentationModuleState {
   module: PresentationModule;
@@ -15,6 +18,7 @@ export function PresentationView() {
   const [presentationModule, setPresentationModule] = useState<PresentationModuleState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [deckSummary, setDeckSummary] = useState<DeckDefinition | null>(null);
   const [exporting, setExporting] = useState<boolean>(false);
   const [exportFeedback, setExportFeedback] = useState<string | null>(null);
 
@@ -24,6 +28,14 @@ export function PresentationView() {
         const module = await loadPresentation(presentationName);
         const assetsDir = `/presentations/${presentationName}-assets`;
         setPresentationModule({ module, assetsPath: assetsDir });
+
+        const rscUrl = `/api/rsc/${presentationName}`;
+        try {
+          const summary = await fetchDeckSummary(rscUrl);
+          setDeckSummary(summary);
+        } catch (rscError) {
+          console.warn('RSC summary unavailable:', rscError);
+        }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         setError(`Failed to load presentation: ${errorMessage}`);
@@ -80,6 +92,8 @@ export function PresentationView() {
     brandLogo: getBrandLogo ? getBrandLogo(assetsPath) : null,
     ...presentationConfig,
   };
+
+  const debugPanel = <DeckSummaryPanel summary={deckSummary} />;
 
   const handleExport = async () => {
     if (!presentationName) return;
@@ -154,6 +168,7 @@ export function PresentationView() {
           {exportFeedback}
         </div>
       )}
+      {debugPanel}
       <Presentation slides={slides} config={config} />
     </>
   );

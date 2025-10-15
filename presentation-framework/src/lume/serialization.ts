@@ -10,6 +10,8 @@ import {
   LumeSlide,
   LumeNotes,
 } from './types';
+import type { DeckDefinition } from '../rsc/types';
+import { parseDeckSummaryFromText } from './rsc/parseSummary';
 
 export interface LumeSerializeOptions {
   /**
@@ -118,10 +120,21 @@ export async function deserializeLumePackage(
       }),
   );
 
+  let rscSummary: DeckDefinition | null = null;
+  if (rscPayload && typeof window === 'undefined') {
+    try {
+      const text = Buffer.from(rscPayload).toString('utf8');
+      rscSummary = parseDeckSummaryFromText(text);
+    } catch (error) {
+      console.warn('Failed to decode lume.rsc payload:', error);
+    }
+  }
+
   return {
     package: packageData,
     files,
     rscPayload,
+    rscSummary,
   };
 }
 

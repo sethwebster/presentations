@@ -2,6 +2,9 @@ import React from 'react';
 import { renderToReadableStream } from 'react-server-dom-webpack/server.node';
 import type { PresentationModule, SlideData } from '../../types/presentation';
 import type { LumePackage } from '../types';
+import { createLumePackageFromSlides } from '../transform';
+import type { DeckDefinition, SlideDefinition, LayerDefinition, ElementDefinition } from '../../rsc/types';
+import { Deck } from '../../rsc/components';
 
 export interface RenderDeckToRSCOptions {
   presentationName: string;
@@ -27,70 +30,30 @@ function createSlides(module: PresentationModule, assetsPath: string | undefined
   }
 }
 
-interface DeckSummary {
-  meta: {
-    id: string;
-    title: string;
-  };
-  slides: Array<{
-    id: string;
-    className?: string;
-    notes?: string;
-    hasContent: boolean;
-  }>;
-}
-
-function ServerDeck({ deck }: { deck: DeckSummary }): DeckSummary {
-  return deck;
-}
-
-function isLumePackage(value: unknown): value is LumePackage {
+function isDeckDefinition(value: unknown): value is DeckDefinition {
   return !!value && typeof value === 'object' && 'meta' in value && 'slides' in value;
 }
 
-/**
- * Render the given presentation module or precomputed Lume package to an RSC stream.
- */
 export async function renderDeckToRSC(
   source: unknown,
   options: RenderDeckToRSCOptions,
 ): Promise<ReadableStream<Uint8Array>> {
-  let deckSummary: DeckSummary;
+  let deckDefinition: DeckDefinition;
 
-  if (isLumePackage(source)) {
-    deckSummary = {
-      meta: {
-        id: source.meta.id,
-        title: source.meta.title,
-      },
-      slides: source.slides.map((slide) => ({
-        id: slide.id,
-        className: slide.metadata?.runtimeClassName || slide.layout,
-        notes: slide.notes?.speaker,
-        hasContent: slide.elements?.length ? true : false,
-      })),
-    };
+  if (isDeckDefinition(source)) {
+    deckDefinition = source;
   } else {
     assertPresentationModule(source);
     const slides = createSlides(source, options.assetsPath);
-
-    deckSummary = {
-      meta: {
-        id: options.presentationName,
-        title: options.presentationTitle ?? toTitleCase(options.presentationName),
-      },
-      slides: slides.map((slide, index) => ({
-        id: slide.id || `slide-${index + 1}`,
-        className: slide.className,
-        notes: slide.notes,
-        hasContent: Boolean(slide.content),
-      })),
-    };
+    const pkg = createLumePackageFromSlides(slides, {
+      deckId: options.presentationName,
+      title: options.presentationTitle ?? toTitleCase(options.presentationName),
+    });
+    deckDefinition = convertLumePackageToDeckDefinition(pkg);
   }
 
-  const model = React.createElement(ServerDeck, { deck: deckSummary });
-
   try {
+    const model = React.createElement(Deck, { definition: deckDefinition });
     const stream = await renderToReadableStream(model, null, {
       onError(error) {
         console.error('RSC render error:', error);
@@ -101,6 +64,102 @@ export async function renderDeckToRSC(
   } catch (error) {
     console.error('Failed to render presentation to RSC:', error);
     throw error;
+  }
+}
+
+function convertLumePackageToDeckDefinition(pkg: LumePackage): DeckDefinition {
+  const slides: SlideDefinition[] = pkg.slides.map((slide, index) => {
+    const layers: LayerDefinition[] = [
+      {
+        id: `${slide.id || `slide-${index + 1}`}-layer-1`,
+        order: 0,
+        elements: (slide.elements ?? []).map((element, elementIndex) => mapElement(element, elementIndex)),
+      },
+    ];
+
+    return {
+      id: slide.id || `slide-${index + 1}`,
+      title: slide.title,
+      layout: slide.layout,
+      layers,
+      timeline: slide.timeline ? { tracks: [] } : undefined,
+      notes: slide.notes ? { presenter: slide.notes.speaker } : undefined,
+      zoomFrame: slide.metadata && (slide.metadata as any).zoomFrame ? (slide.metadata as any).zoomFrame : undefined,
+      transitions: slide.transitions,
+      metadata: slide.metadata,
+    };
+  });
+
+  return {
+    meta: {
+      id: pkg.meta.id,
+      title: pkg.meta.title,
+      description: pkg.meta.description,
+      authors: pkg.meta.authors,
+      tags: pkg.meta.tags,
+      createdAt: pkg.meta.createdAt,
+      updatedAt: pkg.meta.updatedAt,
+      durationMinutes: pkg.meta.targetedDurationMinutes,
+      coverImage: pkg.meta.coverImage,
+    },
+    slides,
+    assets: pkg.assets?.map((asset) => ({
+      id: asset.id,
+      path: asset.path,
+      type: asset.type,
+      metadata: asset.metadata,
+    })),
+    provenance: pkg.provenance?.map((entry) => ({
+      id: entry.id,
+      timestamp: entry.timestamp,
+      actor: entry.actor,
+      action: entry.action,
+      details: entry.details,
+      model: entry.model,
+    })),
+    theme: pkg.meta.settings,
+  };
+}
+
+function mapElement(element: any, index: number = 0): ElementDefinition {
+  switch (element.type) {
+    case 'text':
+      return {
+        id: element.id || `text-${index + 1}`,
+        type: 'text',
+        content: element.content ?? '',
+        bounds: element.position,
+        style: element.style,
+        animation: element.animation,
+        metadata: element.metadata,
+      };
+    case 'image':
+      return {
+        id: element.id || `media-${index + 1}`,
+        type: 'media',
+        src: element.assetRef ?? '',
+        mediaType: 'image',
+        bounds: element.position,
+        style: element.style,
+        animation: element.animation,
+        metadata: element.metadata,
+      } as ElementDefinition;
+    case 'group':
+      return {
+        id: element.id || `group-${index + 1}`,
+        type: 'group',
+        children: (element.children ?? []).map((child: any, childIndex: number) => mapElement(child, childIndex)),
+        bounds: element.position,
+        animation: element.animation,
+        metadata: element.metadata,
+      } as ElementDefinition;
+    default:
+      return {
+        id: element.id || `custom-${index + 1}`,
+        type: 'custom',
+        componentName: element.type,
+        props: element,
+      } as ElementDefinition;
   }
 }
 

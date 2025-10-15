@@ -1,3 +1,5 @@
+import type { DeckDefinition } from '../rsc/types';
+
 /**
  * Core `.lume` package type definitions.
  * These types mirror the high-level schema outlined in docs/ai-powered-presentation-roadmap.md
@@ -7,6 +9,7 @@
 export type LumeElementType =
   | 'text'
   | 'image'
+  | 'group'
   | 'shape'
   | 'video'
   | 'audio'
@@ -14,6 +17,7 @@ export type LumeElementType =
   | 'iframe'
   | 'code'
   | 'table'
+  | 'widget'
   | 'custom';
 
 export type LumeAnimationType =
@@ -21,10 +25,15 @@ export type LumeAnimationType =
   | 'scale'
   | 'slide'
   | 'rise-up'
+  | 'reveal'
+  | 'fade-out'
+  | 'staggered-reveal'
   | 'magic-move'
   | 'morph'
   | 'flip'
   | 'zoom'
+  | 'camera'
+  | 'path-follow'
   | 'custom';
 
 export interface LumeTimeline {
@@ -64,6 +73,7 @@ export interface LumeBuildSequence {
   targetId: string;
   sequence: 'build-in' | 'build-out' | 'emphasis';
   animation: LumeAnimation;
+  trigger?: 'auto' | 'click' | 'voice' | 'timer' | 'interaction';
 }
 
 export interface LumeElementStyle {
@@ -97,6 +107,10 @@ export interface LumeElement {
   effects?: Array<Record<string, unknown>>;
   bindings?: LumeElementBindings;
   children?: LumeElement[];
+  animation?: {
+    type: LumeAnimationType | string;
+    props?: Record<string, unknown>;
+  };
   accessibility?: {
     altText?: string;
     description?: string;
@@ -111,6 +125,11 @@ export interface LumeSlideTheme {
   colorPalette?: string[];
   typography?: Record<string, unknown>;
   customCSS?: string;
+  transitions?: Record<string, unknown>;
+  infiniteZoom?: {
+    enabled: boolean;
+    origin?: { x: number; y: number; scale: number };
+  };
 }
 
 export interface LumeNotes {
@@ -118,6 +137,7 @@ export interface LumeNotes {
   rehearsal?: string[];
   aiSuggestions?: string[];
   references?: Array<{ title: string; url: string }>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface LumeSlide {
@@ -126,12 +146,22 @@ export interface LumeSlide {
   layout?: string;
   theme?: LumeSlideTheme;
   elements: LumeElement[];
+  groups?: LumeElement[];
+  builds?: LumeBuildSequence[];
+  timelines?: LumeTimeline[];
+  interactions?: Array<Record<string, unknown>>;
+  zoomFrame?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    depth?: number;
+  };
   transitions?: {
     in?: LumeAnimation;
     out?: LumeAnimation;
     between?: LumeAnimation;
   };
-  builds?: LumeBuildSequence[];
   timeline?: LumeTimeline;
   notes?: LumeNotes;
   metadata?: Record<string, unknown>;
@@ -150,6 +180,10 @@ export interface LumeDeckMeta {
   targetedDurationMinutes?: number;
   brandKitId?: string;
   settings?: Record<string, unknown>;
+  navigation?: {
+    mode?: 'linear' | 'freeform' | 'zoom';
+    overviewSlideId?: string;
+  };
 }
 
 export interface LumeAssetReference {
@@ -201,6 +235,10 @@ export interface LumePackageArchive {
    * Optional canonical React Server Components payload if present.
    */
   rscPayload?: Uint8Array | null;
+  /**
+   * Optional decoded deck summary derived from the RSC payload.
+   */
+  rscSummary?: DeckDefinition | null;
 }
 
 export const LUME_META_FILENAME = 'meta.json';

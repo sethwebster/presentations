@@ -1,195 +1,259 @@
 import React from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import type { LumeElement, LumeElementType } from './types';
+import type { ReactNode, ReactElement } from 'react';
+import { Reveal } from '../components/Reveal';
+import { FadeOut } from '../components/FadeOut';
+import { StaggeredReveal } from '../components/StaggeredReveal';
+import type { LumeElement, LumeBuildSequence, LumeAnimation } from './types';
 
-type SupportedTag =
-  | 'H1'
-  | 'H2'
-  | 'H3'
-  | 'H4'
-  | 'H5'
-  | 'H6'
-  | 'P'
-  | 'LI'
-  | 'UL'
-  | 'OL'
-  | 'IMG'
-  | 'FIGURE'
-  | 'BLOCKQUOTE'
-  | 'SPAN'
-  | 'DIV'
-  | 'SECTION'
-  | 'ARTICLE';
+interface ExtractedSlideContent {
+  elements: LumeElement[];
+  builds: LumeBuildSequence[];
+}
 
-const TAG_TO_ELEMENT_TYPE: Partial<Record<SupportedTag, LumeElementType>> = {
-  H1: 'text',
-  H2: 'text',
-  H3: 'text',
-  H4: 'text',
-  H5: 'text',
-  H6: 'text',
-  P: 'text',
-  LI: 'text',
-  BLOCKQUOTE: 'text',
-  SPAN: 'text',
-  DIV: 'text',
-  SECTION: 'text',
-  ARTICLE: 'text',
-  UL: 'text',
-  OL: 'text',
-  IMG: 'image',
-  FIGURE: 'image',
-};
+type AnimationComponent = typeof Reveal | typeof FadeOut | typeof StaggeredReveal;
 
-const BLOCK_TAGS = new Set<SupportedTag>([
-  'H1',
-  'H2',
-  'H3',
-  'H4',
-  'H5',
-  'H6',
-  'P',
-  'LI',
-  'BLOCKQUOTE',
-  'DIV',
-  'SECTION',
-  'ARTICLE',
-  'UL',
-  'OL',
+interface AnimationDescriptor {
+  name: string;
+  animationType: LumeAnimation['type'];
+  sequence: 'build-in' | 'build-out' | 'emphasis';
+  pickAnimation: (props: Record<string, unknown>, targetId: string) => LumeAnimation;
+  pickProps: (props: Record<string, unknown>) => Record<string, unknown>;
+}
+
+const animationRegistry = new Map<AnimationComponent, AnimationDescriptor>([
+  [
+    Reveal,
+    {
+      name: 'Reveal',
+      animationType: 'reveal',
+      sequence: 'build-in',
+      pickAnimation: (props, targetId) => ({
+        id: `${targetId}-animation`,
+        type: 'reveal',
+        duration: (props.duration as number) ?? 600,
+        delay: (props.delay as number) ?? 0,
+        easing: 'ease-out',
+        parameters: cleanObject({
+          animation: props.animation,
+        }),
+      }),
+      pickProps: (props) =>
+        cleanObject({
+          delay: props.delay,
+          duration: props.duration,
+          animation: props.animation,
+          className: props.className,
+        }),
+    },
+  ],
+  [
+    FadeOut,
+    {
+      name: 'FadeOut',
+      animationType: 'fade-out',
+      sequence: 'build-out',
+      pickAnimation: (props, targetId) => ({
+        id: `${targetId}-animation`,
+        type: 'fade-out',
+        duration: (props.duration as number) ?? 600,
+        delay: (props.delay as number) ?? 0,
+        easing: 'ease-in',
+        parameters: {},
+      }),
+      pickProps: (props) =>
+        cleanObject({
+          delay: props.delay,
+          duration: props.duration,
+          className: props.className,
+        }),
+    },
+  ],
+  [
+    StaggeredReveal,
+    {
+      name: 'StaggeredReveal',
+      animationType: 'staggered-reveal',
+      sequence: 'build-in',
+      pickAnimation: (props, targetId) => ({
+        id: `${targetId}-animation`,
+        type: 'staggered-reveal',
+        duration: ((props.initialDelay as number) ?? 0) + ((props.staggerDelay as number) ?? 100),
+        delay: (props.initialDelay as number) ?? 0,
+        easing: 'ease-out',
+        parameters: cleanObject({
+          initialDelay: props.initialDelay,
+          staggerDelay: props.staggerDelay,
+        }),
+      }),
+      pickProps: (props) =>
+        cleanObject({
+          initialDelay: props.initialDelay,
+          staggerDelay: props.staggerDelay,
+          className: props.className,
+        }),
+    },
+  ],
 ]);
 
-const IMAGE_TAGS = new Set<SupportedTag>(['IMG', 'FIGURE']);
-
-/**
- * Extract best-effort Lume elements from a React slide node. This is a stopgap
- * implementation until the dedicated editor provides structured element data.
- */
-export function extractElementsFromSlideContent(content: React.ReactNode): LumeElement[] {
-  if (!content) {
-    return [];
-  }
-
-  const html = renderToStaticMarkup(React.createElement(React.Fragment, null, content));
-  const document = parseHTML(html);
-
-  if (!document) {
-    const text = normalizeTextPreservingBreaks(stripHTML(html));
-    if (!text) return [];
-
-    return [createTextElement('auto-text', text, 0)];
-  }
-
+export function extractElementsFromSlideContent(content: ReactNode): ExtractedSlideContent {
   const elements: LumeElement[] = [];
+  const builds: LumeBuildSequence[] = [];
   let elementCounter = 0;
 
-  const nextId = (prefix: string) => `${prefix}-${elementCounter++}`;
-  const bodyChildren = Array.from(document.body.childNodes);
+  const addElement = (element: LumeElement) => {
+    elements.push(element);
+  };
 
-  bodyChildren.forEach((node) => {
-    const created = convertNodeToElements(node as HTMLElement | ChildNode, nextId);
-    created.forEach((elem) => {
-      const withPosition = {
-        ...elem,
-        position: defaultPosition(elements.length),
-      };
-      elements.push(withPosition);
-    });
-  });
+  const createElementId = (prefix: string) => `${prefix}-${++elementCounter}`;
 
-  if (elements.length === 0) {
-    const fallback = normalizeTextPreservingBreaks(document.body.textContent ?? '');
-    if (!fallback) return [];
+  const processNode = (node: ReactNode): LumeElement[] => {
+    if (node == null || typeof node === 'boolean') {
+      return [];
+    }
 
-    elements.push({
-      id: 'fallback-text',
-      type: 'text',
-      content: fallback,
-      position: defaultPosition(0),
-    });
-  }
+    if (Array.isArray(node)) {
+      return node.flatMap(processNode);
+    }
 
-  return elements;
-}
-
-function parseHTML(html: string): Document | null {
-  if (typeof window !== 'undefined' && 'DOMParser' in window) {
-    const parser = new window.DOMParser();
-    return parser.parseFromString(html, 'text/html');
-  }
-  return null;
-}
-
-function convertNodeToElements(
-  node: ChildNode,
-  nextId: (prefix: string) => string,
-): LumeElement[] {
-  if (node.nodeType === node.TEXT_NODE) {
-    const text = normalizeTextPreservingBreaks(node.textContent ?? '');
-    if (!text) return [];
-
-    return [
-      {
-        id: nextId('text'),
+    if (typeof node === 'string' || typeof node === 'number') {
+      const text = normalizeText(String(node));
+      if (!text) return [];
+      const element: LumeElement = {
+        id: createElementId('text'),
         type: 'text',
         content: text,
-      },
-    ];
-  }
+        position: defaultPosition(elementCounter - 1),
+      };
+      return [element];
+    }
 
-  if (node.nodeType !== node.ELEMENT_NODE) {
-    return [];
-  }
+    if (!React.isValidElement(node)) {
+      return [];
+    }
 
-  const element = node as HTMLElement;
-  const tagName = element.tagName as SupportedTag;
+    const { type, props } = node as ReactElement;
+    const childrenArray = React.Children.toArray(props?.children ?? []);
 
-  if (IMAGE_TAGS.has(tagName)) {
-    const src =
-      element.getAttribute('src') ?? element.querySelector('img')?.getAttribute('src');
-    if (!src) return [];
+    if (typeof type === 'string') {
+      if (type === 'br') {
+        return [
+          {
+            id: createElementId('text'),
+            type: 'text',
+            content: '\n',
+            position: defaultPosition(elementCounter - 1),
+          },
+        ];
+      }
 
-    const alt =
-      element.getAttribute('alt') ?? element.querySelector('img')?.getAttribute('alt');
+      if (type === 'img') {
+        const element: LumeElement = {
+          id: createElementId('image'),
+          type: 'image',
+          assetRef: props.src,
+          position: defaultPosition(elementCounter - 1),
+          metadata: cleanObject({
+            alt: props.alt,
+            className: props.className,
+          }),
+        };
+        return [element];
+      }
 
-    return [
-      {
-        id: element.id || nextId('image'),
-        type: 'image',
-        assetRef: src,
-        metadata: {
-          inferred: true,
-          alt,
-        },
-      },
-    ];
-  }
-
-  if (BLOCK_TAGS.has(tagName) || tagName === 'SPAN') {
-    const text = normalizeTextPreservingBreaks(getTextWithBreaks(element));
-    if (text) {
-      return [
-        {
-          id: element.id || nextId('text'),
+      const text = collectText(childrenArray);
+      if (text) {
+        const element: LumeElement = {
+          id: createElementId('text'),
           type: 'text',
           content: text,
-          style: {
-            tagName,
-          },
-          metadata: {
-            sourceTag: tagName,
-          },
-        },
-      ];
+          position: defaultPosition(elementCounter - 1),
+          metadata: cleanObject({
+            tagName: type.toUpperCase(),
+            className: props.className,
+          }),
+        };
+        return [element];
+      }
+
+      return childrenArray.flatMap(processNode);
     }
-  }
 
-  // Fallback: process children recursively.
-  const childElements: LumeElement[] = [];
-  element.childNodes.forEach((child) => {
-    childElements.push(...convertNodeToElements(child, nextId));
-  });
+    const animationDescriptor = animationRegistry.get(type as AnimationComponent);
+    if (animationDescriptor) {
+      const childElements = childrenArray.flatMap(processNode);
+      const groupId = createElementId(animationDescriptor.animationType);
 
-  return childElements;
+      const groupElement: LumeElement = {
+        id: groupId,
+        type: 'group',
+        children: childElements,
+        position: defaultPosition(elementCounter - 1),
+        animation: {
+          type: animationDescriptor.animationType,
+          props: animationDescriptor.pickProps(props),
+        },
+        metadata: {
+          component: animationDescriptor.name,
+        },
+      };
+
+      const build: LumeBuildSequence = {
+        id: `${groupId}-build`,
+        targetId: groupId,
+        sequence: animationDescriptor.sequence,
+        animation: animationDescriptor.pickAnimation(props, groupId),
+      };
+
+      builds.push(build);
+
+      return [groupElement];
+    }
+
+    return childrenArray.flatMap(processNode);
+  };
+
+  processNode(content).forEach(addElement);
+
+  return {
+    elements,
+    builds,
+  };
+}
+
+function collectText(nodes: ReactNode[]): string {
+  const parts: string[] = [];
+
+  const visit = (node: ReactNode) => {
+    if (node == null || typeof node === 'boolean') return;
+
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+
+    if (typeof node === 'string' || typeof node === 'number') {
+      parts.push(String(node));
+      return;
+    }
+
+    if (!React.isValidElement(node)) {
+      return;
+    }
+
+    if (node.type === 'br') {
+      parts.push('\n');
+      return;
+    }
+
+    visit(node.props?.children);
+  };
+
+  nodes.forEach(visit);
+  return normalizeText(parts.join(''));
+}
+
+function normalizeText(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
 }
 
 function defaultPosition(index: number) {
@@ -205,78 +269,12 @@ function defaultPosition(index: number) {
   };
 }
 
-function stripHTML(html: string): string {
-  return html.replace(/<[^>]+>/g, ' ');
-}
-
-function normalizeTextPreservingBreaks(value: string): string {
-  return value
-    .replace(/\r\n?/g, '\n')
-    .split('\n')
-    .map((line) => line.replace(/[ \t]+/g, ' ').trim())
-    .filter((line) => line.length > 0)
-    .join('\n');
-}
-
-function getTextWithBreaks(element: HTMLElement): string {
-  const chunks: string[] = [];
-
-  element.childNodes.forEach((node) => {
-    if (node.nodeType === node.TEXT_NODE) {
-      const text = node.textContent ?? '';
-      if (text.trim()) {
-        chunks.push(text);
-      }
-      return;
+function cleanObject<T extends Record<string, unknown>>(obj: T): T {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined && typeof value !== 'function') {
+      result[key] = value;
     }
-
-    if (node.nodeType !== node.ELEMENT_NODE) {
-      return;
-    }
-
-    const child = node as HTMLElement;
-    const childTag = child.tagName as SupportedTag;
-
-    if (childTag === 'BR') {
-      chunks.push('\n');
-      return;
-    }
-
-    const childText = getTextWithBreaks(child);
-    if (!childText) return;
-
-    const isBlock = BLOCK_TAGS.has(childTag);
-    if (isBlock) {
-      chunks.push('\n');
-      chunks.push(childText);
-      chunks.push('\n');
-    } else {
-      chunks.push(childText);
-    }
-  });
-
-  if (chunks.length === 0) {
-    return element.textContent ?? '';
   }
-
-  // Collapse any duplicate newlines that may have been inserted.
-  return chunks
-    .join('')
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/^\n+|\n+$/g, '');
-}
-
-function createTextElement(id: string, text: string, index: number, tagName?: string): LumeElement {
-  return {
-    id,
-    type: 'text',
-    content: text,
-    position: defaultPosition(index),
-    style: tagName ? { tagName } : undefined,
-    metadata: tagName
-      ? {
-          sourceTag: tagName,
-        }
-      : undefined,
-  };
+  return result as T;
 }

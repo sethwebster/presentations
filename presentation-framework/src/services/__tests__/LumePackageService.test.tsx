@@ -36,7 +36,7 @@ describe('LumePackageService', () => {
       title: 'Test Deck',
     });
 
-    expect(pkg.slides[0].elements[0].content).toBe('How We Build\nWhy We Build');
+    expect(pkg.slides[0].elements[0].content).toBe('How We Build Why We Build');
   });
 
   it('embeds lume.rsc when export includes RSC payload', async () => {
