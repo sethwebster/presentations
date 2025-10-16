@@ -8,7 +8,6 @@ import type { PresentationModule, PresentationConfig, SlideData } from '../types
 import { exportSlidesAsLume, downloadLumeArchive } from '../services/LumePackageService';
 import { fetchDeckDefinition } from '../rsc/client';
 import type { DeckDefinition } from '../rsc/types';
-import { DeckSummaryPanel } from '../components/DeckSummaryPanel';
 import { deckDefinitionToPresentation, createPresentationModuleFromDeck } from '../rsc/bridge';
 
 interface PresentationState {
@@ -169,8 +168,6 @@ export function PresentationView() {
     return null;
   }
 
-  const debugPanel = <DeckSummaryPanel summary={deckDefinition} />;
-
   const handleExport = async () => {
     if (!presentationName) return;
 
@@ -244,7 +241,6 @@ export function PresentationView() {
           {exportFeedback}
         </div>
       )}
-      {debugPanel}
       <Presentation slides={presentation.slides} config={presentation.config} />
     </>
   );

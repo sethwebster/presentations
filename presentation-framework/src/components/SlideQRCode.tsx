@@ -1,5 +1,7 @@
-import { useMemo } from 'react';
+import React from 'react';
 import type { ReactElement } from 'react';
+
+const { useMemo } = React;
 import { QRCodeSVG } from 'qrcode.react';
 import { navigationService } from '../services/NavigationService';
 import '../styles/QRCode.css';

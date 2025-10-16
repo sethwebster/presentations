@@ -1,3 +1,4 @@
+import React from 'react';
 import type { ReactNode } from 'react';
 import type { DeckDefinition, SlideDefinition, LayerDefinition, ElementDefinition, GroupElementDefinition } from '../types';
 import {
@@ -38,9 +39,10 @@ export function Deck({ definition }: DeckProps) {
 
 function renderSlideTree(slide: SlideDefinition) {
   const { layers, notes, timeline, zoomFrame, transitions, ...slideProps } = slide;
+  const layerList = Array.isArray(layers) ? layers : [];
   return (
-    <SlideComponent key={slide.id} {...slideProps} layers={layers}>
-      {layers.map((layer) => renderLayerTree(layer))}
+    <SlideComponent key={slide.id} {...slideProps} layers={layerList}>
+      {layerList.map((layer) => renderLayerTree(layer))}
       {notes ? <SlideNotesComponent {...notes} /> : null}
       {timeline ? <TimelineComponent {...timeline} /> : null}
       {zoomFrame ? <ZoomFrameComponent {...zoomFrame} /> : null}
@@ -51,9 +53,10 @@ function renderSlideTree(slide: SlideDefinition) {
 
 function renderLayerTree(layer: LayerDefinition) {
   const { elements, ...layerProps } = layer;
+  const elementList = Array.isArray(elements) ? elements : [];
   return (
     <LayerComponent key={layer.id} {...layerProps}>
-      {elements.map((element) => renderElementTree(element))}
+      {elementList.map((element) => renderElementTree(element))}
     </LayerComponent>
   );
 }
@@ -86,9 +89,10 @@ function mapGroupElement(
   definition: GroupElementDefinition,
 ): GroupElementDefinition & { renderedChildren?: ReactNode } {
   const { children: childElements = [], ...groupProps } = definition;
+  const childList = Array.isArray(childElements) ? childElements : [];
   return {
     ...groupProps,
-    children: childElements,
-    renderedChildren: childElements.map((child) => renderElementTree(child)),
+    children: childList,
+    renderedChildren: childList.map((child) => renderElementTree(child)),
   };
 }

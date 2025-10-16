@@ -2,26 +2,30 @@
  * Core presentation type definitions
  */
 
+import type { ReactNode } from 'react';
+import type { TimelineDefinition } from '../rsc/types';
+
 export interface SlideData {
   id: string;
   className?: string;
   notes?: string;
-  content: React.ReactNode;
+  content: ReactNode;
   hideBrandLogo?: boolean;
   hideQRCode?: boolean;
+  timeline?: TimelineDefinition | null;
 }
 
 export interface PresentationConfig {
-  brandLogo?: React.ReactNode;
-  renderSlideNumber?: () => React.ReactNode;
-  renderNavigation?: () => React.ReactNode;
+  brandLogo?: ReactNode;
+  renderSlideNumber?: () => ReactNode;
+  renderNavigation?: () => ReactNode;
   customStyles?: string;
   [key: string]: unknown;
 }
 
 export interface PresentationModule {
   getSlides: (assetsPath: string) => SlideData[];
-  getBrandLogo?: (assetsPath: string) => React.ReactNode;
+  getBrandLogo?: (assetsPath: string) => ReactNode;
   presentationConfig?: PresentationConfig;
   customStyles?: string;
 }

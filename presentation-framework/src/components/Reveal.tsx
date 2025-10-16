@@ -1,4 +1,7 @@
-import { useState, useEffect, CSSProperties } from 'react';
+import React from 'react';
+import type { CSSProperties } from 'react';
+
+const { useState, useEffect } = React;
 import '../styles/Reveal.css';
 
 type AnimationType = 'fade' | 'slide-up' | 'slide-down' | 'scale' | 'bounce';

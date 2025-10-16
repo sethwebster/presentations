@@ -52,6 +52,7 @@ function slideDefinitionToSlideData(slide: SlideDefinition, assetsBase?: string)
     className: slide.layout,
     notes: slide.notes?.presenter,
     content,
+    timeline: slide.timeline ?? null,
   };
 }
 
@@ -62,8 +63,10 @@ function renderSlide(slide: SlideDefinition, assetsBase?: string): ReactNode {
     minHeight: '720px',
     overflow: 'hidden',
   };
+  (slideStyle as Record<string, unknown>).viewTransitionName = `slide-${slide.id}`;
 
-  const layers = slide.layers.map((layer) => renderLayer(layer, assetsBase));
+  const layerList = Array.isArray(slide.layers) ? slide.layers : [];
+  const layers = layerList.map((layer) => renderLayer(layer, assetsBase));
 
   return (
     <div className="rsc-slide" style={slideStyle} data-slide-id={slide.id} data-layout={slide.layout}>
@@ -81,7 +84,9 @@ function renderLayer(layer: LayerDefinition, assetsBase?: string): ReactNode {
 
   return (
     <div key={layer.id} className="rsc-layer" style={layerStyle} data-layer-id={layer.id} data-layer-order={layer.order}>
-      {layer.elements.map((element) => renderElement(element, assetsBase))}
+      {Array.isArray(layer.elements)
+        ? layer.elements.map((element) => renderElement(element, assetsBase))
+        : null}
     </div>
   );
 }
@@ -255,6 +260,12 @@ function mergeStyles(
     applyStyleRecord(style, element.style as Record<string, unknown>);
   }
 
+  const metadata = element.metadata as Record<string, unknown> | undefined;
+  const viewTransitionName = metadata?.viewTransitionName;
+  if (typeof viewTransitionName === 'string' && viewTransitionName.trim().length > 0) {
+    (style as Record<string, unknown>).viewTransitionName = viewTransitionName.trim();
+  }
+
   return style;
 }
 
@@ -271,6 +282,9 @@ function applyStyleRecord(target: CSSProperties, styleRecord: Record<string, unk
   if (typeof styleRecord.opacity === 'number') {
     target.opacity = styleRecord.opacity;
   }
+  if (typeof styleRecord.opacity === 'string') {
+    target.opacity = Number(styleRecord.opacity);
+  }
   if (typeof styleRecord.fontSize === 'number') {
     target.fontSize = styleRecord.fontSize;
   }
@@ -286,6 +300,9 @@ function applyStyleRecord(target: CSSProperties, styleRecord: Record<string, unk
   if (typeof styleRecord.letterSpacing === 'number' || typeof styleRecord.letterSpacing === 'string') {
     target.letterSpacing = styleRecord.letterSpacing as CSSProperties['letterSpacing'];
   }
+  if (typeof styleRecord.textTransform === 'string') {
+    target.textTransform = styleRecord.textTransform as CSSProperties['textTransform'];
+  }
 
   if (typeof styleRecord.borderRadius === 'number' || typeof styleRecord.borderRadius === 'string') {
     target.borderRadius = styleRecord.borderRadius as CSSProperties['borderRadius'];
@@ -297,6 +314,66 @@ function applyStyleRecord(target: CSSProperties, styleRecord: Record<string, unk
     const color = border.color ?? 'currentColor';
     const style = border.style ?? 'solid';
     target.border = `${width}px ${style} ${color}`;
+  }
+  if (typeof styleRecord.display === 'string') {
+    target.display = styleRecord.display as CSSProperties['display'];
+  }
+  if (typeof styleRecord.flexDirection === 'string') {
+    target.flexDirection = styleRecord.flexDirection as CSSProperties['flexDirection'];
+  }
+  if (typeof styleRecord.flexWrap === 'string') {
+    target.flexWrap = styleRecord.flexWrap as CSSProperties['flexWrap'];
+  }
+  if (typeof styleRecord.alignItems === 'string') {
+    target.alignItems = styleRecord.alignItems as CSSProperties['alignItems'];
+  }
+  if (typeof styleRecord.justifyContent === 'string') {
+    target.justifyContent = styleRecord.justifyContent as CSSProperties['justifyContent'];
+  }
+  if (typeof styleRecord.gap === 'number' || typeof styleRecord.gap === 'string') {
+    target.gap = styleRecord.gap as CSSProperties['gap'];
+  }
+  if (typeof styleRecord.columnGap === 'number' || typeof styleRecord.columnGap === 'string') {
+    target.columnGap = styleRecord.columnGap as CSSProperties['columnGap'];
+  }
+  if (typeof styleRecord.rowGap === 'number' || typeof styleRecord.rowGap === 'string') {
+    target.rowGap = styleRecord.rowGap as CSSProperties['rowGap'];
+  }
+  if (typeof styleRecord.gridTemplateColumns === 'string') {
+    target.gridTemplateColumns = styleRecord.gridTemplateColumns as CSSProperties['gridTemplateColumns'];
+  }
+  if (typeof styleRecord.gridTemplateRows === 'string') {
+    target.gridTemplateRows = styleRecord.gridTemplateRows as CSSProperties['gridTemplateRows'];
+  }
+  if (typeof styleRecord.gridAutoRows === 'string') {
+    target.gridAutoRows = styleRecord.gridAutoRows as CSSProperties['gridAutoRows'];
+  }
+  if (typeof styleRecord.gridAutoColumns === 'string') {
+    target.gridAutoColumns = styleRecord.gridAutoColumns as CSSProperties['gridAutoColumns'];
+  }
+  if (typeof styleRecord.padding === 'number' || typeof styleRecord.padding === 'string') {
+    target.padding = styleRecord.padding as CSSProperties['padding'];
+  }
+  if (typeof styleRecord.paddingTop === 'number' || typeof styleRecord.paddingTop === 'string') {
+    target.paddingTop = styleRecord.paddingTop as CSSProperties['paddingTop'];
+  }
+  if (typeof styleRecord.paddingBottom === 'number' || typeof styleRecord.paddingBottom === 'string') {
+    target.paddingBottom = styleRecord.paddingBottom as CSSProperties['paddingBottom'];
+  }
+  if (typeof styleRecord.paddingLeft === 'number' || typeof styleRecord.paddingLeft === 'string') {
+    target.paddingLeft = styleRecord.paddingLeft as CSSProperties['paddingLeft'];
+  }
+  if (typeof styleRecord.paddingRight === 'number' || typeof styleRecord.paddingRight === 'string') {
+    target.paddingRight = styleRecord.paddingRight as CSSProperties['paddingRight'];
+  }
+  if (typeof styleRecord.boxShadow === 'string') {
+    target.boxShadow = styleRecord.boxShadow as CSSProperties['boxShadow'];
+  }
+  if (typeof styleRecord.backdropFilter === 'string') {
+    target.backdropFilter = styleRecord.backdropFilter as CSSProperties['backdropFilter'];
+  }
+  if (typeof styleRecord.viewTransitionName === 'string') {
+    (target as Record<string, unknown>).viewTransitionName = styleRecord.viewTransitionName;
   }
 }
 

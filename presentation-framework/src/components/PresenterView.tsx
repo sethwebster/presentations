@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import React from 'react';
+
+const { useEffect, useState } = React;
 import { windowSyncService } from '../services/WindowSyncService';
 import { reactionService } from '../services/ReactionService';
 import { keyboardService } from '../services/KeyboardService';

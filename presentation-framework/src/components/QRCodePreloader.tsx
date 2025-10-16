@@ -1,4 +1,6 @@
-import { useMemo } from 'react';
+import React from 'react';
+
+const { useMemo } = React;
 import { QRCodeSVG } from 'qrcode.react';
 
 interface QRCodePreloaderProps {

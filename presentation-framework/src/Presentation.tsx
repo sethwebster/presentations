@@ -1,7 +1,22 @@
 "use client";
 
 import './styles/Presentation.css';
-import { useState, useEffect, FormEvent, MouseEvent, ChangeEvent } from 'react';
+import * as React from 'react';
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from 'react';
+import type {
+  MutableRefObject,
+  Dispatch,
+  SetStateAction,
+  FormEvent,
+  MouseEvent,
+  ChangeEvent,
+} from 'react';
 import { useRouter } from 'next/navigation';
 import { usePresentation } from './hooks/usePresentation';
 import { useKeyboardNavigation } from './hooks/useKeyboardNavigation';
@@ -20,6 +35,7 @@ import { WelcomeToast } from './components/WelcomeToast';
 import { AutopilotHUD } from './autopilot/ui/AutopilotHUD';
 import { useAutopilot } from './autopilot/useAutopilot';
 import type { SlideData, PresentationConfig } from './types/presentation';
+import type { TimelineDefinition, TimelineSegmentDefinition, AnimationDefinition } from './rsc/types';
 
 interface PresentationProps {
   slides: SlideData[];
@@ -38,6 +54,188 @@ interface AutopilotProps {
   onThresholdChange: (threshold: number) => void;
 }
 
+type RouterLike = { push: (href: string) => void };
+
+interface PresenterBroadcastArgs {
+  currentSlide: number;
+  isPresenter: boolean;
+  deckId: string | null;
+  publishSlideChange: (slide: number) => unknown;
+}
+
+interface PresentationDebugArgs {
+  deckId: string | null;
+  isViewer: boolean;
+  isPresenterMode: boolean;
+  isPresenter: boolean;
+  isAuthenticated: boolean;
+  currentSlide: number;
+}
+
+interface BuildSegmentSyncArgs {
+  buildSegments: TimelineSegmentDefinition[];
+  slideId?: string;
+  buildSegmentsRef: MutableRefObject<TimelineSegmentDefinition[]>;
+  pendingAnimationRef: MutableRefObject<number | null>;
+  pendingCompleteRef: MutableRefObject<boolean>;
+  setBuildIndex: Dispatch<SetStateAction<number>>;
+}
+
+interface BuildPlaybackArgs {
+  buildIndex: number;
+  buildSegments: TimelineSegmentDefinition[];
+  slideId?: string;
+  slideRef: MutableRefObject<HTMLDivElement | null>;
+  buildSegmentsRef: MutableRefObject<TimelineSegmentDefinition[]>;
+  pendingAnimationRef: MutableRefObject<number | null>;
+}
+
+const viewTransitionProp = ['View', 'Transition'].join('');
+
+const ReactViewTransition = (() => {
+  const candidate =
+    typeof Reflect !== 'undefined'
+      ? Reflect.get(React, viewTransitionProp)
+      : (React as Record<string, unknown>)[viewTransitionProp];
+  return candidate as
+    | React.ExoticComponent<{ name?: string; children?: React.ReactNode }>
+    | undefined;
+})();
+
+function SlideViewTransition({
+  name,
+  children,
+}: {
+  name: string;
+  children: React.ReactNode;
+}) {
+  if (ReactViewTransition) {
+    return <ReactViewTransition name={name}>{children}</ReactViewTransition>;
+  }
+  return <>{children}</>;
+}
+
+function usePresenterModeDetection(setIsPresenterMode: Dispatch<SetStateAction<boolean>>) {
+  useEffect(() => {
+    setIsPresenterMode(navigationService.isPresenterModeWindow());
+  }, [setIsPresenterMode]);
+}
+
+function useDoubleEscapeNavigation(router: RouterLike) {
+  useEffect(() => {
+    const unsubscribe = keyboardService.onDoubleEscape(() => {
+      router.push('/');
+    });
+    return unsubscribe;
+  }, [router]);
+}
+
+function useEscapeKeyCollapse(showPasswordPrompt: boolean, onClose: () => void) {
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      if (showPasswordPrompt) {
+        onClose();
+        keyboardService.resetEscapeTiming();
+        return;
+      }
+
+      keyboardService.checkDoubleEscape();
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [showPasswordPrompt, onClose]);
+}
+
+function usePresenterBroadcast({
+  currentSlide,
+  isPresenter,
+  deckId,
+  publishSlideChange,
+}: PresenterBroadcastArgs) {
+  useEffect(() => {
+    if (!isPresenter) {
+      return;
+    }
+
+    console.log('Publishing slide change:', currentSlide, 'to deck:', deckId);
+
+    const timeoutId = setTimeout(() => {
+      publishSlideChange(currentSlide);
+    }, 50);
+
+    return () => clearTimeout(timeoutId);
+  }, [currentSlide, isPresenter, publishSlideChange, deckId]);
+}
+
+function usePresentationDebug({
+  deckId,
+  isViewer,
+  isPresenterMode,
+  isPresenter,
+  isAuthenticated,
+  currentSlide,
+}: PresentationDebugArgs) {
+  useEffect(() => {
+    console.log('Presentation mode:', {
+      deckId,
+      isViewer,
+      isPresenterMode,
+      isPresenter,
+      isAuthenticated,
+      currentSlide,
+    });
+
+    if (isPresenter) {
+      console.log('✅ PRESENTER MODE: You can control slides');
+    } else if (isViewer) {
+      console.log('👁️ VIEWER MODE: Following presenter');
+    }
+  }, [deckId, isViewer, isPresenterMode, isPresenter, isAuthenticated, currentSlide]);
+}
+
+function useBuildSegmentSync({
+  buildSegments,
+  slideId,
+  buildSegmentsRef,
+  pendingAnimationRef,
+  pendingCompleteRef,
+  setBuildIndex,
+}: BuildSegmentSyncArgs) {
+  useEffect(() => {
+    buildSegmentsRef.current = buildSegments;
+    pendingAnimationRef.current = null;
+    setBuildIndex(() => {
+      if (pendingCompleteRef.current) {
+        pendingCompleteRef.current = false;
+        return buildSegments.length;
+      }
+      return 0;
+    });
+  }, [buildSegments, slideId, buildSegmentsRef, pendingAnimationRef, pendingCompleteRef, setBuildIndex]);
+}
+
+function useBuildPlayback({
+  buildIndex,
+  buildSegments,
+  slideId,
+  slideRef,
+  buildSegmentsRef,
+  pendingAnimationRef,
+}: BuildPlaybackArgs) {
+  useEffect(() => {
+    const container = slideRef.current;
+    if (!container) {
+      return;
+    }
+    applyBuildState(container, buildSegmentsRef.current, buildIndex, pendingAnimationRef);
+  }, [buildIndex, buildSegments, slideId, slideRef, buildSegmentsRef, pendingAnimationRef]);
+}
+
 /**
  * Main Presentation component - framework core
  */
@@ -52,16 +250,19 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
   // Get deckId from NavigationService
   const deckId = navigationService.getDeckId();
 
-  // Check if in presenter mode window
-  useEffect(() => {
-    setIsPresenterMode(navigationService.isPresenterModeWindow());
-  }, []);
+  usePresenterModeDetection(setIsPresenterMode);
 
   // Authentication (business logic in AuthService)
   const auth = usePresenterAuth();
 
   // By default, everyone is a viewer unless authenticated
   const isViewer = !auth.isAuthenticated;
+
+  const closePasswordPrompt = useCallback(() => {
+    setShowPasswordPrompt(false);
+    setPasswordInput('');
+    setPasswordError(false);
+  }, []);
 
   // Handle password submission (delegates to AuthService)
   const handlePasswordSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
@@ -70,9 +271,7 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
       const result = await auth.login(passwordInput.trim(), rememberKey);
 
       if (result.success) {
-        setShowPasswordPrompt(false);
-        setPasswordInput('');
-        setPasswordError(false);
+        closePasswordPrompt();
         // Reload to update presenter status
         window.location.reload();
       } else {
@@ -82,36 +281,8 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
     }
   };
 
-  // Subscribe to double-escape events from KeyboardService
-  useEffect(() => {
-    const unsubscribe = keyboardService.onDoubleEscape(() => {
-      router.push('/');
-    });
-
-    return unsubscribe;
-  }, [router]);
-
-  // Handle escape key
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        // Close password prompt if open
-        if (showPasswordPrompt) {
-          setShowPasswordPrompt(false);
-          setPasswordInput('');
-          setPasswordError(false);
-          keyboardService.resetEscapeTiming();
-          return;
-        }
-
-        // Check for double-escape via service
-        keyboardService.checkDoubleEscape();
-      }
-    };
-
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [showPasswordPrompt]);
+  useDoubleEscapeNavigation(router);
+  useEscapeKeyCollapse(showPasswordPrompt, closePasswordPrompt);
 
   const {
     currentSlide,
@@ -123,57 +294,8 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
     progress
   } = usePresentation(slides.length);
 
-  // Only enable keyboard navigation for non-viewers
-  useKeyboardNavigation(
-    isViewer ? () => {} : nextSlide,
-    isViewer ? () => {} : prevSlide,
-    isViewer ? () => {} : goToSlide,
-    slides.length
-  );
-  const { openPresenterView, presenterWindowOpen } = useWindowSync(currentSlide, goToSlide);
-  const { isIdle, hasMouseMoved } = useMouseIdle(500);
-
   // Determine who is the presenter (authenticated and not in presenter mode window)
   const isPresenter = Boolean(deckId && auth.isAuthenticated && !isPresenterMode);
-
-  // Realtime features
-  const { reactions, publishSlideChange, sendReaction } = useRealtimePresentation(
-    deckId,
-    currentSlide,
-    goToSlide,
-    isPresenter
-  );
-
-  // Publish slide changes when presenter navigates (debounced to prevent spam)
-  useEffect(() => {
-    if (!isPresenter) return;
-
-    console.log('Publishing slide change:', currentSlide, 'to deck:', deckId);
-
-    const timeoutId = setTimeout(() => {
-      publishSlideChange(currentSlide);
-    }, 50); // 50ms debounce to batch rapid changes
-
-    return () => clearTimeout(timeoutId);
-  }, [currentSlide, isPresenter, publishSlideChange, deckId]);
-
-  // Debug logging
-  useEffect(() => {
-    console.log('Presentation mode:', {
-      deckId,
-      isViewer,
-      isPresenterMode,
-      isPresenter,
-      isAuthenticated: auth.isAuthenticated,
-      currentSlide
-    });
-
-    if (isPresenter) {
-      console.log('✅ PRESENTER MODE: You can control slides');
-    } else if (isViewer) {
-      console.log('👁️ VIEWER MODE: Following presenter');
-    }
-  }, [deckId, isViewer, isPresenterMode, isPresenter, auth.isAuthenticated, currentSlide]);
 
   // Autopilot - Voice-driven auto-advance (works in presenter mode window OR main presenter)
   const canUseAutopilot = Boolean(deckId && (isPresenter || isPresenterMode));
@@ -199,6 +321,115 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
     onThresholdChange: autopilot.setThreshold,
   } : null;
 
+  const currentSlideData = slides[currentSlide];
+  const slideRef = useRef<HTMLDivElement | null>(null);
+  const [buildIndex, setBuildIndex] = useState<number>(0);
+  const buildSegments = useMemo(
+    () => normalizeTimeline(currentSlideData?.timeline),
+    [currentSlideData?.timeline, currentSlideData?.id],
+  );
+  const buildSegmentsRef = useRef<TimelineSegmentDefinition[]>(buildSegments);
+  const pendingAnimationRef = useRef<number | null>(null);
+  const pendingCompleteRef = useRef<boolean>(false);
+
+  const totalBuilds = buildSegments.length;
+
+  useBuildSegmentSync({
+    buildSegments,
+    slideId: currentSlideData?.id,
+    buildSegmentsRef,
+    pendingAnimationRef,
+    pendingCompleteRef,
+    setBuildIndex,
+  });
+
+  useBuildPlayback({
+    buildIndex,
+    buildSegments,
+    slideId: currentSlideData?.id,
+    slideRef,
+    buildSegmentsRef,
+    pendingAnimationRef,
+  });
+
+  const goToSlideWithReset = useCallback((index: number) => {
+    pendingAnimationRef.current = null;
+    pendingCompleteRef.current = false;
+    setBuildIndex(0);
+    goToSlide(index);
+  }, [goToSlide]);
+
+  const advance = useCallback(() => {
+    const total = buildSegmentsRef.current.length;
+    let navigated = false;
+    setBuildIndex((current) => {
+      if (current < total) {
+        pendingAnimationRef.current = current;
+        return current + 1;
+      }
+      navigated = true;
+      return current;
+    });
+    if (navigated) {
+      pendingAnimationRef.current = null;
+      pendingCompleteRef.current = false;
+      setBuildIndex(0);
+      nextSlide();
+    }
+  }, [nextSlide]);
+
+  const retreat = useCallback(() => {
+    let navigated = false;
+    setBuildIndex((current) => {
+      if (current > 0) {
+        pendingAnimationRef.current = null;
+        return current - 1;
+      }
+      navigated = true;
+      return current;
+    });
+    if (navigated) {
+      pendingAnimationRef.current = null;
+      pendingCompleteRef.current = true;
+      setBuildIndex(0);
+      prevSlide();
+    }
+  }, [prevSlide]);
+
+  // Realtime features
+  const { reactions, publishSlideChange, sendReaction } = useRealtimePresentation(
+    deckId,
+    currentSlide,
+    goToSlideWithReset,
+    isPresenter
+  );
+
+  usePresenterBroadcast({
+    currentSlide,
+    isPresenter,
+    deckId,
+    publishSlideChange,
+  });
+
+  usePresentationDebug({
+    deckId,
+    isViewer,
+    isPresenterMode,
+    isPresenter,
+    isAuthenticated: auth.isAuthenticated,
+    currentSlide,
+  });
+
+  // Only enable keyboard navigation for non-viewers
+  useKeyboardNavigation(
+    isViewer ? () => {} : advance,
+    isViewer ? () => {} : retreat,
+    isViewer ? () => {} : goToSlideWithReset,
+    slides.length
+  );
+  const { openPresenterView, presenterWindowOpen } = useWindowSync(currentSlide, goToSlideWithReset);
+  const { isIdle, hasMouseMoved } = useMouseIdle(500);
+
   if (isPresenterMode) {
     return (
       <PresenterView
@@ -210,8 +441,6 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
       />
     );
   }
-
-  const currentSlideData = slides[currentSlide];
 
   // Default slide number renderer
   const defaultSlideNumberRenderer = (): React.ReactElement => (
@@ -226,6 +455,9 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
     window.location.reload();
   };
 
+  const disablePrev = isFirst && buildIndex === 0;
+  const disableNext = isLast && buildIndex >= totalBuilds;
+
   // Default navigation renderer
   const defaultNavigationRenderer = (): React.ReactElement | null => {
     // Viewers don't see navigation controls
@@ -238,16 +470,16 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
       <>
         <button
           className={`nav-arrow nav-arrow-left ${!hasMouseMoved ? 'initial' : isIdle ? 'hidden' : 'visible'}`}
-          onClick={prevSlide}
-          disabled={isFirst}
+          onClick={retreat}
+          disabled={disablePrev}
           aria-label="Previous slide"
         >
           ←
         </button>
         <button
           className={`nav-arrow nav-arrow-right ${!hasMouseMoved ? 'initial' : isIdle ? 'hidden' : 'visible'}`}
-          onClick={nextSlide}
-          disabled={isLast}
+          onClick={advance}
+          disabled={disableNext}
           aria-label="Next slide"
         >
           →
@@ -281,7 +513,14 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
       <WelcomeToast isPresenterMode={isPresenterMode} />
 
       <div className="slide-container">
-        <div key={currentSlideData.id} className={`slide ${currentSlideData.className || ''}`}>
+        <SlideViewTransition name={`slide-${currentSlideData.id}`}>
+          <div
+            key={currentSlideData.id}
+            className={`slide ${currentSlideData.className || ''}`}
+            ref={slideRef}
+            data-build-count={totalBuilds}
+            data-build-index={buildIndex}
+          >
             {currentSlideData.content}
             {config.brandLogo && !currentSlideData.hideBrandLogo && (
               <div className="brand-logo">
@@ -298,6 +537,7 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
               />
             )}
           </div>
+        </SlideViewTransition>
       </div>
 
       {renderNavigation()}
@@ -449,6 +689,345 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
       )}
     </div>
   );
+}
+
+function normalizeTimeline(timeline?: TimelineDefinition | null): TimelineSegmentDefinition[] {
+  if (!timeline || !Array.isArray(timeline.tracks)) {
+    return [];
+  }
+
+  const segments: Array<{ segment: TimelineSegmentDefinition; order: number }> = [];
+  timeline.tracks
+    .filter((track) => track.trackType === 'animation')
+    .forEach((track) => {
+      track.segments.forEach((segment) => {
+        segments.push({ segment, order: segments.length });
+      });
+    });
+
+  return segments
+    .sort((a, b) => {
+      if (a.segment.start === b.segment.start) {
+        return a.order - b.order;
+      }
+      return a.segment.start - b.segment.start;
+    })
+    .map((entry) => entry.segment);
+}
+
+function applyBuildState(
+  container: HTMLElement,
+  segments: TimelineSegmentDefinition[],
+  buildIndex: number,
+  pendingRef: MutableRefObject<number | null>,
+) {
+  if (!segments.length) {
+    pendingRef.current = null;
+    return;
+  }
+
+  const assignments = new Map<string, AnimationDefinition>();
+  segments.forEach((segment) => {
+    segment.targets.forEach((targetId) => {
+      if (!assignments.has(targetId)) {
+        assignments.set(targetId, segment.animation);
+      }
+    });
+  });
+
+  resetElements(container, assignments);
+
+  for (let index = 0; index < segments.length; index += 1) {
+    if (index >= buildIndex) {
+      continue;
+    }
+    const animate = pendingRef.current === index;
+    playSegment(container, segments[index], animate);
+  }
+
+  pendingRef.current = null;
+}
+
+type BuildDataset = DOMStringMap & {
+  originalOpacity?: string;
+  originalTransform?: string;
+  initialOpacity?: string;
+  initialTransform?: string;
+  targetOpacity?: string;
+  targetTransform?: string;
+  buildState?: 'before' | 'after';
+};
+
+interface AnimationPhases {
+  initialOpacity?: string;
+  initialTransform?: string;
+  finalOpacity?: string;
+  finalTransform?: string;
+}
+
+function resetElements(container: HTMLElement, assignments: Map<string, AnimationDefinition>) {
+  assignments.forEach((animation, targetId) => {
+    const elements = findElements(container, targetId);
+    elements.forEach((element) => primeElement(element, animation));
+  });
+}
+
+function primeElement(element: HTMLElement, animation: AnimationDefinition) {
+  const dataset = element.dataset as BuildDataset;
+  if (dataset.originalOpacity === undefined) {
+    dataset.originalOpacity = element.style.opacity ?? '';
+  }
+  if (dataset.originalTransform === undefined) {
+    dataset.originalTransform = element.style.transform ?? '';
+  }
+
+  const phases = resolveAnimationPhases(animation, dataset.originalOpacity, dataset.originalTransform);
+  const initialOpacity = phases.initialOpacity ?? dataset.originalOpacity ?? '';
+  const initialTransform = phases.initialTransform ?? dataset.originalTransform ?? '';
+  const finalOpacity = phases.finalOpacity ?? dataset.originalOpacity ?? '';
+  const finalTransform = phases.finalTransform ?? dataset.originalTransform ?? '';
+
+  dataset.initialOpacity = initialOpacity;
+  dataset.initialTransform = initialTransform;
+  dataset.targetOpacity = finalOpacity;
+  dataset.targetTransform = finalTransform;
+  dataset.buildState = 'before';
+
+  element.style.transition = 'none';
+  element.style.willChange = 'opacity, transform';
+  element.style.opacity = initialOpacity;
+  element.style.transform = initialTransform;
+}
+
+function playSegment(container: HTMLElement, segment: TimelineSegmentDefinition, animate: boolean) {
+  const baseDelay = segment.animation.delay ?? 0;
+  const targets = segment.targets ?? [];
+  if (!targets.length) {
+    return;
+  }
+
+  if (segment.animation.type === 'staggered-reveal') {
+    const initialDelay = getAnimationNumber(segment.animation, 'initialDelay', 0);
+    const staggerDelay = getAnimationNumber(segment.animation, 'staggerDelay', 140);
+    targets.forEach((targetId, index) => {
+      const elements = findElements(container, targetId);
+      const delay = animate ? baseDelay + initialDelay + index * staggerDelay : 0;
+      elements.forEach((element) => finalizeElement(element, segment.animation, animate, delay));
+    });
+    return;
+  }
+
+  targets.forEach((targetId) => {
+    const elements = findElements(container, targetId);
+    const delay = animate ? baseDelay : 0;
+    elements.forEach((element) => finalizeElement(element, segment.animation, animate, delay));
+  });
+}
+
+function finalizeElement(
+  element: HTMLElement,
+  animation: AnimationDefinition,
+  animate: boolean,
+  delay: number,
+) {
+  const dataset = element.dataset as BuildDataset;
+  const targetOpacity = dataset.targetOpacity ?? dataset.originalOpacity ?? '';
+  const targetTransform = dataset.targetTransform ?? dataset.originalTransform ?? '';
+  const duration = animation.duration ?? 520;
+  const easing = animation.easing ?? 'ease-out';
+
+  const run = () => {
+    if (animate) {
+      element.style.transition = `opacity ${duration}ms ${easing}, transform ${duration}ms ${easing}`;
+    } else {
+      element.style.transition = 'none';
+    }
+
+    element.style.opacity = targetOpacity;
+    element.style.transform = targetTransform;
+    dataset.buildState = 'after';
+
+    const cleanup = () => {
+      element.style.transition = '';
+      element.style.willChange = '';
+    };
+
+    if (animate) {
+      window.setTimeout(cleanup, duration + delay + 50);
+    } else {
+      cleanup();
+    }
+  };
+
+  if (animate && delay > 0) {
+    window.setTimeout(run, delay);
+  } else {
+    run();
+  }
+}
+
+function resolveAnimationPhases(
+  animation: AnimationDefinition,
+  originalOpacity?: string,
+  originalTransform?: string,
+): AnimationPhases {
+  const type = animation.type ?? 'fade';
+  const fallbackOpacity = originalOpacity ?? '';
+  const fallbackTransform = originalTransform ?? '';
+
+  const phases: AnimationPhases = {
+    initialOpacity: fallbackOpacity,
+    initialTransform: fallbackTransform,
+    finalOpacity: fallbackOpacity,
+    finalTransform: fallbackTransform,
+  };
+
+  const ensureOpacity = (value: number | string | undefined, fallback: string) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(value);
+    }
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value;
+    }
+    return fallback;
+  };
+
+  const translateFromOffset = (axis: 'x' | 'y', offset: number) => {
+    const suffix = axis === 'x' ? 'translateX' : 'translateY';
+    return `${suffix}(${offset}px)`;
+  };
+
+  switch (type) {
+    case 'fade':
+    case 'fade-in':
+      phases.initialOpacity = '0';
+      break;
+    case 'fade-out':
+      phases.finalOpacity = '0';
+      break;
+    case 'reveal':
+    case 'staggered-reveal':
+      phases.initialOpacity = '0';
+      phases.initialTransform = appendTransform(fallbackTransform, 'translateY(18px)');
+      break;
+    case 'scale': {
+      const from = getAnimationNumber(animation, 'from', 0.86);
+      phases.initialOpacity = '0';
+      phases.initialTransform = appendTransform(fallbackTransform, `scale(${from})`);
+      break;
+    }
+    case 'zoom-in': {
+      const from = getAnimationNumber(animation, 'from', 0.82);
+      phases.initialOpacity = '0';
+      phases.initialTransform = appendTransform(fallbackTransform, `scale(${from})`);
+      break;
+    }
+    case 'zoom-out': {
+      const to = getAnimationNumber(animation, 'to', 0.86);
+      phases.finalOpacity = '0';
+      phases.finalTransform = appendTransform(fallbackTransform, `scale(${to})`);
+      break;
+    }
+    case 'enter-left':
+    case 'enter-right':
+    case 'enter-up':
+    case 'enter-down': {
+      const { axis, sign } = getDirectionalDefaults(type);
+      const defaultOffset = getDefaultDirectionalMagnitude(axis) * sign;
+      const offset = getSignedOffset(animation, defaultOffset);
+      phases.initialOpacity = '0';
+      phases.initialTransform = appendTransform(fallbackTransform, translateFromOffset(axis, offset));
+      break;
+    }
+    case 'exit-left':
+    case 'exit-right':
+    case 'exit-up':
+    case 'exit-down': {
+      const { axis, sign } = getDirectionalDefaults(type);
+      const defaultOffset = getDefaultDirectionalMagnitude(axis) * sign;
+      const offset = getSignedOffset(animation, defaultOffset);
+      phases.finalOpacity = '0';
+      phases.finalTransform = appendTransform(fallbackTransform, translateFromOffset(axis, offset));
+      break;
+    }
+    case 'magic-move':
+      break;
+    default:
+      phases.initialOpacity = '0';
+      break;
+  }
+
+  phases.initialOpacity = ensureOpacity(phases.initialOpacity, fallbackOpacity || '0');
+  phases.finalOpacity = ensureOpacity(phases.finalOpacity, fallbackOpacity || '');
+
+  return phases;
+}
+
+function getDefaultDirectionalMagnitude(axis: 'x' | 'y'): number {
+  return axis === 'x' ? 64 : 48;
+}
+
+function getSignedOffset(animation: AnimationDefinition, fallback: number): number {
+  const value = animation.parameters?.offset;
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return fallback;
+}
+
+function getDirectionalDefaults(type: string): { axis: 'x' | 'y'; sign: number } {
+  switch (type) {
+    case 'enter-left':
+    case 'exit-left':
+      return { axis: 'x', sign: -1 };
+    case 'enter-right':
+    case 'exit-right':
+      return { axis: 'x', sign: 1 };
+    case 'enter-up':
+    case 'exit-up':
+      return { axis: 'y', sign: -1 };
+    case 'enter-down':
+    case 'exit-down':
+      return { axis: 'y', sign: 1 };
+    default:
+      return { axis: 'x', sign: 1 };
+  }
+}
+
+function findElements(container: HTMLElement, targetId: string): HTMLElement[] {
+  return Array.from(container.querySelectorAll<HTMLElement>(`[data-element-id="${targetId}"]`));
+}
+
+function appendTransform(base: string | undefined, addition: string): string {
+  const trimmedAddition = addition?.trim();
+  const trimmedBase = base?.trim() ?? '';
+  if (!trimmedAddition) {
+    return trimmedBase;
+  }
+  if (!trimmedBase) {
+    return trimmedAddition;
+  }
+  return `${trimmedBase} ${trimmedAddition}`.trim();
+}
+
+function getAnimationNumber(animation: AnimationDefinition, key: string, fallback: number): number {
+  const value = animation.parameters?.[key];
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return fallback;
 }
 
 export default Presentation;
