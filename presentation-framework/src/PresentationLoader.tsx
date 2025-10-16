@@ -1,32 +1,11 @@
 import { useState, useEffect } from 'react';
+import type { ChangeEvent } from 'react';
 import { Presentation } from './Presentation';
-import { loadPresentation, presentations } from './presentations/index.js';
+import { loadPresentation, presentations } from './presentations';
 import { Header } from './components/Header';
 import { Card, CardHeader, CardTitle, CardDescription } from './components/ui/card';
 import './styles/PresentationLoader.css';
-
-interface PresentationModule {
-  getSlides: (assetsPath: string) => Slide[];
-  getBrandLogo?: (assetsPath: string) => React.ReactNode;
-  presentationConfig?: PresentationConfig;
-  customStyles?: string;
-}
-
-interface Slide {
-  id: string | number;
-  className?: string;
-  notes?: string;
-  content: React.ReactNode;
-  hideBrandLogo?: boolean;
-  hideQRCode?: boolean;
-}
-
-interface PresentationConfig {
-  brandLogo?: React.ReactNode;
-  renderSlideNumber?: () => React.ReactNode;
-  renderNavigation?: () => React.ReactNode;
-  customStyles?: string;
-}
+import type { PresentationModule, PresentationConfig, SlideData } from './types/presentation';
 
 /**
  * PresentationLoader component - Loads presentation packages dynamically
@@ -92,7 +71,7 @@ export function PresentationLoader() {
     }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+  const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -211,7 +190,10 @@ export function PresentationLoader() {
   // Presentation is loaded, render it
   const { getSlides, getBrandLogo, presentationConfig } = presentationModule;
 
-  const slides = getSlides(assetsPath);
+  const slides: SlideData[] = getSlides(assetsPath).map((slide, index) => ({
+    ...slide,
+    id: String(slide.id ?? index),
+  }));
   const config: PresentationConfig = {
     brandLogo: getBrandLogo ? getBrandLogo(assetsPath) : null,
     ...presentationConfig,

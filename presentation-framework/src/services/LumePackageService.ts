@@ -1,6 +1,7 @@
 import { serializeLumePackage, deserializeLumePackage } from '../lume/serialization';
 import { createLumePackageFromSlides } from '../lume/transform';
-import type { LumePackage, LumeSerializedAssets } from '../lume/types';
+import type { LumePackage } from '../lume/types';
+import type { LumeSerializedAssets } from '../lume/serialization';
 import type { SlideData, PresentationModule } from '../types/presentation';
 
 export interface CreateLumePackageOptions {
@@ -85,7 +86,11 @@ export function downloadLumeArchive(filename: string, archive: Uint8Array): void
     return;
   }
 
-  const blob = new Blob([archive], { type: 'application/zip' });
+  const arrayBuffer = archive.buffer.slice(
+    archive.byteOffset,
+    archive.byteOffset + archive.byteLength,
+  ) as ArrayBuffer;
+  const blob = new Blob([arrayBuffer as ArrayBuffer], { type: 'application/zip' });
   const url = URL.createObjectURL(blob);
 
   const anchor = document.createElement('a');

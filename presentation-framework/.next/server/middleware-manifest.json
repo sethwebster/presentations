@@ -1,0 +1,36 @@
+{
+  "version": 3,
+  "middleware": {},
+  "functions": {
+    "/api/control/advance/[deckId]/route": {
+      "files": [
+        "server/server-reference-manifest.js",
+        "server/app/api/control/advance/[deckId]/route_client-reference-manifest.js",
+        "server/middleware-build-manifest.js",
+        "server/middleware-react-loadable-manifest.js",
+        "server/next-font-manifest.js",
+        "server/interception-route-rewrite-manifest.js",
+        "server/edge-runtime-webpack.js",
+        "server/app/api/control/advance/[deckId]/route.js"
+      ],
+      "name": "app/api/control/advance/[deckId]/route",
+      "page": "/api/control/advance/[deckId]/route",
+      "matchers": [
+        {
+          "regexp": "^/api/control/advance/(?<deckId>[^/]+?)$",
+          "originalSource": "/api/control/advance/[deckId]"
+        }
+      ],
+      "wasm": [],
+      "assets": [],
+      "env": {
+        "__NEXT_BUILD_ID": "development",
+        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "oMnAe8kXmzAMfVimTWjOxDMmkVbJC2djeAj/cvQheYs=",
+        "__NEXT_PREVIEW_MODE_ID": "74766a58f5f1f06b12c8569490330432",
+        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "11788ff3eb79e90a87db0e2f03f4aecdd0198028f480c12abc872c640e103d7c",
+        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "b8a3f4099b50a8ef2421fc560b93621dd006404751e74d1e72e69018ca9a4591"
+      }
+    }
+  },
+  "sortedMiddleware": []
+}

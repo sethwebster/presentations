@@ -1,0 +1,31 @@
+{
+  "pages": {
+    "/api/live/[deckId]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/live/[deckId]/route.js"
+    ],
+    "/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/layout.css",
+      "static/chunks/app/layout.js"
+    ],
+    "/present/[presentationName]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/present/[presentationName]/page.css",
+      "static/chunks/app/present/[presentationName]/page.js"
+    ],
+    "/api/rsc/[deckId]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/rsc/[deckId]/route.js"
+    ],
+    "/api/control/advance/[deckId]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/control/advance/[deckId]/route.js"
+    ]
+  }
+}

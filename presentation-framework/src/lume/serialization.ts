@@ -85,7 +85,7 @@ export async function deserializeLumePackage(
 
   const meta = await getJSON<LumePackage['meta']>(LUME_META_FILENAME);
   const slides = await getJSON<LumeSlide[]>(LUME_SLIDES_FILENAME);
-  const provenance = await getJSON(LUME_PROVENANCE_FILENAME);
+  const provenance = await getJSON<LumePackage['provenance']>(LUME_PROVENANCE_FILENAME);
   const notes = await getJSON<Record<string, LumeNotes>>(LUME_NOTES_FILENAME);
 
   if (!meta || !slides) {

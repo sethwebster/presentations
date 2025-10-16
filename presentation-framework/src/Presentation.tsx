@@ -1,6 +1,8 @@
+"use client";
+
 import './styles/Presentation.css';
 import { useState, useEffect, FormEvent, MouseEvent, ChangeEvent } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { usePresentation } from './hooks/usePresentation';
 import { useKeyboardNavigation } from './hooks/useKeyboardNavigation';
 import { useWindowSync } from './hooks/useWindowSync';
@@ -41,8 +43,7 @@ interface AutopilotProps {
  */
 export function Presentation({ slides, config = {} }: PresentationProps): React.ReactElement {
   const [isPresenterMode, setIsPresenterMode] = useState<boolean>(false);
-  const [, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
+  const router = useRouter();
   const [showPasswordPrompt, setShowPasswordPrompt] = useState<boolean>(false);
   const [passwordInput, setPasswordInput] = useState<string>('');
   const [passwordError, setPasswordError] = useState<boolean>(false);
@@ -84,11 +85,11 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
   // Subscribe to double-escape events from KeyboardService
   useEffect(() => {
     const unsubscribe = keyboardService.onDoubleEscape(() => {
-      navigate('/');
+      router.push('/');
     });
 
     return unsubscribe;
-  }, [navigate]);
+  }, [router]);
 
   // Handle escape key
   useEffect(() => {
@@ -133,7 +134,7 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
   const { isIdle, hasMouseMoved } = useMouseIdle(500);
 
   // Determine who is the presenter (authenticated and not in presenter mode window)
-  const isPresenter = deckId && auth.isAuthenticated && !isPresenterMode;
+  const isPresenter = Boolean(deckId && auth.isAuthenticated && !isPresenterMode);
 
   // Realtime features
   const { reactions, publishSlideChange, sendReaction } = useRealtimePresentation(
@@ -175,7 +176,7 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
   }, [deckId, isViewer, isPresenterMode, isPresenter, auth.isAuthenticated, currentSlide]);
 
   // Autopilot - Voice-driven auto-advance (works in presenter mode window OR main presenter)
-  const canUseAutopilot = deckId && (isPresenter || isPresenterMode);
+  const canUseAutopilot = Boolean(deckId && (isPresenter || isPresenterMode));
 
   const autopilot = useAutopilot({
     deckId,

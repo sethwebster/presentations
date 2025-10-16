@@ -1,0 +1,14 @@
+{
+  "src/presentations/index.ts -> ./demo-rsc": {
+    "id": "src/presentations/index.ts -> ./demo-rsc",
+    "files": [
+      "static/chunks/_app-pages-browser_src_presentations_demo-rsc_ts.js"
+    ]
+  },
+  "src/presentations/index.ts -> ./jsconf-2025-react-foundation": {
+    "id": "src/presentations/index.ts -> ./jsconf-2025-react-foundation",
+    "files": [
+      "static/chunks/_app-pages-browser_src_presentations_jsconf-2025-react-foundation_tsx.js"
+    ]
+  }
+}

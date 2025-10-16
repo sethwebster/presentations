@@ -5,6 +5,13 @@ import { FadeOut } from '../components/FadeOut';
 import { StaggeredReveal } from '../components/StaggeredReveal';
 import type { LumeElement, LumeBuildSequence, LumeAnimation } from './types';
 
+type ElementProps = Record<string, unknown> & {
+  children?: ReactNode;
+  className?: string;
+  src?: string;
+  alt?: string;
+};
+
 interface ExtractedSlideContent {
   elements: LumeElement[];
   builds: LumeBuildSequence[];
@@ -131,8 +138,10 @@ export function extractElementsFromSlideContent(content: ReactNode): ExtractedSl
       return [];
     }
 
-    const { type, props } = node as ReactElement;
-    const childrenArray = React.Children.toArray(props?.children ?? []);
+    const element = node as ReactElement<ElementProps>;
+    const { type, props: rawProps } = element;
+    const props: ElementProps = rawProps ?? {};
+    const childrenArray = React.Children.toArray(props.children ?? []);
 
     if (typeof type === 'string') {
       if (type === 'br') {
@@ -245,7 +254,8 @@ function collectText(nodes: ReactNode[]): string {
       return;
     }
 
-    visit(node.props?.children);
+    const element = node as ReactElement<ElementProps>;
+    visit(element.props?.children ?? null);
   };
 
   nodes.forEach(visit);

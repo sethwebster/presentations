@@ -1,0 +1,6 @@
+{
+  "/api/control/advance/[deckId]/route": "app/api/control/advance/[deckId]/route.js",
+  "/api/live/[deckId]/route": "app/api/live/[deckId]/route.js",
+  "/api/rsc/[deckId]/route": "app/api/rsc/[deckId]/route.js",
+  "/present/[presentationName]/page": "app/present/[presentationName]/page.js"
+}

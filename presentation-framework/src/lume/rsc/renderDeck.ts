@@ -55,7 +55,7 @@ export async function renderDeckToRSC(
   try {
     const model = React.createElement(Deck, { definition: deckDefinition });
     const stream = await renderToReadableStream(model, null, {
-      onError(error) {
+      onError(error: unknown) {
         console.error('RSC render error:', error);
       },
     });

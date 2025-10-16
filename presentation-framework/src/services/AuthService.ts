@@ -8,11 +8,18 @@ class AuthService {
   private readonly TOKEN_KEY = 'lume-presenter-token';
   private authStateListeners = new Set<(event: AuthEvent) => void>();
 
+  private hasWindow(): boolean {
+    return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+  }
+
   /**
    * Get the current auth token
    */
   getToken(): string | null {
-    return localStorage.getItem(this.TOKEN_KEY);
+    if (!this.hasWindow()) {
+      return null;
+    }
+    return window.localStorage.getItem(this.TOKEN_KEY);
   }
 
   /**
@@ -39,8 +46,8 @@ class AuthService {
         const { token } = await response.json() as { token: string };
 
         // Store token if remember is true
-        if (remember) {
-          localStorage.setItem(this.TOKEN_KEY, token);
+        if (remember && this.hasWindow()) {
+          window.localStorage.setItem(this.TOKEN_KEY, token);
         }
 
         // Emit authenticated event
@@ -61,7 +68,9 @@ class AuthService {
    * Logout
    */
   logout(): void {
-    localStorage.removeItem(this.TOKEN_KEY);
+    if (this.hasWindow()) {
+      window.localStorage.removeItem(this.TOKEN_KEY);
+    }
     this.emitAuthState({ type: 'logged_out' });
   }
 

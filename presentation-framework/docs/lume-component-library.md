@@ -13,7 +13,7 @@ App Build                       Deck Export                       Runtime
 ```
 
 ## Component Library
-The library provides typed, composable React Server Components designed for presentations. Example hierarchy:
+The library provides typed, composable React Server Components designed for presentations. The initial implementation lives in `src/rsc/components/library/nodes.tsx` and is wired through the RSC exporter via `src/rsc/components/Deck.tsx`. Example hierarchy:
 
 - `<Deck meta={} theme={} assets={} settings={}>`
   - `<Slide id="" layout="" timeline={} zoomFrame={} interactions={}>`
@@ -79,7 +79,7 @@ Every element exposes declarative props for layout (`bounds`, `transform`), styl
 - After AI completes deck definition, exporter generates `.lume` file as above.
 
 ## Roadmap & TODO
-- [ ] Finalize TypeScript definitions for component props (`DeckProps`, `SlideProps`, `ElementProps`, `AnimationSegment`).
+- [x] Finalize TypeScript definitions for component props (`DeckProps`, `SlideProps`, `ElementProps`, `AnimationSegment`).
 - [ ] Implement RSC bundler setup (Vite RSC plugin) and commit manifest to build output.
 - [ ] Replace DOM extraction with new component-based authoring pipeline.
 - [ ] Update export CLI to render servings using canonical components and include manifest version metadata.
@@ -88,4 +88,3 @@ Every element exposes declarative props for layout (`bounds`, `transform`), styl
 - [ ] Implement timeline playback using `React.startTransition`, View Transition API.
 - [ ] Add infinite zoom (camera track, zoom frame) support.
 - [ ] Design AI toolset exposing deck manipulation operations.
-

@@ -1,2 +1,2 @@
 export * from './renderDeck';
-export * from './decode';
+export * from './parseSummary';

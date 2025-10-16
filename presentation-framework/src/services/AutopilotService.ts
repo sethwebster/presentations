@@ -31,8 +31,11 @@ class AutopilotService {
    * Load threshold from localStorage
    */
   private loadThreshold(): number {
+    if (typeof window === 'undefined') {
+      return 0.50;
+    }
     try {
-      const saved = localStorage.getItem('lume-autopilot-threshold');
+      const saved = window.localStorage.getItem('lume-autopilot-threshold');
       const value = saved ? parseFloat(saved) : 0.50;
       console.log('🔄 Loading threshold from localStorage:', value);
       return value;
@@ -46,8 +49,11 @@ class AutopilotService {
    * Save threshold to localStorage
    */
   private saveThreshold(value: number): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
     try {
-      localStorage.setItem('lume-autopilot-threshold', value.toString());
+      window.localStorage.setItem('lume-autopilot-threshold', value.toString());
       console.log('💾 Saved threshold:', value);
     } catch (err) {
       console.error('Failed to save threshold:', err);
@@ -99,7 +105,7 @@ EXAMPLES
    * Initialize autopilot for presentation
    */
   initialize(deckId: string, slides: SlideData[]): void {
-    this._deckId = deckId;
+    this.deckId = deckId;
     this.notesBySlide = extractSpeakerNotes(slides);
     console.log('Autopilot initialized for deck:', deckId);
   }
@@ -153,7 +159,7 @@ EXAMPLES
    * Update context when slide changes
    */
   updateSlideContext(slideIndex: number): void {
-    this._currentSlide = slideIndex;
+    this.currentSlide = slideIndex;
 
     if (!this.enabled) return;
 

@@ -16,6 +16,7 @@ export interface PresentationConfig {
   renderSlideNumber?: () => React.ReactNode;
   renderNavigation?: () => React.ReactNode;
   customStyles?: string;
+  [key: string]: unknown;
 }
 
 export interface PresentationModule {

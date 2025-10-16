@@ -21,7 +21,7 @@ export const useWindowSync = (
   // Listen for messages from other windows
   useEffect(() => {
     const unsubscribe = windowSyncService.subscribe((message) => {
-      if (message.type === 'SLIDE_CHANGE') {
+      if (message.type === 'SLIDE_CHANGE' && typeof message.slideIndex === 'number') {
         setCurrentSlide(message.slideIndex);
       } else if (message.type === 'PRESENTER_OPENED') {
         setPresenterWindowOpen(true);
