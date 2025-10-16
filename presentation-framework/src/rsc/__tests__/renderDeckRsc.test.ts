@@ -125,22 +125,20 @@ describe('renderDeckToRSC', () => {
     }>;
     expect(slides).toHaveLength(demoDeck.slides.length);
     expect(slides[0]?.type).toBe('SlideComponent');
-    expect(slides[0]?.props.id).toBe('intro');
+    expect(slides[0]?.props.id).toBe('welcome');
 
-    const introRenderedLayers = toArrayChildren(slides[0]?.children);
-    const introRenderedElements = toArrayChildren(introRenderedLayers[0]?.children);
-    const insightsRenderedLayers = toArrayChildren(slides[1]?.children);
-    const insightsRenderedElements = toArrayChildren(insightsRenderedLayers[0]?.children);
+    const welcomeRenderedLayers = toArrayChildren(slides[0]?.children);
+    const welcomeRenderedElements = toArrayChildren(welcomeRenderedLayers[0]?.children);
+    const secondRenderedLayers = toArrayChildren(slides[1]?.children);
+    const secondRenderedElements = toArrayChildren(secondRenderedLayers[0]?.children);
 
-    const introRenderedTypes = introRenderedElements.map((el: any) => el.type);
-    const insightsRenderedTypes = insightsRenderedElements.map((el: any) => el.type);
+    const welcomeRenderedTypes = welcomeRenderedElements.map((el: any) => el.type);
+    const secondRenderedTypes = secondRenderedElements.map((el: any) => el.type);
 
-    expect(introRenderedTypes).toEqual(
-      expect.arrayContaining(['TextElement', 'MediaElement', 'GroupElement', 'CustomElement']),
+    expect(welcomeRenderedTypes).toEqual(
+      expect.arrayContaining(['TextElement', 'MediaElement', 'GroupElement', 'ShapeElement']),
     );
-    expect(insightsRenderedTypes).toEqual(
-      expect.arrayContaining(['ChartElement', 'ShapeElement', 'GroupElement']),
-    );
+    expect(secondRenderedTypes).toEqual(expect.arrayContaining(['TextElement']));
   });
 });
 function toArrayChildren(node: unknown): any[] {

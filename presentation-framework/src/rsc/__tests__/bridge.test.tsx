@@ -15,10 +15,10 @@ describe('deckDefinitionToPresentation', () => {
     const introSlide = slides[0];
     const { container } = render(<>{introSlide.content}</>);
 
-    expect(container.textContent).toContain('Welcome to Lume');
+    expect(container.textContent).toContain('Ignite immersive presentations with Lume');
 
     const img = container.querySelector('img');
     expect(img).not.toBeNull();
-    expect(img?.getAttribute('src')).toContain('assets/images/hero.png');
+    expect(img?.getAttribute('src')).toContain('demo-rsc-deck-assets/hero.svg');
   });
 });
