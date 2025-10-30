@@ -485,6 +485,32 @@ function ImageElementContent({ element }: { element: ElementDefinition }) {
   );
 }
 
+function GroupElementContent({ element }: { element: ElementDefinition }) {
+  if (element.type !== 'group') return null;
+  const groupElement = element as any;
+  const childCount = groupElement.children?.length || 0;
+  
+  return (
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(22, 194, 199, 0.1)',
+        border: '1px dashed rgba(22, 194, 199, 0.5)',
+        borderRadius: '4px',
+        color: 'var(--lume-primary)',
+        fontSize: '12px',
+        fontWeight: '500',
+      }}
+    >
+      Group ({childCount} {childCount === 1 ? 'element' : 'elements'})
+    </div>
+  );
+}
+
 function SelectionHandles({ element }: { element: ElementDefinition }) {
   const state = useEditor();
   const editor = useEditorInstance();
