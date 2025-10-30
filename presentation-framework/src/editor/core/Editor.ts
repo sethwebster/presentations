@@ -591,6 +591,92 @@ export class Editor {
     this.updateElement(elementId, { metadata: updatedMetadata });
   }
 
+  // Clipboard operations
+  copy(): void {
+    const { deck, currentSlideIndex, selectedElementIds } = this.state;
+    if (!deck || selectedElementIds.size === 0) return;
+
+    const slide = deck.slides[currentSlideIndex];
+    if (!slide) return;
+
+    const allElements = [
+      ...(slide.elements || []),
+      ...(slide.layers?.flatMap(l => l.elements) || []),
+    ];
+
+    const elementsToCopy = allElements.filter(el => selectedElementIds.has(el.id));
+    this.setState({ clipboard: elementsToCopy });
+  }
+
+  paste(slideIndex?: number): void {
+    const { clipboard, currentSlideIndex } = this.state;
+    if (clipboard.length === 0) return;
+
+    const targetIndex = slideIndex ?? currentSlideIndex;
+    const pasted = clipboard.map(el => ({
+      ...el,
+      id: `${el.id}-paste-${Date.now()}`,
+      bounds: el.bounds
+        ? {
+            ...el.bounds,
+            x: (el.bounds.x || 0) + 20,
+            y: (el.bounds.y || 0) + 20,
+          }
+        : undefined,
+    }));
+
+    pasted.forEach(el => this.addElement(el, targetIndex));
+    this.selectElements(pasted.map(el => el.id));
+  }
+
+  cut(): void {
+    this.copy();
+    const { selectedElementIds } = this.state;
+    selectedElementIds.forEach(id => this.deleteElement(id));
+  }
+
+  duplicateElement(elementId: string): void {
+    const { deck, currentSlideIndex } = this.state;
+    if (!deck) return;
+
+    const slide = deck.slides[currentSlideIndex];
+    if (!slide) return;
+
+    // Find element in elements or layers
+    let elementToDuplicate: ElementDefinition | undefined;
+    const allElements = [
+      ...(slide.elements || []),
+      ...(slide.layers?.flatMap(l => l.elements) || []),
+    ];
+    elementToDuplicate = allElements.find(el => el.id === elementId);
+
+    if (!elementToDuplicate) return;
+
+    const duplicated: ElementDefinition = {
+      ...elementToDuplicate,
+      id: `${elementId}-copy-${Date.now()}`,
+      bounds: elementToDuplicate.bounds
+        ? {
+            ...elementToDuplicate.bounds,
+            x: (elementToDuplicate.bounds.x || 0) + 20,
+            y: (elementToDuplicate.bounds.y || 0) + 20,
+          }
+        : undefined,
+    };
+
+    this.addElement(duplicated, currentSlideIndex);
+  }
+
+  groupElements(elementIds: string[]): void {
+    // TODO: Implement grouping
+    console.log('Group elements:', elementIds);
+  }
+
+  ungroupElements(groupId: string): void {
+    // TODO: Implement ungrouping
+    console.log('Ungroup element:', groupId);
+  }
+
   // UI state operations
   setZoom(zoom: number): void {
     this.setState({ zoom });

@@ -1,20 +1,13 @@
 "use client";
 
 import { useEffect } from 'react';
-import { useEditorStore } from '../store/editorStore';
+import { useEditor, useEditorInstance } from './useEditor';
 
 export function useKeyboardShortcuts() {
-  const deleteElement = useEditorStore((state) => state.deleteElement);
-  const copy = useEditorStore((state) => state.copy);
-  const paste = useEditorStore((state) => state.paste);
-  const cut = useEditorStore((state) => state.cut);
-  const undo = useEditorStore((state) => state.undo);
-  const redo = useEditorStore((state) => state.redo);
-  const duplicateElement = useEditorStore((state) => state.duplicateElement);
-  const groupElements = useEditorStore((state) => state.groupElements);
-  const ungroupElements = useEditorStore((state) => state.ungroupElements);
-  const selectedElementIds = useEditorStore((state) => state.selectedElementIds);
-  const saveDeck = useEditorStore((state) => state.saveDeck);
+  const state = useEditor();
+  const editor = useEditorInstance();
+  
+  const selectedElementIds = state.selectedElementIds;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -33,28 +26,28 @@ export function useKeyboardShortcuts() {
       // Delete/Backspace - Delete selected elements
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementIds.size > 0) {
         e.preventDefault();
-        selectedElementIds.forEach((id) => deleteElement(id));
+        selectedElementIds.forEach((id) => editor.deleteElement(id));
         return;
       }
 
       // Copy (Cmd/Ctrl + C)
       if (modKey && e.key === 'c' && !e.shiftKey) {
         e.preventDefault();
-        copy();
+        editor.copy();
         return;
       }
 
       // Cut (Cmd/Ctrl + X)
       if (modKey && e.key === 'x') {
         e.preventDefault();
-        cut();
+        editor.cut();
         return;
       }
 
       // Paste (Cmd/Ctrl + V)
       if (modKey && e.key === 'v' && !e.shiftKey) {
         e.preventDefault();
-        paste();
+        editor.paste();
         return;
       }
 
@@ -62,7 +55,7 @@ export function useKeyboardShortcuts() {
       if (modKey && e.key === 'd') {
         e.preventDefault();
         if (selectedElementIds.size === 1) {
-          duplicateElement(Array.from(selectedElementIds)[0]);
+          editor.duplicateElement(Array.from(selectedElementIds)[0]);
         }
         return;
       }
@@ -70,28 +63,27 @@ export function useKeyboardShortcuts() {
       // Undo (Cmd/Ctrl + Z)
       if (modKey && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
-        undo();
+        editor.undo();
         return;
       }
 
       // Redo (Cmd/Ctrl + Shift + Z or Cmd/Ctrl + Y)
       if ((modKey && e.shiftKey && e.key === 'z') || (modKey && e.key === 'y')) {
         e.preventDefault();
-        redo();
+        editor.redo();
         return;
       }
 
       // Save (Cmd/Ctrl + S)
       if (modKey && e.key === 's') {
         e.preventDefault();
-        saveDeck();
+        editor.saveDeck();
         return;
       }
 
       // Escape - Clear selection
       if (e.key === 'Escape') {
-        const clearSelection = useEditorStore.getState().clearSelection;
-        clearSelection();
+        editor.clearSelection();
         return;
       }
 
@@ -108,9 +100,8 @@ export function useKeyboardShortcuts() {
         if (e.key === 'ArrowRight') deltaX = nudgeAmount;
 
         // Nudge selected elements
-        const deck = useEditorStore.getState().deck;
-        const currentSlideIndex = useEditorStore.getState().currentSlideIndex;
-        const updateElement = useEditorStore.getState().updateElement;
+        const deck = state.deck;
+        const currentSlideIndex = state.currentSlideIndex;
         
         if (deck) {
           const slide = deck.slides[currentSlideIndex];
@@ -125,7 +116,7 @@ export function useKeyboardShortcuts() {
               if (element && element.bounds) {
                 const newX = Math.max(0, (element.bounds.x || 0) + deltaX);
                 const newY = Math.max(0, (element.bounds.y || 0) + deltaY);
-                updateElement(id, {
+                editor.updateElement(id, {
                   bounds: {
                     ...element.bounds,
                     x: newX,
@@ -141,18 +132,6 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [
-    deleteElement,
-    copy,
-    paste,
-    cut,
-    undo,
-    redo,
-    duplicateElement,
-    groupElements,
-    ungroupElements,
-    selectedElementIds,
-    saveDeck,
-  ]);
+  }, [selectedElementIds, state.deck, state.currentSlideIndex, editor]);
 }
 
