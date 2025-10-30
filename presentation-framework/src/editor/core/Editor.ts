@@ -456,8 +456,8 @@ export class Editor {
             };
           }
           
-          const updatedChildren = group.children.map((child, i) =>
-            i === childIndex ? { ...child, ...relativeUpdates } : child
+          const updatedChildren: ElementDefinition[] = group.children.map((child, i) =>
+            i === childIndex ? { ...child, ...relativeUpdates } as ElementDefinition : child
           );
           
           // Recalculate group bounds based on updated children
