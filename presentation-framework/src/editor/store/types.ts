@@ -50,6 +50,8 @@ export interface EditorActions {
   loadDeck: (deckId: string) => Promise<void>;
   saveDeck: () => Promise<void>;
   setDeck: (deck: DeckDefinition) => void;
+  updateDeckSettings: (settings: Partial<import('@/rsc/types').DeckSettings>) => void;
+  updateDeckMeta: (meta: Partial<import('@/rsc/types').DeckMeta>) => void;
   
   // Slide operations
   setCurrentSlide: (index: number) => void;

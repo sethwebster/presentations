@@ -4,6 +4,7 @@ import { useEditorStore } from '../store/editorStore';
 import type { ElementDefinition } from '@/rsc/types';
 import { AlignmentTools } from './AlignmentTools';
 import { ColorPicker } from './ColorPicker';
+import { DocumentProperties } from './DocumentProperties';
 
 interface PropertiesPanelProps {
   deckId: string;
@@ -61,13 +62,7 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
         overflowY: 'auto',
       }}>
         {!selectedElement ? (
-          <div style={{
-            color: 'rgba(236, 236, 236, 0.6)',
-            fontSize: '12px',
-            fontStyle: 'italic',
-          }}>
-            Select an element to edit properties
-          </div>
+          <DocumentProperties />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* Position & Size */}

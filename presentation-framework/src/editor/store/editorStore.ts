@@ -98,6 +98,46 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     set({ deck });
   },
 
+  updateDeckSettings: (settingsUpdate: Partial<import('@/rsc/types').DeckSettings>) => {
+    const { deck } = get();
+    if (!deck) return;
+
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      settings: {
+        ...deck.settings,
+        ...settingsUpdate,
+      },
+    };
+
+    set({ deck: updatedDeck });
+    get().executeCommand({
+      type: 'updateDeckSettings',
+      params: { settings: settingsUpdate },
+      timestamp: Date.now(),
+    });
+  },
+
+  updateDeckMeta: (metaUpdate: Partial<import('@/rsc/types').DeckMeta>) => {
+    const { deck } = get();
+    if (!deck) return;
+
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      meta: {
+        ...deck.meta,
+        ...metaUpdate,
+      },
+    };
+
+    set({ deck: updatedDeck });
+    get().executeCommand({
+      type: 'updateDeckMeta',
+      params: { meta: metaUpdate },
+      timestamp: Date.now(),
+    });
+  },
+
   // Slide operations
   setCurrentSlide: (index: number) => {
     const { deck } = get();
