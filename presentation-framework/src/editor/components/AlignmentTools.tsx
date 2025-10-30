@@ -21,100 +21,143 @@ export function AlignmentTools() {
     ...(currentSlide.layers?.flatMap(l => l.elements) || []),
   ];
 
-  const selectedElements = allElements.filter(el => selectedElementIds.has(el.id));
+  // Helper to get fresh selected elements from current state
+  const getSelectedElements = () => {
+    const currentState = editor.getState();
+    const currentDeck = currentState.deck;
+    const currentSlide = currentDeck?.slides[currentState.currentSlideIndex];
+    if (!currentSlide) return [];
+    
+    const allElements = [
+      ...(currentSlide.elements || []),
+      ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+    ];
+    
+    return allElements.filter(el => currentState.selectedElementIds.has(el.id));
+  };
 
   const alignLeft = () => {
+    const selectedElements = getSelectedElements();
+    if (selectedElements.length < 2) return;
+    
     const leftmostX = Math.min(...selectedElements.map(el => el.bounds?.x || 0));
     selectedElements.forEach(el => {
+      const bounds = el.bounds || { x: 0, y: 0, width: 100, height: 50 };
       editor.updateElement(el.id, {
-        bounds: { ...el.bounds, x: leftmostX, width: el.bounds?.width || 100, height: el.bounds?.height || 50 },
+        bounds: { ...bounds, x: leftmostX },
       });
     });
   };
 
   const alignRight = () => {
+    const selectedElements = getSelectedElements();
+    if (selectedElements.length < 2) return;
+    
     const rightmostX = Math.max(...selectedElements.map(el => (el.bounds?.x || 0) + (el.bounds?.width || 100)));
     selectedElements.forEach(el => {
-      const elementWidth = el.bounds?.width || 100;
+      const bounds = el.bounds || { x: 0, y: 0, width: 100, height: 50 };
+      const elementWidth = bounds.width || 100;
       editor.updateElement(el.id, {
-        bounds: { ...el.bounds, x: rightmostX - elementWidth, width: elementWidth, height: el.bounds?.height || 50 },
+        bounds: { ...bounds, x: rightmostX - elementWidth },
       });
     });
   };
 
   const alignTop = () => {
+    const selectedElements = getSelectedElements();
+    if (selectedElements.length < 2) return;
+    
     const topmostY = Math.min(...selectedElements.map(el => el.bounds?.y || 0));
     selectedElements.forEach(el => {
+      const bounds = el.bounds || { x: 0, y: 0, width: 100, height: 50 };
       editor.updateElement(el.id, {
-        bounds: { ...el.bounds, y: topmostY, width: el.bounds?.width || 100, height: el.bounds?.height || 50 },
+        bounds: { ...bounds, y: topmostY },
       });
     });
   };
 
   const alignBottom = () => {
+    const selectedElements = getSelectedElements();
+    if (selectedElements.length < 2) return;
+    
     const bottommostY = Math.max(...selectedElements.map(el => (el.bounds?.y || 0) + (el.bounds?.height || 50)));
     selectedElements.forEach(el => {
-      const elementHeight = el.bounds?.height || 50;
+      const bounds = el.bounds || { x: 0, y: 0, width: 100, height: 50 };
+      const elementHeight = bounds.height || 50;
       editor.updateElement(el.id, {
-        bounds: { ...el.bounds, y: bottommostY - elementHeight, width: el.bounds?.width || 100, height: elementHeight },
+        bounds: { ...bounds, y: bottommostY - elementHeight },
       });
     });
   };
 
   const alignCenterX = () => {
+    const selectedElements = getSelectedElements();
+    if (selectedElements.length < 2) return;
+    
     const minX = Math.min(...selectedElements.map(el => el.bounds?.x || 0));
     const maxX = Math.max(...selectedElements.map(el => (el.bounds?.x || 0) + (el.bounds?.width || 100)));
     const centerX = (minX + maxX) / 2;
     selectedElements.forEach(el => {
-      const elementWidth = el.bounds?.width || 100;
+      const bounds = el.bounds || { x: 0, y: 0, width: 100, height: 50 };
+      const elementWidth = bounds.width || 100;
       editor.updateElement(el.id, {
-        bounds: { ...el.bounds, x: centerX - elementWidth / 2, width: elementWidth, height: el.bounds?.height || 50 },
+        bounds: { ...bounds, x: centerX - elementWidth / 2 },
       });
     });
   };
 
   const alignCenterY = () => {
+    const selectedElements = getSelectedElements();
+    if (selectedElements.length < 2) return;
+    
     const minY = Math.min(...selectedElements.map(el => el.bounds?.y || 0));
     const maxY = Math.max(...selectedElements.map(el => (el.bounds?.y || 0) + (el.bounds?.height || 50)));
     const centerY = (minY + maxY) / 2;
     selectedElements.forEach(el => {
-      const elementHeight = el.bounds?.height || 50;
+      const bounds = el.bounds || { x: 0, y: 0, width: 100, height: 50 };
+      const elementHeight = bounds.height || 50;
       editor.updateElement(el.id, {
-        bounds: { ...el.bounds, y: centerY - elementHeight / 2, width: el.bounds?.width || 100, height: elementHeight },
+        bounds: { ...bounds, y: centerY - elementHeight / 2 },
       });
     });
   };
 
   const distributeHorizontally = () => {
+    const selectedElements = getSelectedElements();
     if (selectedElements.length < 3) return;
     
     const sorted = [...selectedElements].sort((a, b) => (a.bounds?.x || 0) - (b.bounds?.x || 0));
     const firstX = sorted[0].bounds?.x || 0;
-    const lastX = sorted[sorted.length - 1].bounds?.x || 0;
+    const lastElement = sorted[sorted.length - 1];
+    const lastX = (lastElement.bounds?.x || 0) + (lastElement.bounds?.width || 100);
     const totalWidth = lastX - firstX;
     const spacing = totalWidth / (sorted.length - 1);
 
     sorted.forEach((el, index) => {
       if (index === 0 || index === sorted.length - 1) return;
+      const bounds = el.bounds || { x: 0, y: 0, width: 100, height: 50 };
       editor.updateElement(el.id, {
-        bounds: { ...el.bounds, x: firstX + spacing * index, width: el.bounds?.width || 100, height: el.bounds?.height || 50 },
+        bounds: { ...bounds, x: firstX + spacing * index },
       });
     });
   };
 
   const distributeVertically = () => {
+    const selectedElements = getSelectedElements();
     if (selectedElements.length < 3) return;
     
     const sorted = [...selectedElements].sort((a, b) => (a.bounds?.y || 0) - (b.bounds?.y || 0));
     const firstY = sorted[0].bounds?.y || 0;
-    const lastY = sorted[sorted.length - 1].bounds?.y || 0;
+    const lastElement = sorted[sorted.length - 1];
+    const lastY = (lastElement.bounds?.y || 0) + (lastElement.bounds?.height || 50);
     const totalHeight = lastY - firstY;
     const spacing = totalHeight / (sorted.length - 1);
 
     sorted.forEach((el, index) => {
       if (index === 0 || index === sorted.length - 1) return;
+      const bounds = el.bounds || { x: 0, y: 0, width: 100, height: 50 };
       editor.updateElement(el.id, {
-        bounds: { ...el.bounds, y: firstY + spacing * index, width: el.bounds?.width || 100, height: el.bounds?.height || 50 },
+        bounds: { ...bounds, y: firstY + spacing * index },
       });
     });
   };
