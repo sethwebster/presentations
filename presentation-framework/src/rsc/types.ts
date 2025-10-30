@@ -13,20 +13,162 @@ export interface DeckMeta {
   id: string;
   title: string;
   description?: string;
-  authors?: Array<{ name: string; email?: string }>;
+  authors?: Array<{ name: string; email?: string; role?: string }>;
   tags?: string[];
   createdAt?: string;
   updatedAt?: string;
   durationMinutes?: number;
   coverImage?: string;
+  subject?: string;
+  keywords?: string[];
+  category?: string;
+  language?: string; // ISO 639-1 language code (e.g., 'en', 'es', 'fr')
+  revision?: number;
+  version?: string;
+  company?: string;
+  manager?: string;
+  comments?: string;
+  customProperties?: Record<string, string | number | boolean>;
+}
+
+export interface SlideSize {
+  width: number;
+  height: number;
+  preset?: 'standard' | 'widescreen' | 'ultrawide' | 'square' | 'custom';
+  units?: 'pixels' | 'points' | 'inches' | 'centimeters';
+}
+
+export interface ThemeColors {
+  background?: string;
+  text?: string;
+  accent?: string;
+  link?: string;
+  visitedLink?: string;
+  highlight?: string;
+  custom?: Record<string, string>;
+}
+
+export interface TypographyTheme {
+  fontFamily?: string;
+  headingFont?: string;
+  bodyFont?: string;
+  monospaceFont?: string;
+  fontSizeScale?: number; // Base scale multiplier
+  fontSizes?: {
+    h1?: number;
+    h2?: number;
+    h3?: number;
+    h4?: number;
+    body?: number;
+    caption?: number;
+  };
+}
+
+export interface MasterSlide {
+  id: string;
+  name: string;
+  background?: string | { type: 'color' | 'gradient' | 'image'; value: string | object };
+  placeholders?: Array<{
+    id: string;
+    type: 'title' | 'content' | 'image' | 'footer' | 'date' | 'slideNumber';
+    bounds: { x: number; y: number; width: number; height: number };
+    style?: Record<string, unknown>;
+  }>;
+  elements?: ElementDefinition[];
+  defaultTransition?: AnimationDefinition;
+}
+
+export interface GridSettings {
+  enabled: boolean;
+  size: number;
+  snapToGrid: boolean;
+  color?: string;
+  opacity?: number;
+  style?: 'dots' | 'lines' | 'cross';
+}
+
+export interface RulerSettings {
+  enabled: boolean;
+  units: 'pixels' | 'points' | 'inches' | 'centimeters';
+  showGuides: boolean;
+  showMargins: boolean;
+}
+
+export interface ExportSettings {
+  format?: 'pdf' | 'png' | 'pptx' | 'key' | 'html';
+  quality?: 'low' | 'medium' | 'high' | 'print';
+  includeNotes?: boolean;
+  includeHiddenSlides?: boolean;
+  pageRange?: string; // e.g., "1-5,10,15-20"
+  backgroundColor?: string;
+  transparentBackground?: boolean;
+  dpi?: number;
+}
+
+export interface SharingSettings {
+  public: boolean;
+  allowComments: boolean;
+  allowEdit: boolean;
+  allowCopy: boolean;
+  allowDownload: boolean;
+  accessLevel?: 'viewer' | 'commenter' | 'editor' | 'owner';
+  collaborators?: Array<{
+    email: string;
+    role: 'viewer' | 'commenter' | 'editor';
+    name?: string;
+  }>;
+  linkSharing?: {
+    enabled: boolean;
+    accessLevel: 'viewer' | 'commenter' | 'editor';
+    requireSignIn: boolean;
+  };
+}
+
+export interface PresentationSettings {
+  loop: boolean;
+  autoAdvance: boolean;
+  autoAdvanceDelay?: number; // seconds
+  skipHiddenSlides: boolean;
+  showSlideNumbers: boolean;
+  showPresenterNotes: boolean;
+  startSlideIndex?: number;
+  endSlideIndex?: number;
 }
 
 export interface DeckSettings {
+  // Slide dimensions and layout
+  slideSize?: SlideSize;
+  orientation?: 'landscape' | 'portrait';
+  
+  // Navigation
   navigation?: {
     mode?: 'linear' | 'freeform' | 'zoom';
     overviewSlideId?: string;
   };
+  
+  // Theme and styling
+  theme?: {
+    colors?: ThemeColors;
+    typography?: TypographyTheme;
+    masterSlides?: MasterSlide[];
+    defaultMasterSlideId?: string;
+  };
+  
+  // Grid and rulers
+  grid?: GridSettings;
+  ruler?: RulerSettings;
+  
+  // Default slide properties
+  defaultBackground?: string | { type: 'color' | 'gradient' | 'image'; value: string | object };
+  defaultTransition?: AnimationDefinition;
+  
+  // Presentation behavior
+  presentation?: PresentationSettings;
+  
+  // Autopilot/Voice control
   autopilot?: Record<string, unknown>;
+  
+  // Branding
   branding?: {
     logo?: {
       src: string;
@@ -34,7 +176,62 @@ export interface DeckSettings {
       width?: number;
       height?: number;
       style?: Record<string, unknown>;
+      position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
     };
+    footer?: {
+      text?: string;
+      showDate?: boolean;
+      showSlideNumber?: boolean;
+      style?: Record<string, unknown>;
+    };
+  };
+  
+  // Export settings
+  export?: ExportSettings;
+  
+  // Sharing and collaboration
+  sharing?: SharingSettings;
+  
+  // Version control
+  versionControl?: {
+    enabled: boolean;
+    maxVersions?: number;
+    autoSaveVersions?: boolean;
+  };
+  
+  // Comments and review
+  comments?: {
+    enabled: boolean;
+    requireModeration?: boolean;
+    notificationSettings?: Record<string, unknown>;
+  };
+  
+  // Accessibility
+  accessibility?: {
+    altTextRequired?: boolean;
+    readingOrder?: 'visual' | 'logical';
+    highContrast?: boolean;
+    screenReaderOptimized?: boolean;
+  };
+  
+  // Regional settings
+  regional?: {
+    locale?: string; // e.g., 'en-US', 'fr-FR'
+    dateFormat?: string;
+    timeFormat?: '12h' | '24h';
+    currency?: string;
+    numberFormat?: string;
+  };
+  
+  // Print settings
+  print?: {
+    layout?: 'fullPage' | 'notes' | 'handouts' | 'outline';
+    slidesPerPage?: number;
+    scale?: number;
+    orientation?: 'portrait' | 'landscape';
+    margins?: { top: number; right: number; bottom: number; left: number };
+    includeBackground?: boolean;
+    grayscale?: boolean;
   };
 }
 
