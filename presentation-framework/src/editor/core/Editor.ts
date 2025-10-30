@@ -40,6 +40,7 @@ export class Editor {
   private state: EditorState;
   private listeners: Set<EditorStateListener> = new Set();
   private saveDebounceTimer: NodeJS.Timeout | null = null;
+  private isSaving: boolean = false;
 
   constructor() {
     this.state = {
@@ -143,16 +144,25 @@ export class Editor {
     const { deck, deckId } = this.state;
     if (!deck || !deckId) {
       console.warn('Cannot save: missing deck or deckId', { deck: !!deck, deckId });
-      return;
+      return Promise.reject(new Error('Missing deck or deckId'));
     }
 
-    // Prevent concurrent saves
+    // If already saving, wait for it to complete
+    if (this.isSaving) {
+      return Promise.resolve();
+    }
+
+    // Clear any pending debounced save
     if (this.saveDebounceTimer) {
       clearTimeout(this.saveDebounceTimer);
+      this.saveDebounceTimer = null;
     }
 
     return new Promise<void>((resolve, reject) => {
       this.saveDebounceTimer = setTimeout(async () => {
+        this.isSaving = true;
+        this.saveDebounceTimer = null;
+        
         try {
           const deckToSave: DeckDefinition = {
             ...deck,
@@ -162,6 +172,8 @@ export class Editor {
             },
           };
 
+          console.log('Saving deck:', deckId, { slides: deckToSave.slides.length });
+          
           const response = await fetch(`/api/editor/${deckId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -173,14 +185,17 @@ export class Editor {
             throw new Error(`Failed to save deck: ${response.statusText} - ${errorText}`);
           }
           
+          const result = await response.json();
+          console.log('Save successful:', result);
+          
           // Update deck silently without triggering unnecessary re-renders
           // The deck reference stays the same, just the updatedAt changes
           this.state.deck = deckToSave;
-          this.saveDebounceTimer = null;
+          this.isSaving = false;
           resolve();
         } catch (error) {
           console.error('Error saving deck:', error);
-          this.saveDebounceTimer = null;
+          this.isSaving = false;
           this.setState({
             error: error instanceof Error ? error.message : 'Failed to save deck',
           });
