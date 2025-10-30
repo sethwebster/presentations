@@ -310,35 +310,50 @@ function GroupElementContainer({ element, slideId }: { element: GroupElementDefi
       }}
     >
       {/* Render children with relative positioning inside the group */}
-      {/* Wrap children in a container that blocks pointer events so group container handles all interactions */}
-      <div
-        style={{
-          position: 'relative',
-          width: '100%',
-          height: '100%',
-          pointerEvents: 'none', // Children don't intercept events when group is closed
-        }}
-      >
-        {element.children?.map((child) => {
-          // Children already have relative bounds, render them directly
-          // But wrap each child to allow visual rendering while blocking interactions
-          return (
-            <div
-              key={child.id}
-              style={{
-                position: 'absolute',
-                left: `${child.bounds?.x || 0}px`,
-                top: `${child.bounds?.y || 0}px`,
-                width: `${child.bounds?.width || 100}px`,
-                height: `${child.bounds?.height || 50}px`,
-                pointerEvents: 'none', // Prevent children from capturing events
-              }}
-            >
-              <ElementRenderer element={child} slideId={slideId} />
-            </div>
-          );
-        })}
-      </div>
+      {/* Children are rendered but cannot intercept mouse events - group container handles all interactions */}
+      {element.children?.map((child) => {
+        // Wrap each child in a div that completely blocks event propagation
+        // This ensures BaseElement's handlers never fire when group is closed
+        return (
+          <div
+            key={child.id}
+            style={{
+              position: 'absolute',
+              left: `${child.bounds?.x || 0}px`,
+              top: `${child.bounds?.y || 0}px`,
+              width: `${child.bounds?.width || 100}px`,
+              height: `${child.bounds?.height || 50}px`,
+              pointerEvents: 'none', // CSS: prevents element from being event target
+            }}
+            onMouseDown={(e) => {
+              // React: explicitly stop propagation at capture phase
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            onMouseMove={(e) => {
+              e.stopPropagation();
+            }}
+            onMouseUp={(e) => {
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            onContextMenu={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+          >
+            {/* Render child element - its BaseElement handlers will be blocked by parent */}
+            <ElementRenderer element={child} slideId={slideId} />
+          </div>
+        );
+      })}
     </div>
   );
 }
