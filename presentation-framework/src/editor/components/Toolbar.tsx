@@ -14,6 +14,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
   const currentSlideIndex = useEditorStore((state) => state.currentSlideIndex);
   const selectedElementIds = useEditorStore((state) => state.selectedElementIds);
   const updateElement = useEditorStore((state) => state.updateElement);
+  const autosaveEnabled = useEditorStore((state) => state.autosaveEnabled);
   return (
     <div className="editor-toolbar" style={{
       height: '56px',
@@ -201,17 +202,28 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       {/* Save Button */}
       <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto', paddingRight: '16px', borderRight: '1px solid rgba(236, 236, 236, 0.1)' }}>
         <ToolbarButton
-          title="Save (Cmd/Ctrl+S)"
+          title={autosaveEnabled ? "Autosave ON - Click to disable (Cmd/Ctrl+S to save)" : "Autosave OFF - Click to enable (Cmd/Ctrl+S to save)"}
           onClick={() => {
-            const saveDeck = useEditorStore.getState().saveDeck;
-            saveDeck();
+            const toggleAutosave = useEditorStore.getState().toggleAutosave;
+            toggleAutosave();
           }}
+          isActive={autosaveEnabled}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
-            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-            <polyline points="17 21 17 13 7 13 7 21"/>
-            <polyline points="7 3 7 8 15 8"/>
-          </svg>
+          {autosaveEnabled ? (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/>
+              <polyline points="7 3 7 8 15 8"/>
+              <circle cx="18" cy="8" r="1" fill="currentColor"/>
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/>
+              <polyline points="7 3 7 8 15 8"/>
+              <line x1="18" y1="6" x2="18" y2="10" strokeWidth="2"/>
+            </svg>
+          )}
         </ToolbarButton>
       </div>
 

@@ -18,21 +18,22 @@ export function EditorLayout({ deckId }: EditorLayoutProps) {
   const loadDeck = useEditorStore((state) => state.loadDeck);
   const saveDeck = useEditorStore((state) => state.saveDeck);
   const deck = useEditorStore((state) => state.deck);
+  const autosaveEnabled = useEditorStore((state) => state.autosaveEnabled);
 
   useEffect(() => {
     loadDeck(deckId);
   }, [deckId, loadDeck]);
 
-  // Auto-save every 30 seconds
+  // Auto-save every 30 seconds (if enabled)
   useEffect(() => {
-    if (!deck) return;
+    if (!deck || !autosaveEnabled) return;
 
     const interval = setInterval(() => {
       saveDeck();
     }, 30000); // 30 seconds
 
     return () => clearInterval(interval);
-  }, [deck, saveDeck]);
+  }, [deck, saveDeck, autosaveEnabled]);
 
   // Enable keyboard shortcuts
   useKeyboardShortcuts();

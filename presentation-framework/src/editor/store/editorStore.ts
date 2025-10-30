@@ -16,6 +16,7 @@ const initialState = {
   pan: { x: 0, y: 0 },
   showGrid: false,
   showGuides: true,
+  autosaveEnabled: true,
   draggingElementId: null,
   draggingBounds: null,
   isLoading: false,
@@ -505,6 +506,10 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
   toggleGuides: () => {
     set(state => ({ showGuides: !state.showGuides }));
+  },
+
+  toggleAutosave: () => {
+    set(state => ({ autosaveEnabled: !state.autosaveEnabled }));
   },
 
   setDraggingElement: (elementId: string | null, bounds: { x: number; y: number; width: number; height: number } | null) => {

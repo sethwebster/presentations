@@ -23,6 +23,7 @@ export interface EditorState {
   pan: { x: number; y: number };
   showGrid: boolean;
   showGuides: boolean;
+  autosaveEnabled: boolean;
   draggingElementId: string | null;
   draggingBounds: { x: number; y: number; width: number; height: number } | null;
   
@@ -89,6 +90,7 @@ export interface EditorActions {
   setPan: (pan: { x: number; y: number }) => void;
   toggleGrid: () => void;
   toggleGuides: () => void;
+  toggleAutosave: () => void;
   setDraggingElement: (elementId: string | null, bounds: { x: number; y: number; width: number; height: number } | null) => void;
   
   // Utility
