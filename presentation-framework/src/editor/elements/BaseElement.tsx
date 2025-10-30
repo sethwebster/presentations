@@ -5,6 +5,33 @@ import type { ElementDefinition } from '@/rsc/types';
 import { useEditorStore } from '../store/editorStore';
 import { EditableTextElement } from './EditableTextElement';
 
+const CANVAS_WIDTH = 1280;
+const CANVAS_HEIGHT = 720;
+
+// Convert screen coordinates to canvas coordinates
+function screenToCanvas(screenX: number, screenY: number, zoom: number, pan: { x: number; y: number }): { x: number; y: number } {
+  // Get canvas container (centered on screen)
+  const canvasContainer = document.querySelector('[data-canvas-container]') as HTMLElement;
+  if (!canvasContainer) {
+    return { x: screenX, y: screenY };
+  }
+
+  const rect = canvasContainer.getBoundingClientRect();
+  
+  // The canvas container has transform: translate(calc(-50% + pan.x), calc(-50% + pan.y)) scale(zoom)
+  // The bounding rect already reflects this transform
+  // Canvas center in screen space (accounting for pan and scale)
+  const canvasTopLeftScreenX = rect.left;
+  const canvasTopLeftScreenY = rect.top;
+  
+  // Convert screen coordinates to canvas coordinates
+  // Account for zoom: divide by zoom to get canvas space
+  const canvasX = (screenX - canvasTopLeftScreenX) / zoom;
+  const canvasY = (screenY - canvasTopLeftScreenY) / zoom;
+
+  return { x: canvasX, y: canvasY };
+}
+
 interface BaseElementProps {
   element: ElementDefinition;
   slideId: string;
@@ -16,6 +43,8 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
   const selectElement = useEditorStore((state) => state.selectElement);
   const updateElement = useEditorStore((state) => state.updateElement);
   const setDraggingElement = useEditorStore((state) => state.setDraggingElement);
+  const zoom = useEditorStore((state) => state.zoom);
+  const pan = useEditorStore((state) => state.pan);
   const isSelected = selectedElementIds.has(element.id);
 
   const bounds = element.bounds || { x: 0, y: 0, width: 100, height: 50 };
@@ -46,10 +75,13 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
       selectElement(element.id, e.shiftKey);
     }
 
+    // Convert screen coordinates to canvas coordinates
+    const canvasPos = screenToCanvas(e.clientX, e.clientY, zoom, pan);
+    
     setIsDragging(true);
     setDragStart({
-      x: e.clientX - (bounds.x || 0),
-      y: e.clientY - (bounds.y || 0),
+      x: canvasPos.x - (bounds.x || 0),
+      y: canvasPos.y - (bounds.y || 0),
     });
   };
 
@@ -68,13 +100,18 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
 
     const handleMouseMove = (e: MouseEvent) => {
       e.preventDefault();
-      const newX = e.clientX - dragStart.x;
-      const newY = e.clientY - dragStart.y;
+      
+      // Convert screen coordinates to canvas coordinates
+      const canvasPos = screenToCanvas(e.clientX, e.clientY, zoom, pan);
+      
+      const newX = canvasPos.x - dragStart.x;
+      const newY = canvasPos.y - dragStart.y;
+      
       const newBounds = {
-          ...bounds,
-          x: Math.max(0, newX),
-          y: Math.max(0, newY),
-        };
+        ...bounds,
+        x: Math.max(0, Math.min(CANVAS_WIDTH - (bounds.width || 0), newX)),
+        y: Math.max(0, Math.min(CANVAS_HEIGHT - (bounds.height || 0), newY)),
+      };
 
       // Update dragging state for alignment guides
       setDraggingElement(element.id, newBounds);
@@ -111,7 +148,7 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
       document.body.style.webkitUserSelect = '';
       document.body.style.cursor = '';
     };
-  }, [isDragging, dragStart, bounds, element.id, updateElement, setDraggingElement]);
+  }, [isDragging, dragStart, bounds, element.id, updateElement, setDraggingElement, zoom, pan]);
 
   return (
     <div

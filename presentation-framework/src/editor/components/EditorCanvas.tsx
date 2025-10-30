@@ -118,6 +118,7 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
     >
       {/* Canvas Container */}
       <div
+        data-canvas-container
         style={{
           position: 'absolute',
           top: '50%',
