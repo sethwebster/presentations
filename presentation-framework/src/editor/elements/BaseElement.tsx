@@ -7,6 +7,7 @@ import { EditableTextElement } from './EditableTextElement';
 
 const CANVAS_WIDTH = 1280;
 const CANVAS_HEIGHT = 720;
+const SNAP_THRESHOLD = 5; // pixels - same as GUIDE_THRESHOLD
 
 // Convert screen coordinates to canvas coordinates
 function screenToCanvas(screenX: number, screenY: number, zoom: number, pan: { x: number; y: number }): { x: number; y: number } {
@@ -30,6 +31,99 @@ function screenToCanvas(screenX: number, screenY: number, zoom: number, pan: { x
   const canvasY = (screenY - canvasTopLeftScreenY) / zoom;
 
   return { x: canvasX, y: canvasY };
+}
+
+// Helper to find snap points for an element at a given position
+function findSnapPoints(
+  elementBounds: { x: number; y: number; width: number; height: number },
+  allElements: Array<{ bounds?: { x?: number; y?: number; width?: number; height?: number } }>,
+  excludeElementId?: string
+): { snapX: number | null; snapY: number | null } {
+  const snapPointsX: number[] = [];
+  const snapPointsY: number[] = [];
+  
+  const elementCenterX = elementBounds.x + elementBounds.width / 2;
+  const elementCenterY = elementBounds.y + elementBounds.height / 2;
+  const elementLeft = elementBounds.x;
+  const elementRight = elementBounds.x + elementBounds.width;
+  const elementTop = elementBounds.y;
+  const elementBottom = elementBounds.y + elementBounds.height;
+
+  // Check alignment with other elements
+  for (const el of allElements) {
+    if (!el.bounds) continue;
+    
+    const bounds = el.bounds;
+    const otherLeft = bounds.x || 0;
+    const otherRight = (bounds.x || 0) + (bounds.width || 0);
+    const otherTop = bounds.y || 0;
+    const otherBottom = (bounds.y || 0) + (bounds.height || 0);
+    const otherCenterX = (bounds.x || 0) + (bounds.width || 0) / 2;
+    const otherCenterY = (bounds.y || 0) + (bounds.height || 0) / 2;
+
+    // Left edge alignment
+    if (Math.abs(elementLeft - otherLeft) < SNAP_THRESHOLD) {
+      snapPointsX.push(otherLeft);
+    }
+    // Right edge alignment
+    if (Math.abs(elementRight - otherRight) < SNAP_THRESHOLD) {
+      snapPointsX.push(otherRight - elementBounds.width);
+    }
+    // Center X alignment
+    if (Math.abs(elementCenterX - otherCenterX) < SNAP_THRESHOLD) {
+      snapPointsX.push(otherCenterX - elementBounds.width / 2);
+    }
+
+    // Top edge alignment
+    if (Math.abs(elementTop - otherTop) < SNAP_THRESHOLD) {
+      snapPointsY.push(otherTop);
+    }
+    // Bottom edge alignment
+    if (Math.abs(elementBottom - otherBottom) < SNAP_THRESHOLD) {
+      snapPointsY.push(otherBottom - elementBounds.height);
+    }
+    // Center Y alignment
+    if (Math.abs(elementCenterY - otherCenterY) < SNAP_THRESHOLD) {
+      snapPointsY.push(otherCenterY - elementBounds.height / 2);
+    }
+  }
+
+  // Check alignment with canvas center and edges
+  // Canvas center
+  if (Math.abs(elementCenterX - CANVAS_WIDTH / 2) < SNAP_THRESHOLD) {
+    snapPointsX.push(CANVAS_WIDTH / 2 - elementBounds.width / 2);
+  }
+  if (Math.abs(elementCenterY - CANVAS_HEIGHT / 2) < SNAP_THRESHOLD) {
+    snapPointsY.push(CANVAS_HEIGHT / 2 - elementBounds.height / 2);
+  }
+  // Canvas edges
+  if (Math.abs(elementLeft) < SNAP_THRESHOLD) {
+    snapPointsX.push(0);
+  }
+  if (Math.abs(elementRight - CANVAS_WIDTH) < SNAP_THRESHOLD) {
+    snapPointsX.push(CANVAS_WIDTH - elementBounds.width);
+  }
+  if (Math.abs(elementTop) < SNAP_THRESHOLD) {
+    snapPointsY.push(0);
+  }
+  if (Math.abs(elementBottom - CANVAS_HEIGHT) < SNAP_THRESHOLD) {
+    snapPointsY.push(CANVAS_HEIGHT - elementBounds.height);
+  }
+
+  // Return the closest snap point (or null if none within threshold)
+  const snapX = snapPointsX.length > 0 
+    ? snapPointsX.reduce((closest, point) => 
+        Math.abs(point - elementBounds.x) < Math.abs(closest - elementBounds.x) ? point : closest
+      )
+    : null;
+  
+  const snapY = snapPointsY.length > 0
+    ? snapPointsY.reduce((closest, point) => 
+        Math.abs(point - elementBounds.y) < Math.abs(closest - elementBounds.y) ? point : closest
+      )
+    : null;
+
+  return { snapX, snapY };
 }
 
 interface BaseElementProps {
@@ -154,8 +248,29 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
         const initialMouseOffsetY = dragStart.y - primaryInitialBounds.y;
         
         // Calculate where the primary element should be (follows cursor)
-        const primaryNewX = Math.max(0, Math.min(CANVAS_WIDTH - primaryInitialBounds.width, canvasPos.x - initialMouseOffsetX));
-        const primaryNewY = Math.max(0, Math.min(CANVAS_HEIGHT - primaryInitialBounds.height, canvasPos.y - initialMouseOffsetY));
+        let primaryNewX = Math.max(0, Math.min(CANVAS_WIDTH - primaryInitialBounds.width, canvasPos.x - initialMouseOffsetX));
+        let primaryNewY = Math.max(0, Math.min(CANVAS_HEIGHT - primaryInitialBounds.height, canvasPos.y - initialMouseOffsetY));
+        
+        // Check for snap points
+        const tempBounds = {
+          x: primaryNewX,
+          y: primaryNewY,
+          width: primaryInitialBounds.width,
+          height: primaryInitialBounds.height,
+        };
+        const snapPoints = findSnapPoints(tempBounds, allElements.filter(el => el.id !== element.id));
+        
+        // Apply snapping if within threshold
+        if (snapPoints.snapX !== null && Math.abs(snapPoints.snapX - primaryNewX) < SNAP_THRESHOLD) {
+          primaryNewX = snapPoints.snapX;
+        }
+        if (snapPoints.snapY !== null && Math.abs(snapPoints.snapY - primaryNewY) < SNAP_THRESHOLD) {
+          primaryNewY = snapPoints.snapY;
+        }
+        
+        // Ensure bounds are still valid after snapping
+        primaryNewX = Math.max(0, Math.min(CANVAS_WIDTH - primaryInitialBounds.width, primaryNewX));
+        primaryNewY = Math.max(0, Math.min(CANVAS_HEIGHT - primaryInitialBounds.height, primaryNewY));
         
         // Calculate the delta of the primary element
         const primaryDeltaX = primaryNewX - primaryInitialBounds.x;
