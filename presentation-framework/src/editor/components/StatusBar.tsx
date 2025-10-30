@@ -18,31 +18,43 @@ export function StatusBar({ deckId }: StatusBarProps) {
   
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [previousDeckHash, setPreviousDeckHash] = useState<string>('');
 
-  // Track save status
+  // Track save status by monitoring deck changes
   useEffect(() => {
-    if (!deck) return;
-
-    const saveDeck = useEditorStore.getState().saveDeck;
-    let saveTimeout: NodeJS.Timeout;
-
-    // Mark as unsaved when deck changes
-    setSaveStatus('unsaved');
-
-    // Auto-save if enabled
-    if (autosaveEnabled) {
-      saveTimeout = setTimeout(async () => {
-        setSaveStatus('saving');
-        await saveDeck();
-        setSaveStatus('saved');
-        setLastSaved(new Date());
-      }, 1000); // Debounce saves by 1 second
+    if (!deck) {
+      setSaveStatus('saved');
+      return;
     }
 
-    return () => {
-      if (saveTimeout) clearTimeout(saveTimeout);
-    };
-  }, [deck, autosaveEnabled]);
+    // Create a simple hash of the deck to detect changes
+    const deckHash = JSON.stringify(deck);
+    
+    // If deck changed, mark as unsaved
+    if (deckHash !== previousDeckHash && previousDeckHash !== '') {
+      setSaveStatus('unsaved');
+    }
+
+    // Auto-save if enabled and deck has changed
+    if (autosaveEnabled && deckHash !== previousDeckHash) {
+      const saveTimeout = setTimeout(async () => {
+        setSaveStatus('saving');
+        const saveDeck = useEditorStore.getState().saveDeck;
+        try {
+          await saveDeck();
+          setSaveStatus('saved');
+          setLastSaved(new Date());
+          setPreviousDeckHash(deckHash);
+        } catch (error) {
+          setSaveStatus('unsaved');
+        }
+      }, 1000); // Debounce saves by 1 second
+
+      return () => clearTimeout(saveTimeout);
+    }
+
+    setPreviousDeckHash(deckHash);
+  }, [deck, autosaveEnabled, previousDeckHash]);
 
   const currentSlide = deck?.slides[currentSlideIndex];
   const elementCount = currentSlide 
