@@ -40,7 +40,7 @@ const MAX_UNDO_STACK_SIZE = 50;
 export class Editor {
   private state: EditorState;
   private listeners: Set<EditorStateListener> = new Set();
-  private saveDebounceTimer: NodeJS.Timeout | null = null;
+  private saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private isSaving: boolean = false;
 
   constructor() {
@@ -94,15 +94,17 @@ export class Editor {
 
   // Deep merge helper
   private deepMerge<T extends Record<string, any>>(target: T, source: Partial<T>): T {
-    if (!source || typeof source !== 'object') return source as T;
-    if (!target || typeof target !== 'object') return source as T;
+    if (!source || typeof source !== 'object') return target;
+    if (!target || typeof target !== 'object') return target;
     
     const result = { ...target };
     for (const key in source) {
-      if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key]) && source[key].constructor === Object) {
-        result[key] = this.deepMerge(target[key] || {}, source[key]);
-      } else {
-        result[key] = source[key];
+      if (source[key] !== undefined) {
+        if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key]) && source[key].constructor === Object) {
+          result[key] = this.deepMerge((target[key] || {}) as T[Extract<keyof T, string>], source[key] as Partial<T[Extract<keyof T, string>]>);
+        } else {
+          result[key] = source[key] as T[Extract<keyof T, string>];
+        }
       }
     }
     return result;
@@ -441,7 +443,6 @@ export class Editor {
         if (childIndex !== undefined && childIndex !== -1) {
           // Update child in group's children array
           // Convert absolute bounds (from dragging) back to relative bounds
-          const child = group.children[childIndex];
           let relativeUpdates = { ...updates };
           
           if (updates.bounds && group.bounds) {
@@ -472,7 +473,7 @@ export class Editor {
           // Update the group in the slide
           const updatedDeck: DeckDefinition = {
             ...deck,
-            slides: deck.slides.map((slide, i) => {
+            slides: deck.slides.map((slide, i): SlideDefinition => {
               if (i !== currentSlideIndex) return slide;
               
               const elements = slide.elements || [];
@@ -483,7 +484,7 @@ export class Editor {
                   ...slide,
                   elements: elements.map((el, idx) =>
                     idx === groupIndex ? updatedGroup : el
-                  ),
+                  ) as ElementDefinition[],
                 };
               }
               
@@ -496,7 +497,7 @@ export class Editor {
                       ...layer,
                       elements: layer.elements.map((el, idx) =>
                         idx === layerGroupIndex ? updatedGroup : el
-                      ),
+                      ) as ElementDefinition[],
                     };
                   }
                   return layer;
@@ -1261,6 +1262,7 @@ export class Editor {
       },
       isLoading: false,
       error: null,
+      openedGroupId: null,
     };
     this.notify();
   }
