@@ -150,9 +150,16 @@ export class Editor {
       return Promise.reject(new Error('Missing deck or deckId'));
     }
 
-    // If already saving, wait for it to complete
+    // If already saving, queue this save for after the current one completes
     if (this.isSaving) {
-      return Promise.resolve();
+      console.log('Save already in progress, queuing save...');
+      return new Promise<void>((resolve) => {
+        // Wait a bit and retry
+        setTimeout(async () => {
+          await this.saveDeck();
+          resolve();
+        }, 500);
+      });
     }
 
     // Clear any pending debounced save

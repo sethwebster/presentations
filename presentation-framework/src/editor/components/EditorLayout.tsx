@@ -34,12 +34,13 @@ export function EditorLayout({ deckId }: EditorLayoutProps) {
 
     // Only set up interval, don't save immediately (saves are triggered by state changes via StatusBar)
     const interval = setInterval(() => {
-      editor.saveDeck();
+      console.log('Periodic autosave triggered (30s interval)');
+      editor.saveDeck().catch(err => console.error('Periodic autosave failed:', err));
     }, 30000); // 30 seconds
 
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.autosaveEnabled]); // Only re-run if autosave is toggled, not on every deck change
+  }, [state.autosaveEnabled, state.deck]); // Re-run when deck changes to ensure we have a deck to save
 
   // Enable keyboard shortcuts
   useKeyboardShortcuts();
