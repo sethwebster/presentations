@@ -58,18 +58,36 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
   saveDeck: async () => {
     const { deck, deckId } = get();
-    if (!deck || !deckId) return;
+    if (!deck || !deckId) {
+      console.warn('Cannot save: missing deck or deckId', { deck: !!deck, deckId });
+      return;
+    }
 
     try {
+      // Update the updatedAt timestamp
+      const deckToSave: DeckDefinition = {
+        ...deck,
+        meta: {
+          ...deck.meta,
+          updatedAt: new Date().toISOString(),
+        },
+      };
+
       const response = await fetch(`/api/editor/${deckId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(deck),
+        body: JSON.stringify(deckToSave),
       });
+      
       if (!response.ok) {
-        throw new Error(`Failed to save deck: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`Failed to save deck: ${response.statusText} - ${errorText}`);
       }
+      
+      // Update the deck in store with the new timestamp
+      set({ deck: deckToSave });
     } catch (error) {
+      console.error('Error saving deck:', error);
       set({
         error: error instanceof Error ? error.message : 'Failed to save deck',
       });

@@ -26,8 +26,19 @@ export function EditorLayout({ deckId }: EditorLayoutProps) {
 
   // Auto-save every 30 seconds (if enabled)
   useEffect(() => {
-    if (!deck || !autosaveEnabled) return;
+    if (!deck || !autosaveEnabled) {
+      return;
+    }
 
+    // Save immediately on mount/change if deck exists
+    const saveImmediately = () => {
+      if (deck) {
+        saveDeck();
+      }
+    };
+
+    // Save immediately, then set up interval
+    saveImmediately();
     const interval = setInterval(() => {
       saveDeck();
     }, 30000); // 30 seconds
