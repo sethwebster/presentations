@@ -7,7 +7,7 @@ import { PropertiesPanel } from './PropertiesPanel';
 import { LayerPanel } from './LayerPanel';
 import { TimelineEditor } from './TimelineEditor';
 import { StatusBar } from './StatusBar';
-import { useEditorStore } from '../store/editorStore';
+import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 
 interface EditorLayoutProps {
@@ -16,36 +16,36 @@ interface EditorLayoutProps {
 
 export function EditorLayout({ deckId }: EditorLayoutProps) {
   const [showTimeline, setShowTimeline] = useState(false);
-  const loadDeck = useEditorStore((state) => state.loadDeck);
-  const saveDeck = useEditorStore((state) => state.saveDeck);
-  const deck = useEditorStore((state) => state.deck);
-  const autosaveEnabled = useEditorStore((state) => state.autosaveEnabled);
+  // Observe editor state
+  const state = useEditor();
+  // Get editor instance to call methods
+  const editor = useEditorInstance();
 
   useEffect(() => {
-    loadDeck(deckId);
-  }, [deckId, loadDeck]);
+    editor.loadDeck(deckId);
+  }, [deckId, editor]);
 
   // Auto-save every 30 seconds (if enabled)
   useEffect(() => {
-    if (!deck || !autosaveEnabled) {
+    if (!state.deck || !state.autosaveEnabled) {
       return;
     }
 
     // Save immediately on mount/change if deck exists
     const saveImmediately = () => {
-      if (deck) {
-        saveDeck();
+      if (state.deck) {
+        editor.saveDeck();
       }
     };
 
     // Save immediately, then set up interval
     saveImmediately();
     const interval = setInterval(() => {
-      saveDeck();
+      editor.saveDeck();
     }, 30000); // 30 seconds
 
     return () => clearInterval(interval);
-  }, [deck, saveDeck, autosaveEnabled]);
+  }, [state.deck, state.autosaveEnabled, editor]);
 
   // Enable keyboard shortcuts
   useKeyboardShortcuts();
