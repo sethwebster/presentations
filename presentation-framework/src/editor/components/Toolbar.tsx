@@ -178,8 +178,9 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       {/* Layout Tools */}
       <div style={{ display: 'flex', gap: '4px', paddingRight: '16px', borderRight: '1px solid rgba(236, 236, 236, 0.1)' }}>
         <ToolbarButton title="Group (Cmd/Ctrl+G)" onClick={() => {
-          // TODO: Implement groupElements in Editor class
-          console.warn('Group functionality not yet implemented in Editor class');
+          if (selectedElementIds.size >= 2) {
+            editor.groupElements(Array.from(selectedElementIds));
+          }
         }}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
             <rect x="3" y="3" width="7" height="7" />
