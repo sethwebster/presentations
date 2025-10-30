@@ -6,6 +6,7 @@ import { EditorCanvas } from './EditorCanvas';
 import { PropertiesPanel } from './PropertiesPanel';
 import { LayerPanel } from './LayerPanel';
 import { TimelineEditor } from './TimelineEditor';
+import { StatusBar } from './StatusBar';
 import { useEditorStore } from '../store/editorStore';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 
@@ -97,6 +98,9 @@ export function EditorLayout({ deckId }: EditorLayoutProps) {
           <TimelineEditor deckId={deckId} />
         </div>
       )}
+
+      {/* Status Bar */}
+      <StatusBar deckId={deckId} />
     </div>
   );
 }
