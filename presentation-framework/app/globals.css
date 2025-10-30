@@ -140,3 +140,13 @@
   }
 }
 
+/* Status bar animations */
+@keyframes statusBarPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes statusBarSpin {
+  to { transform: rotate(360deg); }
+}
+

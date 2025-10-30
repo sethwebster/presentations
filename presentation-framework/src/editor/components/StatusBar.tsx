@@ -84,7 +84,7 @@ export function StatusBar({ deckId }: StatusBarProps) {
                 height: '8px',
                 borderRadius: '50%',
                 background: 'var(--lume-primary)',
-                animation: 'pulse 1s ease-in-out infinite',
+                animation: 'statusBarPulse 1s ease-in-out infinite',
               }} />
               <span>Saving...</span>
             </>
@@ -147,7 +147,7 @@ export function StatusBar({ deckId }: StatusBarProps) {
               borderRadius: '50%',
               border: '1px solid currentColor',
               borderTopColor: 'transparent',
-              animation: 'spin 0.6s linear infinite',
+              animation: 'statusBarSpin 0.6s linear infinite',
             }} />
             <span>Loading...</span>
           </div>
@@ -182,16 +182,6 @@ export function StatusBar({ deckId }: StatusBarProps) {
           {Math.round(zoom * 100)}%
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }
