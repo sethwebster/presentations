@@ -93,9 +93,25 @@ function GroupElementRenderer({ element, slideId }: { element: GroupElementDefin
   if (isOpened && element.children && element.bounds) {
     const groupX = element.bounds.x || 0;
     const groupY = element.bounds.y || 0;
+    const isSelected = state.selectedElementIds.has(element.id);
     
     return (
       <>
+        {/* Render group bounds as a visual guide when opened */}
+        <div
+          style={{
+            position: 'absolute',
+            left: `${element.bounds.x || 0}px`,
+            top: `${element.bounds.y || 0}px`,
+            width: `${element.bounds.width || 100}px`,
+            height: `${element.bounds.height || 100}px`,
+            border: isSelected ? '2px solid var(--lume-primary)' : '1px dashed rgba(22, 194, 199, 0.3)',
+            borderRadius: '4px',
+            pointerEvents: 'none',
+            background: isSelected ? 'rgba(22, 194, 199, 0.05)' : 'transparent',
+            zIndex: 0, // Behind children
+          }}
+        />
         {element.children.map((child) => {
           // Restore absolute positions for children
           const childWithAbsoluteBounds = {
