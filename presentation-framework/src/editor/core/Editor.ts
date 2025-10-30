@@ -547,7 +547,7 @@ export class Editor {
     // Update element in deck
     const updatedDeck: DeckDefinition = {
       ...deck,
-      slides: deck.slides.map(slide => {
+      slides: deck.slides.map((slide): SlideDefinition => {
         const elements = slide.elements || [];
         const elementIndex = elements.findIndex(el => el.id === elementId);
         
@@ -555,7 +555,7 @@ export class Editor {
           return {
             ...slide,
             elements: elements.map((el, i) => 
-              i === elementIndex ? { ...el, ...updates } : el
+              i === elementIndex ? { ...el, ...updates } as ElementDefinition : el
             ),
           };
         }
@@ -568,7 +568,7 @@ export class Editor {
               return {
                 ...layer,
                 elements: layer.elements.map((el, i) =>
-                  i === layerElementIndex ? { ...el, ...updates } : el
+                  i === layerElementIndex ? { ...el, ...updates } as ElementDefinition : el
                 ),
               };
             }
