@@ -2,11 +2,16 @@
 
 import { useEditorStore } from '../store/editorStore';
 import { ColorPicker } from './ColorPicker';
+import { useMemo } from 'react';
 
 export function DocumentProperties() {
   const deck = useEditorStore((state) => state.deck);
   const updateDeckSettings = useEditorStore((state) => state.updateDeckSettings);
   const updateDeckMeta = useEditorStore((state) => state.updateDeckMeta);
+
+  // Memoize settings and meta to avoid creating new object references on every render
+  const settings = useMemo(() => deck?.settings || {}, [deck?.settings]);
+  const meta = useMemo(() => deck?.meta || {}, [deck?.meta]);
 
   if (!deck) {
     return (
@@ -19,9 +24,6 @@ export function DocumentProperties() {
       </div>
     );
   }
-
-  const settings = deck.settings || {};
-  const meta = deck.meta || {};
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -245,12 +247,7 @@ export function DocumentProperties() {
               checked={settings.presentation?.loop || false}
               onChange={(e) => updateDeckSettings({
                 presentation: {
-                  ...settings.presentation,
                   loop: e.target.checked,
-                  autoAdvance: settings.presentation?.autoAdvance || false,
-                  skipHiddenSlides: settings.presentation?.skipHiddenSlides || false,
-                  showSlideNumbers: settings.presentation?.showSlideNumbers || false,
-                  showPresenterNotes: settings.presentation?.showPresenterNotes || false,
                 },
               })}
               style={{ cursor: 'pointer' }}
@@ -263,12 +260,7 @@ export function DocumentProperties() {
               checked={settings.presentation?.autoAdvance || false}
               onChange={(e) => updateDeckSettings({
                 presentation: {
-                  ...settings.presentation,
                   autoAdvance: e.target.checked,
-                  loop: settings.presentation?.loop || false,
-                  skipHiddenSlides: settings.presentation?.skipHiddenSlides || false,
-                  showSlideNumbers: settings.presentation?.showSlideNumbers || false,
-                  showPresenterNotes: settings.presentation?.showPresenterNotes || false,
                 },
               })}
               style={{ cursor: 'pointer' }}
@@ -287,7 +279,6 @@ export function DocumentProperties() {
                 value={settings.presentation?.autoAdvanceDelay || 5}
                 onChange={(e) => updateDeckSettings({
                   presentation: {
-                    ...settings.presentation,
                     autoAdvanceDelay: parseInt(e.target.value) || 5,
                   },
                 })}
@@ -309,12 +300,7 @@ export function DocumentProperties() {
               checked={settings.presentation?.showSlideNumbers || false}
               onChange={(e) => updateDeckSettings({
                 presentation: {
-                  ...settings.presentation,
                   showSlideNumbers: e.target.checked,
-                  loop: settings.presentation?.loop || false,
-                  autoAdvance: settings.presentation?.autoAdvance || false,
-                  skipHiddenSlides: settings.presentation?.skipHiddenSlides || false,
-                  showPresenterNotes: settings.presentation?.showPresenterNotes || false,
                 },
               })}
               style={{ cursor: 'pointer' }}
@@ -336,11 +322,7 @@ export function DocumentProperties() {
               checked={settings.grid?.enabled || false}
               onChange={(e) => updateDeckSettings({
                 grid: {
-                  ...settings.grid,
                   enabled: e.target.checked,
-                  size: settings.grid?.size || 20,
-                  snapToGrid: settings.grid?.snapToGrid || false,
-                  style: settings.grid?.style || 'dots',
                 },
               })}
               style={{ cursor: 'pointer' }}
@@ -355,7 +337,6 @@ export function DocumentProperties() {
                   checked={settings.grid?.snapToGrid || false}
                   onChange={(e) => updateDeckSettings({
                     grid: {
-                      ...settings.grid,
                       snapToGrid: e.target.checked,
                     },
                   })}
@@ -374,7 +355,6 @@ export function DocumentProperties() {
                   value={settings.grid?.size || 20}
                   onChange={(e) => updateDeckSettings({
                     grid: {
-                      ...settings.grid,
                       size: parseInt(e.target.value) || 20,
                     },
                   })}

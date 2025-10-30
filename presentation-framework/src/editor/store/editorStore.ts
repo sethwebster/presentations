@@ -102,12 +102,25 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     const { deck } = get();
     if (!deck) return;
 
+    // Deep merge settings to avoid creating new object references unnecessarily
+    const deepMerge = (target: any, source: any): any => {
+      if (!source || typeof source !== 'object') return source;
+      if (!target || typeof target !== 'object') return source;
+      
+      const result = { ...target };
+      for (const key in source) {
+        if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key]) && source[key].constructor === Object) {
+          result[key] = deepMerge(target[key], source[key]);
+        } else {
+          result[key] = source[key];
+        }
+      }
+      return result;
+    };
+
     const updatedDeck: DeckDefinition = {
       ...deck,
-      settings: {
-        ...deck.settings,
-        ...settingsUpdate,
-      },
+      settings: deepMerge(deck.settings || {}, settingsUpdate),
     };
 
     set({ deck: updatedDeck });
