@@ -188,9 +188,35 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
         ...(currentSlide.elements || []),
         ...(currentSlide.layers?.flatMap(l => l.elements) || []),
       ];
+      
+      // If group is opened, also include children with absolute bounds
+      let elementsWithAbsoluteBounds = [...allElements];
+      if (currentState.openedGroupId) {
+        const groupElement = allElements.find(el => el.id === currentState.openedGroupId);
+        if (groupElement && groupElement.type === 'group') {
+          const group = groupElement as any;
+          const groupX = group.bounds?.x || 0;
+          const groupY = group.bounds?.y || 0;
+          
+          // Add children with absolute bounds for dragging
+          group.children?.forEach((child: any) => {
+            if (currentState.selectedElementIds.has(child.id)) {
+              elementsWithAbsoluteBounds.push({
+                ...child,
+                bounds: child.bounds ? {
+                  ...child.bounds,
+                  x: (child.bounds.x || 0) + groupX,
+                  y: (child.bounds.y || 0) + groupY,
+                } : undefined,
+              });
+            }
+          });
+        }
+      }
+      
       const initialBounds = new Map<string, { x: number; y: number; width: number; height: number }>();
       currentState.selectedElementIds.forEach((id) => {
-        const el = allElements.find(e => e.id === id);
+        const el = elementsWithAbsoluteBounds.find(e => e.id === id);
         if (el && el.bounds) {
           initialBounds.set(id, {
             x: el.bounds.x || 0,
@@ -251,6 +277,9 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
         // Get the initial bounds of the primary element being dragged
         const primaryInitialBounds = selectedElementsInitialBounds.get(element.id);
         if (!primaryInitialBounds) return;
+        
+        // If dragging a child of an opened group, we need to update it differently
+        // The updateElement method will handle the conversion to relative bounds
         
         // Calculate the offset of the mouse from the primary element's initial position
         const initialMouseOffsetX = dragStart.x - primaryInitialBounds.x;
