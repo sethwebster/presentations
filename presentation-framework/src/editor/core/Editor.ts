@@ -1,4 +1,4 @@
-import type { DeckDefinition, SlideDefinition, ElementDefinition, DeckSettings, DeckMeta } from '@/rsc/types';
+import type { DeckDefinition, SlideDefinition, ElementDefinition, DeckSettings, DeckMeta, GroupElementDefinition } from '@/rsc/types';
 
 export interface EditorCommand {
   type: string;
@@ -30,6 +30,7 @@ export interface EditorState {
   lastShapeStyle: Record<string, unknown> | null;
   isLoading: boolean;
   error: string | null;
+  openedGroupId: string | null; // ID of the group currently opened for editing
 }
 
 type EditorStateListener = (state: EditorState) => void;
@@ -66,6 +67,7 @@ export class Editor {
       },
       isLoading: false,
       error: null,
+      openedGroupId: null,
     };
   }
 
@@ -317,9 +319,51 @@ export class Editor {
 
   // Selection operations
   selectElement(elementId: string, addToSelection = false): void {
-    const { selectedElementIds } = this.state;
+    const { deck, currentSlideIndex, openedGroupId } = this.state;
+    
+    // If a group is opened, allow selecting individual elements within it
+    if (openedGroupId && deck) {
+      const slide = deck.slides[currentSlideIndex];
+      if (slide) {
+        const allElements = [
+          ...(slide.elements || []),
+          ...(slide.layers?.flatMap(l => l.elements) || []),
+        ];
+        const groupElement = allElements.find(el => el.id === openedGroupId);
+        if (groupElement && groupElement.type === 'group') {
+          const group = groupElement as GroupElementDefinition;
+          // Check if the clicked element is a child of the opened group
+          if (group.children?.some(child => child.id === elementId)) {
+            // Allow selecting the child element
+            const newSelection = addToSelection 
+              ? new Set([...this.state.selectedElementIds, elementId])
+              : new Set([elementId]);
+            this.setState({ selectedElementIds: newSelection });
+            return;
+          }
+        }
+      }
+    }
+    
+    // Check if element is part of a group (and group is not opened)
+    if (deck) {
+      const slide = deck.slides[currentSlideIndex];
+      if (slide) {
+        const containingGroup = this.findGroupContainingElement(elementId, slide);
+        if (containingGroup && containingGroup.id !== openedGroupId) {
+          // Select the group instead of the individual element
+          const newSelection = addToSelection 
+            ? new Set([...this.state.selectedElementIds, containingGroup.id])
+            : new Set([containingGroup.id]);
+          this.setState({ selectedElementIds: newSelection });
+          return;
+        }
+      }
+    }
+    
+    // Normal selection
     const newSelection = addToSelection 
-      ? new Set([...selectedElementIds, elementId])
+      ? new Set([...this.state.selectedElementIds, elementId])
       : new Set([elementId]);
     this.setState({ selectedElementIds: newSelection });
   }
@@ -846,14 +890,199 @@ export class Editor {
     this.addElement(duplicated, currentSlideIndex);
   }
 
+  // Helper to find which group contains an element (if any)
+  private findGroupContainingElement(elementId: string, slide: SlideDefinition): ElementDefinition | null {
+    const allElements = [
+      ...(slide.elements || []),
+      ...(slide.layers?.flatMap(l => l.elements) || []),
+    ];
+
+    for (const element of allElements) {
+      if (element.type === 'group') {
+        const groupElement = element as GroupElementDefinition;
+        if (groupElement.children?.some(child => child.id === elementId)) {
+          return element;
+        }
+      }
+    }
+    return null;
+  }
+
+  // Helper to calculate bounding box for a group from its children
+  private calculateGroupBounds(children: ElementDefinition[]): { x: number; y: number; width: number; height: number } | undefined {
+    if (children.length === 0) return undefined;
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const child of children) {
+      if (!child.bounds) continue;
+      const x = child.bounds.x || 0;
+      const y = child.bounds.y || 0;
+      const width = child.bounds.width || 0;
+      const height = child.bounds.height || 0;
+
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + width);
+      maxY = Math.max(maxY, y + height);
+    }
+
+    if (minX === Infinity) return undefined;
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
+  }
+
   groupElements(elementIds: string[]): void {
-    // TODO: Implement grouping
-    console.log('Group elements:', elementIds);
+    const { deck, currentSlideIndex } = this.state;
+    if (!deck || elementIds.length < 2) return;
+
+    const slide = deck.slides[currentSlideIndex];
+    if (!slide) return;
+
+    const allElements = [
+      ...(slide.elements || []),
+      ...(slide.layers?.flatMap(l => l.elements) || []),
+    ];
+
+    // Find elements to group
+    const elementsToGroup = allElements.filter(el => elementIds.includes(el.id));
+    if (elementsToGroup.length < 2) return;
+
+    // Calculate group bounds from children
+    const groupBounds = this.calculateGroupBounds(elementsToGroup);
+    if (!groupBounds) return;
+
+    // Adjust children bounds to be relative to group origin
+    const adjustedChildren = elementsToGroup.map(child => ({
+      ...child,
+      bounds: child.bounds ? {
+        ...child.bounds,
+        x: (child.bounds.x || 0) - groupBounds.x,
+        y: (child.bounds.y || 0) - groupBounds.y,
+      } : undefined,
+    }));
+
+    // Create group element
+    const groupElement: GroupElementDefinition = {
+      id: `group-${Date.now()}`,
+      type: 'group',
+      bounds: groupBounds,
+      children: adjustedChildren,
+    };
+
+    // Remove grouped elements from slide
+    const updatedSlide: SlideDefinition = {
+      ...slide,
+      elements: (slide.elements || []).filter(el => !elementIds.includes(el.id)),
+      layers: slide.layers?.map(layer => ({
+        ...layer,
+        elements: layer.elements.filter(el => !elementIds.includes(el.id)),
+      })),
+    };
+
+    // Add group to slide
+    updatedSlide.elements = [...(updatedSlide.elements || []), groupElement];
+
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      slides: deck.slides.map((s, i) => (i === currentSlideIndex ? updatedSlide : s)),
+    };
+
+    this.setState({ 
+      deck: updatedDeck,
+      selectedElementIds: new Set([groupElement.id]),
+    });
+
+    this.executeCommand({
+      type: 'groupElements',
+      target: elementIds,
+      params: { groupId: groupElement.id },
+      timestamp: Date.now(),
+    });
   }
 
   ungroupElements(groupId: string): void {
-    // TODO: Implement ungrouping
-    console.log('Ungroup element:', groupId);
+    const { deck, currentSlideIndex } = this.state;
+    if (!deck) return;
+
+    const slide = deck.slides[currentSlideIndex];
+    if (!slide) return;
+
+    const allElements = [
+      ...(slide.elements || []),
+      ...(slide.layers?.flatMap(l => l.elements) || []),
+    ];
+
+    const groupElement = allElements.find(el => el.id === groupId);
+    if (!groupElement || groupElement.type !== 'group') return;
+
+    const group = groupElement as GroupElementDefinition;
+    if (!group.bounds) return;
+
+    // Restore children with absolute positions
+    const restoredChildren = group.children.map(child => ({
+      ...child,
+      bounds: child.bounds ? {
+        ...child.bounds,
+        x: (child.bounds.x || 0) + (group.bounds?.x || 0),
+        y: (child.bounds.y || 0) + (group.bounds?.y || 0),
+      } : undefined,
+    }));
+
+    // Remove group and add children back
+    const updatedSlide: SlideDefinition = {
+      ...slide,
+      elements: [
+        ...(slide.elements || []).filter(el => el.id !== groupId),
+        ...restoredChildren,
+      ],
+      layers: slide.layers?.map(layer => ({
+        ...layer,
+        elements: layer.elements.filter(el => el.id !== groupId),
+      })),
+    };
+
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      slides: deck.slides.map((s, i) => (i === currentSlideIndex ? updatedSlide : s)),
+    };
+
+    this.setState({ 
+      deck: updatedDeck,
+      selectedElementIds: new Set(restoredChildren.map(c => c.id)),
+      openedGroupId: null, // Close group if it was opened
+    });
+
+    this.executeCommand({
+      type: 'ungroupElements',
+      target: groupId,
+      params: { childrenIds: restoredChildren.map(c => c.id) },
+      timestamp: Date.now(),
+    });
+  }
+
+  openGroup(groupId: string): void {
+    this.setState({ openedGroupId: groupId });
+  }
+
+  closeGroup(): void {
+    this.setState({ openedGroupId: null });
+  }
+
+  toggleGroup(groupId: string): void {
+    if (this.state.openedGroupId === groupId) {
+      this.closeGroup();
+    } else {
+      this.openGroup(groupId);
+    }
   }
 
   // UI state operations

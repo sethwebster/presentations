@@ -154,7 +154,16 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (element.type === 'text' && !isDragging) {
+    if (isDragging) return;
+    
+    // Handle group double-click: open/close group
+    if (element.type === 'group') {
+      editor.toggleGroup(element.id);
+      return;
+    }
+    
+    // Handle text editing
+    if (element.type === 'text') {
       setIsEditingText(true);
     }
   };
@@ -373,6 +382,9 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
       )}
       {element.type === 'image' && (
         <ImageElementContent element={element} />
+      )}
+      {element.type === 'group' && (
+        <GroupElementContent element={element} />
       )}
 
       {/* Selection handles */}
