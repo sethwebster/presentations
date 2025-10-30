@@ -254,13 +254,53 @@ export interface SlideDefinition {
   id: string;
   title?: string;
   layout?: string;
+  masterSlideId?: string; // Reference to master slide template
+  
+  // Content
   layers?: LayerDefinition[];
   elements?: ElementDefinition[];
+  
+  // Background
+  background?: string | { 
+    type: 'color' | 'gradient' | 'image' | 'video';
+    value: string | object;
+    opacity?: number;
+  };
+  
+  // Animation and transitions
   timeline?: TimelineDefinition;
-  notes?: SlideNotes;
-  zoomFrame?: ZoomFrame;
   transitions?: SlideTransitions;
+  
+  // Notes and presenter information
+  notes?: SlideNotes;
+  
+  // Zoom and navigation
+  zoomFrame?: ZoomFrame;
+  
+  // Presentation behavior
+  hidden?: boolean; // Skip in presentation
+  skipInNavigation?: boolean; // Don't show in navigation menu
+  skipInPrint?: boolean; // Don't include when printing
+  duration?: number; // Auto-advance delay in seconds (if auto-advance enabled)
+  
+  // Slide number and footer
+  showSlideNumber?: boolean;
+  customSlideNumber?: string; // Override default numbering
+  
+  // Style overrides
+  style?: {
+    background?: string | object;
+    themeOverride?: Record<string, unknown>;
+  };
+  
+  // Grouping and organization
+  section?: string; // Section/group name
+  sectionIndex?: number; // Order within section
+  
+  // Metadata
   metadata?: Record<string, unknown>;
+  tags?: string[];
+  thumbnail?: string; // Custom thumbnail image URL
 }
 
 export type SlideNotes =
