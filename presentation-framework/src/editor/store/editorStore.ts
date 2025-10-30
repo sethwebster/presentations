@@ -241,6 +241,20 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     const { deck } = get();
     if (!deck) return;
 
+    // Find current element state for undo
+    let previousElement: ElementDefinition | undefined;
+    for (const slide of deck.slides) {
+      const allElements = [
+        ...(slide.elements || []),
+        ...(slide.layers?.flatMap(l => l.elements) || []),
+      ];
+      const element = allElements.find(el => el.id === elementId);
+      if (element) {
+        previousElement = element;
+        break;
+      }
+    }
+
     const updatedDeck: DeckDefinition = {
       ...deck,
       slides: deck.slides.map(slide => ({
@@ -261,7 +275,10 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     get().executeCommand({
       type: 'updateElement',
       target: elementId,
-      params: { updates },
+      params: { 
+        updates,
+        previousElement: previousElement ? JSON.parse(JSON.stringify(previousElement)) : undefined,
+      },
       timestamp: Date.now(),
     });
   },
@@ -269,6 +286,22 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   deleteElement: (elementId: string) => {
     const { deck } = get();
     if (!deck) return;
+
+    // Find element to delete for undo
+    let deletedElement: ElementDefinition | undefined;
+    let slideId: string | undefined;
+    for (const slide of deck.slides) {
+      const allElements = [
+        ...(slide.elements || []),
+        ...(slide.layers?.flatMap(l => l.elements) || []),
+      ];
+      const element = allElements.find(el => el.id === elementId);
+      if (element) {
+        deletedElement = element;
+        slideId = slide.id;
+        break;
+      }
+    }
 
     const updatedDeck: DeckDefinition = {
       ...deck,
@@ -287,7 +320,10 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     get().executeCommand({
       type: 'deleteElement',
       target: elementId,
-      params: {},
+      params: { 
+        deletedElement: deletedElement ? JSON.parse(JSON.stringify(deletedElement)) : undefined,
+        slideId,
+      },
       timestamp: Date.now(),
     });
   },
@@ -459,27 +495,162 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
   // Undo/Redo
   undo: () => {
-    const { undoStack } = get();
-    if (undoStack.length === 0) return;
+    const { undoStack, deck } = get();
+    if (undoStack.length === 0 || !deck) return;
 
     const command = undoStack[undoStack.length - 1];
-    // TODO: Implement undo logic based on command type
-    set({
-      undoStack: undoStack.slice(0, -1),
-      redoStack: [...get().redoStack, command],
-    });
+    let updatedDeck: DeckDefinition | undefined;
+
+    // Apply inverse operation based on command type
+    switch (command.type) {
+      case 'addElement': {
+        // Undo add = delete
+        const elementId = (command.params.element as ElementDefinition)?.id;
+        if (elementId) {
+          updatedDeck = {
+            ...deck,
+            slides: deck.slides.map(slide => ({
+              ...slide,
+              elements: slide.elements?.filter(el => el.id !== elementId),
+              layers: slide.layers?.map(layer => ({
+                ...layer,
+                elements: layer.elements.filter(el => el.id !== elementId),
+              })),
+            })),
+          };
+        }
+        break;
+      }
+      case 'deleteElement': {
+        // Undo delete = add back
+        const deletedElement = command.params.deletedElement as ElementDefinition | undefined;
+        const slideId = command.params.slideId as string | undefined;
+        if (deletedElement && slideId) {
+          const slideIndex = deck.slides.findIndex(s => s.id === slideId);
+          if (slideIndex >= 0) {
+            const slide = deck.slides[slideIndex];
+            updatedDeck = {
+              ...deck,
+              slides: deck.slides.map((s, i) => 
+                i === slideIndex 
+                  ? { ...s, elements: [...(s.elements || []), deletedElement] }
+                  : s
+              ),
+            };
+          }
+        }
+        break;
+      }
+      case 'updateElement': {
+        // Undo update = restore previous state
+        const elementId = command.target as string;
+        const previousElement = command.params.previousElement as ElementDefinition | undefined;
+        if (previousElement) {
+          updatedDeck = {
+            ...deck,
+            slides: deck.slides.map(slide => ({
+              ...slide,
+              elements: slide.elements?.map(el =>
+                el.id === elementId ? previousElement : el
+              ),
+              layers: slide.layers?.map(layer => ({
+                ...layer,
+                elements: layer.elements.map(el =>
+                  el.id === elementId ? previousElement : el
+                ),
+              })),
+            })),
+          };
+        }
+        break;
+      }
+    }
+
+    if (updatedDeck) {
+      set({
+        deck: updatedDeck,
+        undoStack: undoStack.slice(0, -1),
+        redoStack: [...get().redoStack, command],
+      });
+    }
   },
 
   redo: () => {
-    const { redoStack } = get();
-    if (redoStack.length === 0) return;
+    const { redoStack, deck } = get();
+    if (redoStack.length === 0 || !deck) return;
 
     const command = redoStack[redoStack.length - 1];
-    // TODO: Implement redo logic
-    set({
-      redoStack: redoStack.slice(0, -1),
-      undoStack: [...get().undoStack, command],
-    });
+    let updatedDeck: DeckDefinition | undefined;
+
+    // Re-apply the original operation
+    switch (command.type) {
+      case 'addElement': {
+        const element = command.params.element as ElementDefinition;
+        const slideId = command.target as string;
+        if (element && slideId) {
+          const slideIndex = deck.slides.findIndex(s => s.id === slideId);
+          if (slideIndex >= 0) {
+            const slide = deck.slides[slideIndex];
+            updatedDeck = {
+              ...deck,
+              slides: deck.slides.map((s, i) => 
+                i === slideIndex 
+                  ? { ...s, elements: [...(s.elements || []), element] }
+                  : s
+              ),
+            };
+          }
+        }
+        break;
+      }
+      case 'deleteElement': {
+        const elementId = command.target as string;
+        if (elementId) {
+          updatedDeck = {
+            ...deck,
+            slides: deck.slides.map(slide => ({
+              ...slide,
+              elements: slide.elements?.filter(el => el.id !== elementId),
+              layers: slide.layers?.map(layer => ({
+                ...layer,
+                elements: layer.elements.filter(el => el.id !== elementId),
+              })),
+            })),
+          };
+        }
+        break;
+      }
+      case 'updateElement': {
+        const elementId = command.target as string;
+        const updates = command.params.updates as Partial<ElementDefinition>;
+        if (elementId && updates) {
+          updatedDeck = {
+            ...deck,
+            slides: deck.slides.map(slide => ({
+              ...slide,
+              elements: slide.elements?.map(el =>
+                el.id === elementId ? { ...el, ...updates } : el
+              ),
+              layers: slide.layers?.map(layer => ({
+                ...layer,
+                elements: layer.elements.map(el =>
+                  el.id === elementId ? { ...el, ...updates } : el
+                ),
+              })),
+            })),
+          };
+        }
+        break;
+      }
+    }
+
+    if (updatedDeck) {
+      set({
+        deck: updatedDeck,
+        redoStack: redoStack.slice(0, -1),
+        undoStack: [...get().undoStack, command],
+      });
+    }
   },
 
   executeCommand: (command: EditorCommand) => {

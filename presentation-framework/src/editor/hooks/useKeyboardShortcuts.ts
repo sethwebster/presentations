@@ -88,6 +88,13 @@ export function useKeyboardShortcuts() {
         return;
       }
 
+      // Escape - Clear selection
+      if (e.key === 'Escape') {
+        const clearSelection = useEditorStore.getState().clearSelection;
+        clearSelection();
+        return;
+      }
+
       // Arrow keys - Nudge selected elements
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && selectedElementIds.size > 0) {
         e.preventDefault();
@@ -100,11 +107,35 @@ export function useKeyboardShortcuts() {
         if (e.key === 'ArrowLeft') deltaX = -nudgeAmount;
         if (e.key === 'ArrowRight') deltaX = nudgeAmount;
 
-        // TODO: Implement nudge functionality
-        // For now, we'll update elements directly
-        selectedElementIds.forEach((id) => {
-          // Nudge will be handled by updateElement in store
-        });
+        // Nudge selected elements
+        const deck = useEditorStore.getState().deck;
+        const currentSlideIndex = useEditorStore.getState().currentSlideIndex;
+        const updateElement = useEditorStore.getState().updateElement;
+        
+        if (deck) {
+          const slide = deck.slides[currentSlideIndex];
+          if (slide) {
+            const allElements = [
+              ...(slide.elements || []),
+              ...(slide.layers?.flatMap(l => l.elements) || []),
+            ];
+            
+            selectedElementIds.forEach((id) => {
+              const element = allElements.find(el => el.id === id);
+              if (element && element.bounds) {
+                const newX = Math.max(0, (element.bounds.x || 0) + deltaX);
+                const newY = Math.max(0, (element.bounds.y || 0) + deltaY);
+                updateElement(id, {
+                  bounds: {
+                    ...element.bounds,
+                    x: newX,
+                    y: newY,
+                  },
+                });
+              }
+            });
+          }
+        }
       }
     };
 
