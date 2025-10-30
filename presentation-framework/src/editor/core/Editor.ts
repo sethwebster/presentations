@@ -120,11 +120,13 @@ export class Editor {
   async loadDeck(deckId: string): Promise<void> {
     this.setState({ isLoading: true, error: null });
     try {
+      console.log('Loading deck:', deckId);
       const response = await fetch(`/api/editor/${deckId}`);
       if (!response.ok) {
         throw new Error(`Failed to load deck: ${response.statusText}`);
       }
       const deck = await response.json() as DeckDefinition;
+      console.log('Deck loaded:', deckId, { slides: deck.slides.length, title: deck.meta.title });
       this.setState({
         deck,
         deckId,
@@ -133,6 +135,7 @@ export class Editor {
         isLoading: false,
       });
     } catch (error) {
+      console.error('Error loading deck:', error);
       this.setState({
         error: error instanceof Error ? error.message : 'Failed to load deck',
         isLoading: false,

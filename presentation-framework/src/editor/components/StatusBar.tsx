@@ -46,10 +46,13 @@ export function StatusBar({ deckId }: StatusBarProps) {
 
     // Auto-save if enabled and deck content has changed
     if (autosaveEnabled && deckHash !== previousDeckHash && previousDeckHash !== '') {
+      console.log('Deck changed, scheduling autosave...', { deckHash: deckHash.substring(0, 50), previousHash: previousDeckHash.substring(0, 50) });
       const saveTimeout = setTimeout(async () => {
+        console.log('Executing autosave...');
         setSaveStatus('saving');
         try {
           await editor.saveDeck();
+          console.log('Autosave completed successfully');
           setSaveStatus('saved');
           setLastSaved(new Date());
           setPreviousDeckHash(deckHash);
@@ -64,6 +67,7 @@ export function StatusBar({ deckId }: StatusBarProps) {
 
     // Initialize hash on first load
     if (previousDeckHash === '') {
+      console.log('Initializing deck hash on first load');
       setPreviousDeckHash(deckHash);
     }
   }, [deck, autosaveEnabled, previousDeckHash, editor]);
