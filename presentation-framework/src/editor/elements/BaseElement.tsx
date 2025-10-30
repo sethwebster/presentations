@@ -149,9 +149,17 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
         const primaryInitialBounds = selectedElementsInitialBounds.get(element.id);
         if (!primaryInitialBounds) return;
         
-        // Calculate the offset of the mouse from the element's initial position
+        // Calculate the offset of the mouse from the primary element's initial position
         const initialMouseOffsetX = dragStart.x - primaryInitialBounds.x;
         const initialMouseOffsetY = dragStart.y - primaryInitialBounds.y;
+        
+        // Calculate where the primary element should be (follows cursor)
+        const primaryNewX = Math.max(0, Math.min(CANVAS_WIDTH - primaryInitialBounds.width, canvasPos.x - initialMouseOffsetX));
+        const primaryNewY = Math.max(0, Math.min(CANVAS_HEIGHT - primaryInitialBounds.height, canvasPos.y - initialMouseOffsetY));
+        
+        // Calculate the delta of the primary element
+        const primaryDeltaX = primaryNewX - primaryInitialBounds.x;
+        const primaryDeltaY = primaryNewY - primaryInitialBounds.y;
         
         // Update all selected elements
         currentState.selectedElementIds.forEach((id) => {
@@ -161,9 +169,9 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
           const initialBounds = selectedElementsInitialBounds.get(id);
           if (!initialBounds) return;
           
-          // Calculate new position: current mouse position minus the initial offset
-          const newX = Math.max(0, Math.min(CANVAS_WIDTH - initialBounds.width, canvasPos.x - initialMouseOffsetX));
-          const newY = Math.max(0, Math.min(CANVAS_HEIGHT - initialBounds.height, canvasPos.y - initialMouseOffsetY));
+          // Apply the same delta to maintain relative positions
+          const newX = Math.max(0, Math.min(CANVAS_WIDTH - initialBounds.width, initialBounds.x + primaryDeltaX));
+          const newY = Math.max(0, Math.min(CANVAS_HEIGHT - initialBounds.height, initialBounds.y + primaryDeltaY));
           
           const newBounds = {
             ...el.bounds,
