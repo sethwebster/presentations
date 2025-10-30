@@ -278,9 +278,6 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
         const primaryInitialBounds = selectedElementsInitialBounds.get(element.id);
         if (!primaryInitialBounds) return;
         
-        // If dragging a child of an opened group, we need to update it differently
-        // The updateElement method will handle the conversion to relative bounds
-        
         // Calculate the offset of the mouse from the primary element's initial position
         const initialMouseOffsetX = dragStart.x - primaryInitialBounds.x;
         const initialMouseOffsetY = dragStart.y - primaryInitialBounds.y;
@@ -289,6 +286,21 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
         let primaryNewX = Math.max(0, Math.min(CANVAS_WIDTH - primaryInitialBounds.width, canvasPos.x - initialMouseOffsetX));
         let primaryNewY = Math.max(0, Math.min(CANVAS_HEIGHT - primaryInitialBounds.height, canvasPos.y - initialMouseOffsetY));
         
+        // Build list of elements for snap points (excluding the dragged element and other selected elements)
+        const elementsForSnap = allElements.filter(el => {
+          if (el.id === element.id) return false;
+          if (currentState.selectedElementIds.has(el.id)) return false;
+          // If group is opened, also include its children with absolute bounds for snapping
+          if (currentState.openedGroupId && el.type === 'group') {
+            const group = el as any;
+            const groupX = group.bounds?.x || 0;
+            const groupY = group.bounds?.y || 0;
+            // Add group children with absolute bounds for snap detection
+            return true; // Include group itself, children will be handled separately if needed
+          }
+          return true;
+        });
+        
         // Check for snap points
         const tempBounds = {
           x: primaryNewX,
@@ -296,7 +308,7 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
           width: primaryInitialBounds.width,
           height: primaryInitialBounds.height,
         };
-        const snapPoints = findSnapPoints(tempBounds, allElements.filter(el => el.id !== element.id));
+        const snapPoints = findSnapPoints(tempBounds, elementsForSnap);
         
         // Apply snapping if within threshold
         if (snapPoints.snapX !== null && Math.abs(snapPoints.snapX - primaryNewX) < SNAP_THRESHOLD) {
@@ -315,19 +327,16 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
         const primaryDeltaY = primaryNewY - primaryInitialBounds.y;
         
         // Update all selected elements
+        // updateElement will handle conversion to relative bounds if element is a group child
         currentState.selectedElementIds.forEach((id) => {
-          const el = allElements.find(e => e.id === id);
-          if (!el) return;
-          
           const initialBounds = selectedElementsInitialBounds.get(id);
           if (!initialBounds) return;
           
-          // Apply the same delta to maintain relative positions
+          // Calculate new absolute position
           const newX = Math.max(0, Math.min(CANVAS_WIDTH - initialBounds.width, initialBounds.x + primaryDeltaX));
           const newY = Math.max(0, Math.min(CANVAS_HEIGHT - initialBounds.height, initialBounds.y + primaryDeltaY));
           
           const newBounds = {
-            ...el.bounds,
             x: newX,
             y: newY,
             width: initialBounds.width,
@@ -339,6 +348,7 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
             editor.setDraggingElement(element.id, newBounds);
           }
 
+          // updateElement will convert absolute bounds to relative if this is a group child
           editor.updateElement(id, {
             bounds: newBounds,
           });
