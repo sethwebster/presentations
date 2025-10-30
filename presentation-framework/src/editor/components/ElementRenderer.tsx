@@ -311,49 +311,54 @@ function GroupElementContainer({ element, slideId }: { element: GroupElementDefi
     >
       {/* Render children with relative positioning inside the group */}
       {/* Children are rendered but cannot intercept mouse events - group container handles all interactions */}
-      {element.children?.map((child) => {
-        // Wrap each child in a div that completely blocks event propagation
-        // This ensures BaseElement's handlers never fire when group is closed
-        return (
-          <div
-            key={child.id}
-            style={{
-              position: 'absolute',
-              left: `${child.bounds?.x || 0}px`,
-              top: `${child.bounds?.y || 0}px`,
-              width: `${child.bounds?.width || 100}px`,
-              height: `${child.bounds?.height || 50}px`,
-              pointerEvents: 'none', // CSS: prevents element from being event target
-            }}
-            onMouseDown={(e) => {
-              // React: explicitly stop propagation at capture phase
-              e.stopPropagation();
-              e.preventDefault();
-            }}
-            onMouseMove={(e) => {
-              e.stopPropagation();
-            }}
-            onMouseUp={(e) => {
-              e.stopPropagation();
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-            }}
-            onDoubleClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-            }}
-            onContextMenu={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-            }}
-          >
-            {/* Render child element - its BaseElement handlers will be blocked by parent */}
-            <ElementRenderer element={child} slideId={slideId} />
-          </div>
-        );
-      })}
+      {/* Use capture phase to intercept events before they reach children */}
+      <div
+        onMouseDownCapture={(e) => {
+          // Capture phase: intercept before children can handle
+          // Don't stop propagation - let it bubble to group container
+        }}
+        onMouseMoveCapture={(e) => {
+          // Let move events pass through to group
+        }}
+        onMouseUpCapture={(e) => {
+          // Let up events pass through to group
+        }}
+        onClickCapture={(e) => {
+          // Don't let clicks reach children
+          e.stopPropagation();
+        }}
+        onDoubleClickCapture={(e) => {
+          // Don't let double-clicks reach children
+          e.stopPropagation();
+        }}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          pointerEvents: 'auto', // Container captures events
+        }}
+      >
+        {element.children?.map((child) => {
+          // Render children with pointerEvents: 'none' so they can't be event targets
+          return (
+            <div
+              key={child.id}
+              style={{
+                position: 'absolute',
+                left: `${child.bounds?.x || 0}px`,
+                top: `${child.bounds?.y || 0}px`,
+                width: `${child.bounds?.width || 100}px`,
+                height: `${child.bounds?.height || 50}px`,
+                pointerEvents: 'none', // Children cannot receive pointer events
+              }}
+            >
+              <ElementRenderer element={child} slideId={slideId} />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
