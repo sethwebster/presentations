@@ -1,6 +1,6 @@
 "use client";
 
-import { useEditorStore } from '../store/editorStore';
+import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { useEffect, useState } from 'react';
 
 interface StatusBarProps {
@@ -8,13 +8,16 @@ interface StatusBarProps {
 }
 
 export function StatusBar({ deckId }: StatusBarProps) {
-  const deck = useEditorStore((state) => state.deck);
-  const currentSlideIndex = useEditorStore((state) => state.currentSlideIndex);
-  const zoom = useEditorStore((state) => state.zoom);
-  const autosaveEnabled = useEditorStore((state) => state.autosaveEnabled);
-  const error = useEditorStore((state) => state.error);
-  const isLoading = useEditorStore((state) => state.isLoading);
-  const selectedElementIds = useEditorStore((state) => state.selectedElementIds);
+  const state = useEditor();
+  const editor = useEditorInstance();
+  
+  const deck = state.deck;
+  const currentSlideIndex = state.currentSlideIndex;
+  const zoom = state.zoom;
+  const autosaveEnabled = state.autosaveEnabled;
+  const error = state.error;
+  const isLoading = state.isLoading;
+  const selectedElementIds = state.selectedElementIds;
   
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -36,12 +39,11 @@ export function StatusBar({ deckId }: StatusBarProps) {
     }
 
     // Auto-save if enabled and deck has changed
-    if (autosaveEnabled && deckHash !== previousDeckHash) {
+    if (autosaveEnabled && deckHash !== previousDeckHash && previousDeckHash !== '') {
       const saveTimeout = setTimeout(async () => {
         setSaveStatus('saving');
-        const saveDeck = useEditorStore.getState().saveDeck;
         try {
-          await saveDeck();
+          await editor.saveDeck();
           setSaveStatus('saved');
           setLastSaved(new Date());
           setPreviousDeckHash(deckHash);

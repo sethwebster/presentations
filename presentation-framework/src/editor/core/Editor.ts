@@ -148,40 +148,46 @@ export class Editor {
 
     // Prevent concurrent saves
     if (this.saveDebounceTimer) {
-      return;
+      clearTimeout(this.saveDebounceTimer);
     }
 
-    try {
-      const deckToSave: DeckDefinition = {
-        ...deck,
-        meta: {
-          ...deck.meta,
-          updatedAt: new Date().toISOString(),
-        },
-      };
+    return new Promise<void>((resolve, reject) => {
+      this.saveDebounceTimer = setTimeout(async () => {
+        try {
+          const deckToSave: DeckDefinition = {
+            ...deck,
+            meta: {
+              ...deck.meta,
+              updatedAt: new Date().toISOString(),
+            },
+          };
 
-      const response = await fetch(`/api/editor/${deckId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(deckToSave),
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to save deck: ${response.statusText} - ${errorText}`);
-      }
-      
-      // Only update state if deck actually changed (deep comparison would be better, but this prevents loops)
-      // Update deck silently without triggering unnecessary re-renders
-      this.state.deck = deckToSave;
-      // Don't call setState here to avoid triggering subscribers unnecessarily
-      // The deck reference stays the same, just the updatedAt changes
-    } catch (error) {
-      console.error('Error saving deck:', error);
-      this.setState({
-        error: error instanceof Error ? error.message : 'Failed to save deck',
-      });
-    }
+          const response = await fetch(`/api/editor/${deckId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(deckToSave),
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to save deck: ${response.statusText} - ${errorText}`);
+          }
+          
+          // Update deck silently without triggering unnecessary re-renders
+          // The deck reference stays the same, just the updatedAt changes
+          this.state.deck = deckToSave;
+          this.saveDebounceTimer = null;
+          resolve();
+        } catch (error) {
+          console.error('Error saving deck:', error);
+          this.saveDebounceTimer = null;
+          this.setState({
+            error: error instanceof Error ? error.message : 'Failed to save deck',
+          });
+          reject(error);
+        }
+      }, 300); // Small debounce to batch rapid saves
+    });
   }
 
   setDeck(deck: DeckDefinition): void {
