@@ -37,10 +37,22 @@ export async function GET(request: Request, context: DeckRouteContext) {
       // Save the new deck
       await kv.set(`deck:${deckId}:data`, emptyDeck);
 
-      return NextResponse.json(emptyDeck);
+      return NextResponse.json(emptyDeck, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      });
     }
 
-    return NextResponse.json(deckData);
+    return NextResponse.json(deckData, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   } catch (error) {
     console.error('Error loading deck:', error);
     return NextResponse.json(

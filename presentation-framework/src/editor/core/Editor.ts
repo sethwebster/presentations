@@ -121,7 +121,12 @@ export class Editor {
     this.setState({ isLoading: true, error: null });
     try {
       console.log('Loading deck:', deckId);
-      const response = await fetch(`/api/editor/${deckId}`);
+      const response = await fetch(`/api/editor/${deckId}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
       if (!response.ok) {
         throw new Error(`Failed to load deck: ${response.statusText}`);
       }
