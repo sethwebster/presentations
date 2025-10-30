@@ -15,6 +15,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
   const selectedElementIds = useEditorStore((state) => state.selectedElementIds);
   const updateElement = useEditorStore((state) => state.updateElement);
   const autosaveEnabled = useEditorStore((state) => state.autosaveEnabled);
+  const lastShapeStyle = useEditorStore((state) => state.lastShapeStyle);
   return (
     <div className="editor-toolbar" style={{
       height: '56px',
@@ -61,7 +62,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
             type: 'shape',
             shapeType: 'rectangle',
             bounds: { x: 150, y: 150, width: 150, height: 100 },
-            style: {
+            style: lastShapeStyle || {
               fill: '#16C2C7',
               stroke: '#0B1022',
               strokeWidth: 2,
@@ -79,7 +80,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
             type: 'shape',
             shapeType: 'circle',
             bounds: { x: 200, y: 200, width: 120, height: 120 },
-            style: {
+            style: lastShapeStyle || {
               fill: '#C84BD2',
               stroke: '#0B1022',
               strokeWidth: 2,

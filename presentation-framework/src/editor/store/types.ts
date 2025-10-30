@@ -26,6 +26,7 @@ export interface EditorState {
   autosaveEnabled: boolean;
   draggingElementId: string | null;
   draggingBounds: { x: number; y: number; width: number; height: number } | null;
+  lastShapeStyle: Record<string, unknown> | null;
   
   // Loading state
   isLoading: boolean;

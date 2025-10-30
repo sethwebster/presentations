@@ -19,6 +19,12 @@ const initialState = {
   autosaveEnabled: true,
   draggingElementId: null,
   draggingBounds: null,
+  lastShapeStyle: {
+    fill: '#16C2C7',
+    stroke: '#0B1022',
+    strokeWidth: 2,
+    borderRadius: 4,
+  },
   isLoading: false,
   error: null,
 };
@@ -218,6 +224,11 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     const slide = deck.slides[targetIndex];
     if (!slide) return;
 
+    // Update lastShapeStyle if this is a shape element
+    if (element.type === 'shape' && element.style) {
+      set({ lastShapeStyle: { ...element.style } });
+    }
+
     const updatedSlide: SlideDefinition = {
       ...slide,
       elements: [...(slide.elements || []), element],
@@ -243,6 +254,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
     // Find current element state for undo
     let previousElement: ElementDefinition | undefined;
+    let currentElement: ElementDefinition | undefined;
     for (const slide of deck.slides) {
       const allElements = [
         ...(slide.elements || []),
@@ -251,6 +263,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       const element = allElements.find(el => el.id === elementId);
       if (element) {
         previousElement = element;
+        currentElement = element;
         break;
       }
     }
@@ -270,6 +283,12 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         })),
       })),
     };
+
+    // Update lastShapeStyle if this is a shape element and style was updated
+    if (currentElement?.type === 'shape' && updates.style) {
+      const updatedStyle = { ...currentElement.style, ...updates.style };
+      set({ lastShapeStyle: updatedStyle });
+    }
 
     set({ deck: updatedDeck });
     get().executeCommand({
