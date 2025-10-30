@@ -1,6 +1,6 @@
 "use client";
 
-import { useEditorStore } from '../store/editorStore';
+import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { useState } from 'react';
 
 interface LayerPanelProps {
@@ -8,13 +8,12 @@ interface LayerPanelProps {
 }
 
 export function LayerPanel({ deckId }: LayerPanelProps) {
-  const deck = useEditorStore((state) => state.deck);
-  const currentSlideIndex = useEditorStore((state) => state.currentSlideIndex);
-  const selectedElementIds = useEditorStore((state) => state.selectedElementIds);
-  const selectElement = useEditorStore((state) => state.selectElement);
-  const updateElement = useEditorStore((state) => state.updateElement);
-  const reorderElement = useEditorStore((state) => state.reorderElement);
-  const toggleElementLock = useEditorStore((state) => state.toggleElementLock);
+  const state = useEditor();
+  const editor = useEditorInstance();
+  
+  const deck = state.deck;
+  const currentSlideIndex = state.currentSlideIndex;
+  const selectedElementIds = state.selectedElementIds;
   const [expandedLayers, setExpandedLayers] = useState<Set<string>>(new Set());
   const [draggedElementId, setDraggedElementId] = useState<string | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -129,7 +128,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
       return;
     }
 
-    reorderElement(draggedElementId, dropIndex);
+    editor.reorderElement(draggedElementId, dropIndex);
     setDraggedElementId(null);
   };
 
@@ -197,7 +196,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, index)}
                   onDragEnd={handleDragEnd}
-                  onClick={() => !isLocked && selectElement(element.id, false)}
+                  onClick={() => !isLocked && editor.selectElement(element.id, false)}
                   style={{
                     padding: '8px 12px',
                     background: isSelected 
@@ -245,7 +244,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                       style={{ width: '14px', height: '14px', flexShrink: 0, cursor: 'pointer' }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        toggleElementLock(element.id);
+                        editor.toggleElementLock(element.id);
                       }}
                       title="Unlock"
                     >
@@ -294,7 +293,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        toggleElementLock(element.id);
+                        editor.toggleElementLock(element.id);
                       }}
                       style={{
                         background: 'transparent',

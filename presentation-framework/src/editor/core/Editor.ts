@@ -512,6 +512,85 @@ export class Editor {
     }
   }
 
+  reorderElement(elementId: string, newIndex: number): void {
+    const { deck, currentSlideIndex } = this.state;
+    if (!deck) return;
+
+    const slide = deck.slides[currentSlideIndex];
+    if (!slide) return;
+
+    // Collect all elements (from both elements array and layers)
+    const allElements: ElementDefinition[] = [
+      ...(slide.elements || []),
+      ...(slide.layers?.flatMap(l => l.elements) || []),
+    ];
+
+    const currentIndex = allElements.findIndex(el => el.id === elementId);
+    if (currentIndex === -1 || currentIndex === newIndex) return;
+
+    // Remove element from current position
+    const [movedElement] = allElements.splice(currentIndex, 1);
+    // Insert at new position
+    allElements.splice(newIndex, 0, movedElement);
+
+    // Rebuild slide structure (for now, put all in elements array)
+    // TODO: Maintain layer structure when reordering
+    const updatedSlide: SlideDefinition = {
+      ...slide,
+      elements: allElements,
+      layers: slide.layers?.map(layer => ({
+        ...layer,
+        elements: [],
+      })),
+    };
+
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      slides: deck.slides.map((s, i) => (i === currentSlideIndex ? updatedSlide : s)),
+    };
+
+    this.setState({ deck: updatedDeck });
+
+    this.executeCommand({
+      type: 'reorderElement',
+      target: elementId,
+      params: { newIndex },
+      timestamp: Date.now(),
+    });
+  }
+
+  toggleElementLock(elementId: string): void {
+    const { deck } = this.state;
+    if (!deck) return;
+
+    let isLocked = false;
+    let currentElement: ElementDefinition | undefined;
+
+    // Find element and check current lock state
+    for (const slide of deck.slides) {
+      const allElements = [
+        ...(slide.elements || []),
+        ...(slide.layers?.flatMap(l => l.elements) || []),
+      ];
+      const element = allElements.find(el => el.id === elementId);
+      if (element) {
+        currentElement = element;
+        isLocked = (element.metadata as any)?.locked === true;
+        break;
+      }
+    }
+
+    if (!currentElement) return;
+
+    // Toggle lock state
+    const updatedMetadata = {
+      ...currentElement.metadata,
+      locked: !isLocked,
+    };
+
+    this.updateElement(elementId, { metadata: updatedMetadata });
+  }
+
   // UI state operations
   setZoom(zoom: number): void {
     this.setState({ zoom });

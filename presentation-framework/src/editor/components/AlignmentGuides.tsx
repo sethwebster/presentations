@@ -1,6 +1,6 @@
 "use client";
 
-import { useEditorStore } from '../store/editorStore';
+import { useEditor } from '../hooks/useEditor';
 import type { ElementDefinition } from '@/rsc/types';
 import { useEffect, useState } from 'react';
 
@@ -12,8 +12,9 @@ interface AlignmentGuidesProps {
 const GUIDE_THRESHOLD = 5; // pixels
 
 export function AlignmentGuides({ draggingElementId, draggingBounds }: AlignmentGuidesProps) {
-  const deck = useEditorStore((state) => state.deck);
-  const currentSlideIndex = useEditorStore((state) => state.currentSlideIndex);
+  const state = useEditor();
+  const deck = state.deck;
+  const currentSlideIndex = state.currentSlideIndex;
   const [guides, setGuides] = useState<Array<{ type: 'horizontal' | 'vertical'; position: number }>>([]);
 
   useEffect(() => {

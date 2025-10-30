@@ -1,13 +1,15 @@
 "use client";
 
-import { useEditorStore } from '../store/editorStore';
+import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import type { ElementDefinition } from '@/rsc/types';
 
 export function AlignmentTools() {
-  const selectedElementIds = useEditorStore((state) => state.selectedElementIds);
-  const deck = useEditorStore((state) => state.deck);
-  const currentSlideIndex = useEditorStore((state) => state.currentSlideIndex);
-  const updateElement = useEditorStore((state) => state.updateElement);
+  const state = useEditor();
+  const editor = useEditorInstance();
+  
+  const selectedElementIds = state.selectedElementIds;
+  const deck = state.deck;
+  const currentSlideIndex = state.currentSlideIndex;
 
   const currentSlide = deck?.slides[currentSlideIndex];
   if (!currentSlide || selectedElementIds.size < 2) {
@@ -24,7 +26,7 @@ export function AlignmentTools() {
   const alignLeft = () => {
     const leftmostX = Math.min(...selectedElements.map(el => el.bounds?.x || 0));
     selectedElements.forEach(el => {
-      updateElement(el.id, {
+      editor.updateElement(el.id, {
         bounds: { ...el.bounds, x: leftmostX, width: el.bounds?.width || 100, height: el.bounds?.height || 50 },
       });
     });
@@ -34,7 +36,7 @@ export function AlignmentTools() {
     const rightmostX = Math.max(...selectedElements.map(el => (el.bounds?.x || 0) + (el.bounds?.width || 100)));
     selectedElements.forEach(el => {
       const elementWidth = el.bounds?.width || 100;
-      updateElement(el.id, {
+      editor.updateElement(el.id, {
         bounds: { ...el.bounds, x: rightmostX - elementWidth, width: elementWidth, height: el.bounds?.height || 50 },
       });
     });
@@ -43,7 +45,7 @@ export function AlignmentTools() {
   const alignTop = () => {
     const topmostY = Math.min(...selectedElements.map(el => el.bounds?.y || 0));
     selectedElements.forEach(el => {
-      updateElement(el.id, {
+      editor.updateElement(el.id, {
         bounds: { ...el.bounds, y: topmostY, width: el.bounds?.width || 100, height: el.bounds?.height || 50 },
       });
     });
@@ -53,7 +55,7 @@ export function AlignmentTools() {
     const bottommostY = Math.max(...selectedElements.map(el => (el.bounds?.y || 0) + (el.bounds?.height || 50)));
     selectedElements.forEach(el => {
       const elementHeight = el.bounds?.height || 50;
-      updateElement(el.id, {
+      editor.updateElement(el.id, {
         bounds: { ...el.bounds, y: bottommostY - elementHeight, width: el.bounds?.width || 100, height: elementHeight },
       });
     });
@@ -65,7 +67,7 @@ export function AlignmentTools() {
     const centerX = (minX + maxX) / 2;
     selectedElements.forEach(el => {
       const elementWidth = el.bounds?.width || 100;
-      updateElement(el.id, {
+      editor.updateElement(el.id, {
         bounds: { ...el.bounds, x: centerX - elementWidth / 2, width: elementWidth, height: el.bounds?.height || 50 },
       });
     });
@@ -77,7 +79,7 @@ export function AlignmentTools() {
     const centerY = (minY + maxY) / 2;
     selectedElements.forEach(el => {
       const elementHeight = el.bounds?.height || 50;
-      updateElement(el.id, {
+      editor.updateElement(el.id, {
         bounds: { ...el.bounds, y: centerY - elementHeight / 2, width: el.bounds?.width || 100, height: elementHeight },
       });
     });
@@ -94,7 +96,7 @@ export function AlignmentTools() {
 
     sorted.forEach((el, index) => {
       if (index === 0 || index === sorted.length - 1) return;
-      updateElement(el.id, {
+      editor.updateElement(el.id, {
         bounds: { ...el.bounds, x: firstX + spacing * index, width: el.bounds?.width || 100, height: el.bounds?.height || 50 },
       });
     });
@@ -111,7 +113,7 @@ export function AlignmentTools() {
 
     sorted.forEach((el, index) => {
       if (index === 0 || index === sorted.length - 1) return;
-      updateElement(el.id, {
+      editor.updateElement(el.id, {
         bounds: { ...el.bounds, y: firstY + spacing * index, width: el.bounds?.width || 100, height: el.bounds?.height || 50 },
       });
     });

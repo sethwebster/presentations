@@ -1,6 +1,6 @@
 "use client";
 
-import { useEditorStore } from '../store/editorStore';
+import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import type { ElementDefinition } from '@/rsc/types';
 import { AlignmentTools } from './AlignmentTools';
 import { ColorPicker } from './ColorPicker';
@@ -11,10 +11,12 @@ interface PropertiesPanelProps {
 }
 
 export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
-  const selectedElementIds = useEditorStore((state) => state.selectedElementIds);
-  const deck = useEditorStore((state) => state.deck);
-  const currentSlideIndex = useEditorStore((state) => state.currentSlideIndex);
-  const updateElement = useEditorStore((state) => state.updateElement);
+  const state = useEditor();
+  const editor = useEditorInstance();
+  
+  const selectedElementIds = state.selectedElementIds;
+  const deck = state.deck;
+  const currentSlideIndex = state.currentSlideIndex;
 
   const currentSlide = deck?.slides[currentSlideIndex];
   const selectedElements: ElementDefinition[] = [];
@@ -74,28 +76,28 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
                 <PropertyInput
                   label="X"
                   value={selectedElement.bounds?.x || 0}
-                  onChange={(val) => updateElement(selectedElement.id, {
+                  onChange={(val) => editor.updateElement(selectedElement.id, {
                     bounds: { ...selectedElement.bounds, x: val, width: selectedElement.bounds?.width || 100, height: selectedElement.bounds?.height || 50 },
                   })}
                 />
                 <PropertyInput
                   label="Y"
                   value={selectedElement.bounds?.y || 0}
-                  onChange={(val) => updateElement(selectedElement.id, {
+                  onChange={(val) => editor.updateElement(selectedElement.id, {
                     bounds: { ...selectedElement.bounds, y: val, width: selectedElement.bounds?.width || 100, height: selectedElement.bounds?.height || 50 },
                   })}
                 />
                 <PropertyInput
                   label="W"
                   value={selectedElement.bounds?.width || 100}
-                  onChange={(val) => updateElement(selectedElement.id, {
+                  onChange={(val) => editor.updateElement(selectedElement.id, {
                     bounds: { ...selectedElement.bounds, width: val, height: selectedElement.bounds?.height || 50 },
                   })}
                 />
                 <PropertyInput
                   label="H"
                   value={selectedElement.bounds?.height || 50}
-                  onChange={(val) => updateElement(selectedElement.id, {
+                  onChange={(val) => editor.updateElement(selectedElement.id, {
                     bounds: { ...selectedElement.bounds, height: val },
                   })}
                 />
@@ -110,7 +112,7 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
                 </label>
                 <textarea
                   value={(selectedElement as any).content || ''}
-                  onChange={(e) => updateElement(selectedElement.id, { content: e.target.value })}
+                  onChange={(e) => editor.updateElement(selectedElement.id, { content: e.target.value })}
                   style={{
                     width: '100%',
                     minHeight: '60px',
@@ -135,7 +137,7 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
                   </label>
                   <ColorPicker
                     value={(selectedElement.style as any)?.fill || '#16C2C7'}
-                    onChange={(value) => updateElement(selectedElement.id, {
+                    onChange={(value) => editor.updateElement(selectedElement.id, {
                       style: { ...selectedElement.style, fill: value },
                     })}
                   />
@@ -146,7 +148,7 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
                   </label>
                   <ColorPicker
                     value={(selectedElement.style as any)?.stroke || 'transparent'}
-                    onChange={(value) => updateElement(selectedElement.id, {
+                    onChange={(value) => editor.updateElement(selectedElement.id, {
                       style: { ...selectedElement.style, stroke: value },
                     })}
                   />
@@ -161,7 +163,7 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
                       min="0"
                       max="50"
                       value={(selectedElement.style as any)?.strokeWidth || 1}
-                      onChange={(e) => updateElement(selectedElement.id, {
+                      onChange={(e) => editor.updateElement(selectedElement.id, {
                         style: { ...selectedElement.style, strokeWidth: Math.max(0, parseInt(e.target.value) || 1) },
                       })}
                       style={{

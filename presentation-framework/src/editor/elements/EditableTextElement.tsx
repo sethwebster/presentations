@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import type { TextElementDefinition } from '@/rsc/types';
-import { useEditorStore } from '../store/editorStore';
+import { useEditorInstance } from '../hooks/useEditor';
 
 interface EditableTextElementProps {
   element: TextElementDefinition;
@@ -13,7 +13,7 @@ export function EditableTextElement({ element, onBlur }: EditableTextElementProp
   const [isEditing, setIsEditing] = useState(false);
   const [content, setContent] = useState(element.content || '');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const updateElement = useEditorStore((state) => state.updateElement);
+  const editor = useEditorInstance();
 
   useEffect(() => {
     if (isEditing && textareaRef.current) {
@@ -28,7 +28,7 @@ export function EditableTextElement({ element, onBlur }: EditableTextElementProp
 
   const handleBlur = () => {
     setIsEditing(false);
-    updateElement(element.id, { content });
+    editor.updateElement(element.id, { content });
     onBlur();
   };
 
