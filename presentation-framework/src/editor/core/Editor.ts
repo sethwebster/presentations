@@ -188,9 +188,9 @@ export class Editor {
           const result = await response.json();
           console.log('Save successful:', result);
           
-          // Update deck silently without triggering unnecessary re-renders
-          // The deck reference stays the same, just the updatedAt changes
-          this.state.deck = deckToSave;
+          // Update deck and notify subscribers (needed for StatusBar to see the update)
+          // The deck reference changes, but this is necessary for change detection
+          this.setState({ deck: deckToSave });
           this.isSaving = false;
           resolve();
         } catch (error) {

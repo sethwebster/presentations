@@ -27,18 +27,24 @@ export function StatusBar({ deckId }: StatusBarProps) {
   useEffect(() => {
     if (!deck) {
       setSaveStatus('saved');
+      setPreviousDeckHash('');
       return;
     }
 
     // Create a simple hash of the deck to detect changes
-    const deckHash = JSON.stringify(deck);
+    // Exclude updatedAt from hash since it changes on every save
+    const deckForHash = {
+      ...deck,
+      meta: deck.meta ? { ...deck.meta, updatedAt: undefined } : undefined,
+    };
+    const deckHash = JSON.stringify(deckForHash);
     
-    // If deck changed, mark as unsaved
+    // If deck content changed (not just timestamp), mark as unsaved
     if (deckHash !== previousDeckHash && previousDeckHash !== '') {
       setSaveStatus('unsaved');
     }
 
-    // Auto-save if enabled and deck has changed
+    // Auto-save if enabled and deck content has changed
     if (autosaveEnabled && deckHash !== previousDeckHash && previousDeckHash !== '') {
       const saveTimeout = setTimeout(async () => {
         setSaveStatus('saving');
@@ -48,6 +54,7 @@ export function StatusBar({ deckId }: StatusBarProps) {
           setLastSaved(new Date());
           setPreviousDeckHash(deckHash);
         } catch (error) {
+          console.error('Save failed:', error);
           setSaveStatus('unsaved');
         }
       }, 1000); // Debounce saves by 1 second
@@ -55,8 +62,11 @@ export function StatusBar({ deckId }: StatusBarProps) {
       return () => clearTimeout(saveTimeout);
     }
 
-    setPreviousDeckHash(deckHash);
-  }, [deck, autosaveEnabled, previousDeckHash]);
+    // Initialize hash on first load
+    if (previousDeckHash === '') {
+      setPreviousDeckHash(deckHash);
+    }
+  }, [deck, autosaveEnabled, previousDeckHash, editor]);
 
   const currentSlide = deck?.slides[currentSlideIndex];
   const elementCount = currentSlide 
