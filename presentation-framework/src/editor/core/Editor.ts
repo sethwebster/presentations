@@ -461,13 +461,56 @@ export class Editor {
             i === childIndex ? { ...child, ...relativeUpdates } as ElementDefinition : child
           );
           
-          // Recalculate group bounds based on updated children
-          const newGroupBounds = this.calculateGroupBounds(updatedChildren);
+          // Recalculate group bounds from children's relative positions
+          // Calculate the bounding box of relative positions, then position group at that location
+          let minX = Infinity;
+          let minY = Infinity;
+          let maxX = -Infinity;
+          let maxY = -Infinity;
+          
+          for (const child of updatedChildren) {
+            if (!child.bounds) continue;
+            const relX = child.bounds.x || 0;
+            const relY = child.bounds.y || 0;
+            const width = child.bounds.width || 0;
+            const height = child.bounds.height || 0;
+            
+            minX = Math.min(minX, relX);
+            minY = Math.min(minY, relY);
+            maxX = Math.max(maxX, relX + width);
+            maxY = Math.max(maxY, relY + height);
+          }
+          
+          // Calculate new group bounds (children are already relative, so this is the relative bounding box)
+          const newGroupBounds = minX !== Infinity ? {
+            x: group.bounds.x + minX, // Keep group at original position, adjust for relative min
+            y: group.bounds.y + minY,
+            width: maxX - minX,
+            height: maxY - minY,
+          } : group.bounds;
+          
+          // If group origin changed, adjust all children relative positions
+          const deltaX = newGroupBounds.x - group.bounds.x;
+          const deltaY = newGroupBounds.y - group.bounds.y;
+          
+          const finalChildren = deltaX !== 0 || deltaY !== 0
+            ? updatedChildren.map(child => {
+                if (!child.bounds) return child;
+                return {
+                  ...child,
+                  bounds: {
+                    ...child.bounds,
+                    x: (child.bounds.x || 0) - minX, // Adjust relative to new origin
+                    y: (child.bounds.y || 0) - minY,
+                  },
+                };
+              })
+            : updatedChildren;
           
           const updatedGroup: GroupElementDefinition = {
             ...group,
-            children: updatedChildren,
-            bounds: newGroupBounds || group.bounds,
+            children: finalChildren,
+            bounds: newGroupBounds,
           };
           
           // Update the group in the slide
