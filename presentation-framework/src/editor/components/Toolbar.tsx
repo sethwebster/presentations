@@ -198,6 +198,61 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
         </ToolbarButton>
       </div>
 
+      {/* Layer Ordering Tools */}
+      {selectedElementIds.size > 0 && (
+        <div style={{ display: 'flex', gap: '4px', paddingRight: '16px', borderRight: '1px solid rgba(236, 236, 236, 0.1)' }}>
+          <ToolbarButton 
+            title="Bring to Front" 
+            onClick={() => {
+              selectedElementIds.forEach(id => editor.bringToFront(id));
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+              <path d="M8 12h8" />
+              <path d="M12 8v8" />
+            </svg>
+          </ToolbarButton>
+          <ToolbarButton 
+            title="Bring Forward" 
+            onClick={() => {
+              selectedElementIds.forEach(id => editor.bringForward(id));
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+              <path d="M8 12h8" />
+              <path d="M12 8v8" />
+              <circle cx="16" cy="8" r="1" fill="currentColor" />
+            </svg>
+          </ToolbarButton>
+          <ToolbarButton 
+            title="Send Backward" 
+            onClick={() => {
+              selectedElementIds.forEach(id => editor.sendBackward(id));
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+              <path d="M8 12h8" />
+              <path d="M12 8v8" />
+              <circle cx="8" cy="16" r="1" fill="currentColor" />
+            </svg>
+          </ToolbarButton>
+          <ToolbarButton 
+            title="Send to Back" 
+            onClick={() => {
+              selectedElementIds.forEach(id => editor.sendToBack(id));
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+              <path d="M8 12h8" />
+            </svg>
+          </ToolbarButton>
+        </div>
+      )}
+
       {/* Save Button */}
       <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto', paddingRight: '16px', borderRight: '1px solid rgba(236, 236, 236, 0.1)' }}>
         <ToolbarButton

@@ -591,6 +591,185 @@ export class Editor {
     this.updateElement(elementId, { metadata: updatedMetadata });
   }
 
+  // Helper to get all elements in rendering order (for layer operations)
+  private getAllElementsInOrder(slide: SlideDefinition): ElementDefinition[] {
+    const allElements: ElementDefinition[] = [];
+    
+    // First add elements from slide.elements (rendered first, so bottom)
+    if (slide.elements) {
+      allElements.push(...slide.elements);
+    }
+    
+    // Then add elements from layers, sorted by order (lower order = bottom, higher order = top)
+    if (slide.layers) {
+      const sortedLayers = [...slide.layers].sort((a, b) => a.order - b.order);
+      sortedLayers.forEach(layer => {
+        if (layer.elements) {
+          allElements.push(...layer.elements);
+        }
+      });
+    }
+    
+    return allElements;
+  }
+
+  // Helper to find element location and rebuild slide structure
+  private rebuildSlideWithElementOrder(
+    slide: SlideDefinition,
+    elementOrder: ElementDefinition[]
+  ): SlideDefinition {
+    // For simplicity, put all elements in slide.elements and clear layers
+    // This matches the current reorderElement behavior
+    return {
+      ...slide,
+      elements: elementOrder,
+      layers: slide.layers?.map(layer => ({
+        ...layer,
+        elements: [],
+      })),
+    };
+  }
+
+  bringToFront(elementId: string): void {
+    const { deck, currentSlideIndex } = this.state;
+    if (!deck) return;
+
+    const slide = deck.slides[currentSlideIndex];
+    if (!slide) return;
+
+    const allElements = this.getAllElementsInOrder(slide);
+    const currentIndex = allElements.findIndex(el => el.id === elementId);
+    
+    if (currentIndex === -1) return;
+    
+    // If already at the front, do nothing
+    if (currentIndex === allElements.length - 1) return;
+
+    // Remove element and add to end
+    const [movedElement] = allElements.splice(currentIndex, 1);
+    allElements.push(movedElement);
+
+    const updatedSlide = this.rebuildSlideWithElementOrder(slide, allElements);
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      slides: deck.slides.map((s, i) => (i === currentSlideIndex ? updatedSlide : s)),
+    };
+
+    this.setState({ deck: updatedDeck });
+
+    this.executeCommand({
+      type: 'bringToFront',
+      target: elementId,
+      params: {},
+      timestamp: Date.now(),
+    });
+  }
+
+  sendToBack(elementId: string): void {
+    const { deck, currentSlideIndex } = this.state;
+    if (!deck) return;
+
+    const slide = deck.slides[currentSlideIndex];
+    if (!slide) return;
+
+    const allElements = this.getAllElementsInOrder(slide);
+    const currentIndex = allElements.findIndex(el => el.id === elementId);
+    
+    if (currentIndex === -1) return;
+    
+    // If already at the back, do nothing
+    if (currentIndex === 0) return;
+
+    // Remove element and add to beginning
+    const [movedElement] = allElements.splice(currentIndex, 1);
+    allElements.unshift(movedElement);
+
+    const updatedSlide = this.rebuildSlideWithElementOrder(slide, allElements);
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      slides: deck.slides.map((s, i) => (i === currentSlideIndex ? updatedSlide : s)),
+    };
+
+    this.setState({ deck: updatedDeck });
+
+    this.executeCommand({
+      type: 'sendToBack',
+      target: elementId,
+      params: {},
+      timestamp: Date.now(),
+    });
+  }
+
+  bringForward(elementId: string): void {
+    const { deck, currentSlideIndex } = this.state;
+    if (!deck) return;
+
+    const slide = deck.slides[currentSlideIndex];
+    if (!slide) return;
+
+    const allElements = this.getAllElementsInOrder(slide);
+    const currentIndex = allElements.findIndex(el => el.id === elementId);
+    
+    if (currentIndex === -1) return;
+    
+    // If already at the front, do nothing
+    if (currentIndex === allElements.length - 1) return;
+
+    // Swap with next element
+    [allElements[currentIndex], allElements[currentIndex + 1]] = 
+      [allElements[currentIndex + 1], allElements[currentIndex]];
+
+    const updatedSlide = this.rebuildSlideWithElementOrder(slide, allElements);
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      slides: deck.slides.map((s, i) => (i === currentSlideIndex ? updatedSlide : s)),
+    };
+
+    this.setState({ deck: updatedDeck });
+
+    this.executeCommand({
+      type: 'bringForward',
+      target: elementId,
+      params: {},
+      timestamp: Date.now(),
+    });
+  }
+
+  sendBackward(elementId: string): void {
+    const { deck, currentSlideIndex } = this.state;
+    if (!deck) return;
+
+    const slide = deck.slides[currentSlideIndex];
+    if (!slide) return;
+
+    const allElements = this.getAllElementsInOrder(slide);
+    const currentIndex = allElements.findIndex(el => el.id === elementId);
+    
+    if (currentIndex === -1) return;
+    
+    // If already at the back, do nothing
+    if (currentIndex === 0) return;
+
+    // Swap with previous element
+    [allElements[currentIndex], allElements[currentIndex - 1]] = 
+      [allElements[currentIndex - 1], allElements[currentIndex]];
+
+    const updatedSlide = this.rebuildSlideWithElementOrder(slide, allElements);
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      slides: deck.slides.map((s, i) => (i === currentSlideIndex ? updatedSlide : s)),
+    };
+
+    this.setState({ deck: updatedDeck });
+
+    this.executeCommand({
+      type: 'sendBackward',
+      target: elementId,
+      params: {},
+      timestamp: Date.now(),
+    });
+  }
+
   // Clipboard operations
   copy(): void {
     const { deck, currentSlideIndex, selectedElementIds } = this.state;

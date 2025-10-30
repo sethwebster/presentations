@@ -87,6 +87,37 @@ export function useKeyboardShortcuts() {
         return;
       }
 
+      // Layer ordering shortcuts
+      if (selectedElementIds.size > 0) {
+        // Bring to Front (Cmd/Ctrl + Shift + ])
+        if (modKey && e.shiftKey && e.key === ']') {
+          e.preventDefault();
+          selectedElementIds.forEach(id => editor.bringToFront(id));
+          return;
+        }
+
+        // Send to Back (Cmd/Ctrl + Shift + [)
+        if (modKey && e.shiftKey && e.key === '[') {
+          e.preventDefault();
+          selectedElementIds.forEach(id => editor.sendToBack(id));
+          return;
+        }
+
+        // Bring Forward (Cmd/Ctrl + ])
+        if (modKey && !e.shiftKey && e.key === ']') {
+          e.preventDefault();
+          selectedElementIds.forEach(id => editor.bringForward(id));
+          return;
+        }
+
+        // Send Backward (Cmd/Ctrl + [)
+        if (modKey && !e.shiftKey && e.key === '[') {
+          e.preventDefault();
+          selectedElementIds.forEach(id => editor.sendBackward(id));
+          return;
+        }
+      }
+
       // Arrow keys - Nudge selected elements
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && selectedElementIds.size > 0) {
         e.preventDefault();
