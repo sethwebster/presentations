@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import type { ElementDefinition } from '@/rsc/types';
-import { useEditorStore } from '../store/editorStore';
+import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { EditableTextElement } from './EditableTextElement';
 
 const CANVAS_WIDTH = 1280;
@@ -39,12 +39,12 @@ interface BaseElementProps {
 
 export function BaseElement({ element, slideId }: BaseElementProps) {
   const elementRef = useRef<HTMLDivElement>(null);
-  const selectedElementIds = useEditorStore((state) => state.selectedElementIds);
-  const selectElement = useEditorStore((state) => state.selectElement);
-  const updateElement = useEditorStore((state) => state.updateElement);
-  const setDraggingElement = useEditorStore((state) => state.setDraggingElement);
-  const zoom = useEditorStore((state) => state.zoom);
-  const pan = useEditorStore((state) => state.pan);
+  const state = useEditor();
+  const editor = useEditorInstance();
+  
+  const selectedElementIds = state.selectedElementIds;
+  const zoom = state.zoom;
+  const pan = state.pan;
   const isSelected = selectedElementIds.has(element.id);
 
   const bounds = element.bounds || { x: 0, y: 0, width: 100, height: 50 };
@@ -54,7 +54,7 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    selectElement(element.id, e.shiftKey);
+    editor.selectElement(element.id, e.shiftKey);
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -72,7 +72,7 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
     e.stopPropagation();
     
     if (!isSelected) {
-      selectElement(element.id, e.shiftKey);
+      editor.selectElement(element.id, e.shiftKey);
     }
 
     // Convert screen coordinates to canvas coordinates
@@ -114,16 +114,16 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
       };
 
       // Update dragging state for alignment guides
-      setDraggingElement(element.id, newBounds);
+      editor.setDraggingElement(element.id, newBounds);
 
-      updateElement(element.id, {
+      editor.updateElement(element.id, {
         bounds: newBounds,
       });
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
-      setDraggingElement(null, null); // Clear dragging state
+      editor.setDraggingElement(null, null); // Clear dragging state
       // Restore text selection
       document.body.style.userSelect = '';
       document.body.style.webkitUserSelect = '';
@@ -148,7 +148,7 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
       document.body.style.webkitUserSelect = '';
       document.body.style.cursor = '';
     };
-  }, [isDragging, dragStart, bounds, element.id, updateElement, setDraggingElement, zoom, pan]);
+  }, [isDragging, dragStart, bounds, element.id, zoom, pan, editor]);
 
   return (
     <div
@@ -287,8 +287,10 @@ function ImageElementContent({ element }: { element: ElementDefinition }) {
 }
 
 function SelectionHandles({ element }: { element: ElementDefinition }) {
-  const updateElement = useEditorStore((state) => state.updateElement);
+  const state = useEditor();
+  const editor = useEditorInstance();
   const bounds = element.bounds || { x: 0, y: 0, width: 100, height: 50 };
+  const zoom = state.zoom;
   const [isResizing, setIsResizing] = useState(false);
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
@@ -317,8 +319,9 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
 
     const handleMouseMove = (e: MouseEvent) => {
       e.preventDefault();
-      const deltaX = e.clientX - resizeStart.x;
-      const deltaY = e.clientY - resizeStart.y;
+      // Convert screen pixel deltas to canvas coordinates by dividing by zoom
+      const deltaX = (e.clientX - resizeStart.x) / zoom;
+      const deltaY = (e.clientY - resizeStart.y) / zoom;
 
       let newWidth = resizeStart.width;
       let newHeight = resizeStart.height;
@@ -340,7 +343,7 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
         newY = (bounds.y || 0) + deltaY;
       }
 
-      updateElement(element.id, {
+      editor.updateElement(element.id, {
         bounds: {
           ...bounds,
           x: newX,
@@ -370,7 +373,7 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
       document.body.style.userSelect = '';
       document.body.style.webkitUserSelect = '';
     };
-  }, [isResizing, resizeStart, bounds, element.id, updateElement]);
+  }, [isResizing, resizeStart, bounds, element.id, zoom, editor]);
 
   const handleStyle: React.CSSProperties = {
     position: 'absolute',
