@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useEditorStore } from '../store/editorStore';
 import { ElementRenderer } from './ElementRenderer';
+import { AlignmentGuides } from './AlignmentGuides';
 
 interface EditorCanvasProps {
   deckId: string;
@@ -15,8 +16,11 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
   const setZoom = useEditorStore((state) => state.setZoom);
   const setPan = useEditorStore((state) => state.setPan);
   const showGrid = useEditorStore((state) => state.showGrid);
+  const showGuides = useEditorStore((state) => state.showGuides);
   const deck = useEditorStore((state) => state.deck);
   const currentSlideIndex = useEditorStore((state) => state.currentSlideIndex);
+  const draggingElementId = useEditorStore((state) => state.draggingElementId);
+  const draggingBounds = useEditorStore((state) => state.draggingBounds);
   
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
@@ -153,6 +157,26 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
                 pointerEvents: 'none',
               }}
             />
+          )}
+
+          {/* Alignment Guides */}
+          {showGuides && draggingElementId && draggingBounds && (
+            <svg
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                pointerEvents: 'none',
+                zIndex: 1000,
+              }}
+            >
+              <AlignmentGuides
+                draggingElementId={draggingElementId}
+                draggingBounds={draggingBounds}
+              />
+            </svg>
           )}
           
           {/* Placeholder for slide content */}

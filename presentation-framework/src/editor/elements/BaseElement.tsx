@@ -15,6 +15,7 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
   const selectedElementIds = useEditorStore((state) => state.selectedElementIds);
   const selectElement = useEditorStore((state) => state.selectElement);
   const updateElement = useEditorStore((state) => state.updateElement);
+  const setDraggingElement = useEditorStore((state) => state.setDraggingElement);
   const isSelected = selectedElementIds.has(element.id);
 
   const bounds = element.bounds || { x: 0, y: 0, width: 100, height: 50 };
@@ -69,18 +70,23 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
       e.preventDefault();
       const newX = e.clientX - dragStart.x;
       const newY = e.clientY - dragStart.y;
-
-      updateElement(element.id, {
-        bounds: {
+      const newBounds = {
           ...bounds,
           x: Math.max(0, newX),
           y: Math.max(0, newY),
-        },
+        };
+
+      // Update dragging state for alignment guides
+      setDraggingElement(element.id, newBounds);
+
+      updateElement(element.id, {
+        bounds: newBounds,
       });
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
+      setDraggingElement(null, null); // Clear dragging state
       // Restore text selection
       document.body.style.userSelect = '';
       document.body.style.webkitUserSelect = '';
@@ -105,7 +111,7 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
       document.body.style.webkitUserSelect = '';
       document.body.style.cursor = '';
     };
-  }, [isDragging, dragStart, bounds, element.id, updateElement]);
+  }, [isDragging, dragStart, bounds, element.id, updateElement, setDraggingElement]);
 
   return (
     <div
