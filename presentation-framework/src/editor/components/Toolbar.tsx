@@ -1,6 +1,6 @@
 "use client";
 
-import { useEditorStore } from '../store/editorStore';
+import { useEditor, useEditorInstance } from '../hooks/useEditor';
 
 interface ToolbarProps {
   deckId: string;
@@ -8,14 +8,14 @@ interface ToolbarProps {
 }
 
 export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
-  const toggleGrid = useEditorStore((state) => state.toggleGrid);
-  const showGrid = useEditorStore((state) => state.showGrid);
-  const addElement = useEditorStore((state) => state.addElement);
-  const currentSlideIndex = useEditorStore((state) => state.currentSlideIndex);
-  const selectedElementIds = useEditorStore((state) => state.selectedElementIds);
-  const updateElement = useEditorStore((state) => state.updateElement);
-  const autosaveEnabled = useEditorStore((state) => state.autosaveEnabled);
-  const lastShapeStyle = useEditorStore((state) => state.lastShapeStyle);
+  const state = useEditor();
+  const editor = useEditorInstance();
+  
+  const showGrid = state.showGrid;
+  const currentSlideIndex = state.currentSlideIndex;
+  const selectedElementIds = state.selectedElementIds;
+  const autosaveEnabled = state.autosaveEnabled;
+  const lastShapeStyle = state.lastShapeStyle;
   return (
     <div className="editor-toolbar" style={{
       height: '56px',
@@ -31,7 +31,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       {/* Insert Tools */}
       <div style={{ display: 'flex', gap: '4px', paddingRight: '16px', borderRight: '1px solid rgba(236, 236, 236, 0.1)' }}>
         <ToolbarButton title="Insert Text" onClick={() => {
-          addElement({
+          editor.addElement({
             id: `text-${Date.now()}`,
             type: 'text',
             content: 'New Text',
@@ -57,7 +57,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
           </svg>
         </ToolbarButton>
         <ToolbarButton title="Insert Rectangle" onClick={() => {
-          addElement({
+          editor.addElement({
             id: `shape-${Date.now()}`,
             type: 'shape',
             shapeType: 'rectangle',
@@ -75,7 +75,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
           </svg>
         </ToolbarButton>
         <ToolbarButton title="Insert Circle" onClick={() => {
-          addElement({
+          editor.addElement({
             id: `shape-${Date.now()}`,
             type: 'shape',
             shapeType: 'circle',
@@ -97,7 +97,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       {selectedElementIds.size > 0 && (
         <div style={{ display: 'flex', gap: '4px', paddingRight: '16px', borderRight: '1px solid rgba(236, 236, 236, 0.1)' }}>
           <ToolbarButton title="Bold" onClick={() => {
-            const deck = useEditorStore.getState().deck;
+            const deck = state.deck;
             const currentSlide = deck?.slides[currentSlideIndex];
             if (!currentSlide) return;
             
@@ -110,7 +110,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
               const element = allElements.find(el => el.id === id);
               if (element && element.type === 'text') {
                 const currentWeight = (element.style as any)?.fontWeight || 'normal';
-                updateElement(id, {
+                editor.updateElement(id, {
                   style: { ...element.style, fontWeight: currentWeight === 'bold' ? 'normal' : 'bold' },
                 });
               }
@@ -119,7 +119,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
             <strong style={{ fontSize: '14px' }}>B</strong>
           </ToolbarButton>
           <ToolbarButton title="Italic" onClick={() => {
-            const deck = useEditorStore.getState().deck;
+            const deck = state.deck;
             const currentSlide = deck?.slides[currentSlideIndex];
             if (!currentSlide) return;
             
@@ -132,7 +132,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
               const element = allElements.find(el => el.id === id);
               if (element && element.type === 'text') {
                 const currentStyle = (element.style as any)?.fontStyle || 'normal';
-                updateElement(id, {
+                editor.updateElement(id, {
                   style: { ...element.style, fontStyle: currentStyle === 'italic' ? 'normal' : 'italic' },
                 });
               }
@@ -147,7 +147,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       {selectedElementIds.size > 0 && (
         <div style={{ display: 'flex', gap: '4px', paddingRight: '16px', borderRight: '1px solid rgba(236, 236, 236, 0.1)' }}>
           <ToolbarButton title="Align Left" onClick={() => {
-          const deck = useEditorStore.getState().deck;
+          const deck = state.deck;
           const currentSlide = deck?.slides[currentSlideIndex];
           if (!currentSlide) return;
           
@@ -159,7 +159,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
           selectedElementIds.forEach((id) => {
             const element = allElements.find(el => el.id === id);
             if (element && element.type === 'text') {
-              updateElement(id, {
+              editor.updateElement(id, {
                 style: { ...element.style, textAlign: 'left' },
               });
             }
@@ -178,11 +178,8 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       {/* Layout Tools */}
       <div style={{ display: 'flex', gap: '4px', paddingRight: '16px', borderRight: '1px solid rgba(236, 236, 236, 0.1)' }}>
         <ToolbarButton title="Group (Cmd/Ctrl+G)" onClick={() => {
-          const groupElements = useEditorStore.getState().groupElements;
-          const selectedElementIds = useEditorStore.getState().selectedElementIds;
-          if (selectedElementIds.size >= 2) {
-            groupElements(Array.from(selectedElementIds));
-          }
+          // TODO: Implement groupElements in Editor class
+          console.warn('Group functionality not yet implemented in Editor class');
         }}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
             <rect x="3" y="3" width="7" height="7" />
@@ -204,10 +201,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto', paddingRight: '16px', borderRight: '1px solid rgba(236, 236, 236, 0.1)' }}>
         <ToolbarButton
           title={autosaveEnabled ? "Autosave ON - Click to disable (Cmd/Ctrl+S to save)" : "Autosave OFF - Click to enable (Cmd/Ctrl+S to save)"}
-          onClick={() => {
-            const toggleAutosave = useEditorStore.getState().toggleAutosave;
-            toggleAutosave();
-          }}
+          onClick={() => editor.toggleAutosave()}
           isActive={autosaveEnabled}
         >
           {autosaveEnabled ? (
@@ -232,7 +226,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       <div style={{ display: 'flex', gap: '4px' }}>
         <ToolbarButton 
           title="Toggle Grid" 
-          onClick={toggleGrid}
+          onClick={() => editor.toggleGrid()}
           isActive={showGrid}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
