@@ -421,8 +421,109 @@ export class Editor {
   }
 
   updateElement(elementId: string, updates: Partial<ElementDefinition>): void {
-    const { deck } = this.state;
+    const { deck, currentSlideIndex, openedGroupId } = this.state;
     if (!deck) return;
+
+    const currentSlide = deck.slides[currentSlideIndex];
+    if (!currentSlide) return;
+
+    // Check if element is a child of an opened group
+    if (openedGroupId) {
+      const allElements = [
+        ...(currentSlide.elements || []),
+        ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+      ];
+      const groupElement = allElements.find(el => el.id === openedGroupId);
+      if (groupElement && groupElement.type === 'group') {
+        const group = groupElement as GroupElementDefinition;
+        const childIndex = group.children?.findIndex(child => child.id === elementId);
+        
+        if (childIndex !== undefined && childIndex !== -1) {
+          // Update child in group's children array
+          // Convert absolute bounds (from dragging) back to relative bounds
+          const child = group.children[childIndex];
+          let relativeUpdates = { ...updates };
+          
+          if (updates.bounds && group.bounds) {
+            // Convert absolute bounds to relative bounds
+            relativeUpdates = {
+              ...relativeUpdates,
+              bounds: {
+                ...updates.bounds,
+                x: (updates.bounds.x || 0) - (group.bounds.x || 0),
+                y: (updates.bounds.y || 0) - (group.bounds.y || 0),
+              },
+            };
+          }
+          
+          const updatedChildren = group.children.map((child, i) =>
+            i === childIndex ? { ...child, ...relativeUpdates } : child
+          );
+          
+          // Recalculate group bounds based on updated children
+          const newGroupBounds = this.calculateGroupBounds(updatedChildren);
+          
+          const updatedGroup: GroupElementDefinition = {
+            ...group,
+            children: updatedChildren,
+            bounds: newGroupBounds || group.bounds,
+          };
+          
+          // Update the group in the slide
+          const updatedDeck: DeckDefinition = {
+            ...deck,
+            slides: deck.slides.map((slide, i) => {
+              if (i !== currentSlideIndex) return slide;
+              
+              const elements = slide.elements || [];
+              const groupIndex = elements.findIndex(el => el.id === openedGroupId);
+              
+              if (groupIndex !== -1) {
+                return {
+                  ...slide,
+                  elements: elements.map((el, idx) =>
+                    idx === groupIndex ? updatedGroup : el
+                  ),
+                };
+              }
+              
+              // Check layers
+              if (slide.layers) {
+                const updatedLayers = slide.layers.map(layer => {
+                  const layerGroupIndex = layer.elements.findIndex(el => el.id === openedGroupId);
+                  if (layerGroupIndex !== -1) {
+                    return {
+                      ...layer,
+                      elements: layer.elements.map((el, idx) =>
+                        idx === layerGroupIndex ? updatedGroup : el
+                      ),
+                    };
+                  }
+                  return layer;
+                });
+                
+                if (updatedLayers.some((layer, idx) => layer !== slide.layers![idx])) {
+                  return { ...slide, layers: updatedLayers };
+                }
+              }
+              
+              return slide;
+            }),
+          };
+          
+          this.setState({ deck: updatedDeck });
+          
+          this.executeCommand({
+            type: 'updateElement',
+            target: elementId,
+            params: { updates: relativeUpdates },
+            timestamp: Date.now(),
+          });
+          
+          return;
+        }
+      }
+    }
 
     // Find current element state for undo
     let previousElement: ElementDefinition | undefined;
