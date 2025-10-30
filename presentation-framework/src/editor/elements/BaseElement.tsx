@@ -50,6 +50,7 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
   const bounds = element.bounds || { x: 0, y: 0, width: 100, height: 50 };
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [selectedElementsInitialBounds, setSelectedElementsInitialBounds] = useState<Map<string, { x: number; y: number; width: number; height: number }>>(new Map());
   const [isEditingText, setIsEditingText] = useState(false);
 
   const handleClick = (e: React.MouseEvent) => {
@@ -73,6 +74,30 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
     
     if (!isSelected) {
       editor.selectElement(element.id, e.shiftKey);
+    }
+
+    // Store initial positions of all selected elements for multi-selection dragging
+    const currentState = editor.getState();
+    const currentDeck = currentState.deck;
+    const currentSlide = currentDeck?.slides[currentState.currentSlideIndex];
+    if (currentSlide && currentState.selectedElementIds.size > 0) {
+      const allElements = [
+        ...(currentSlide.elements || []),
+        ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+      ];
+      const initialBounds = new Map<string, { x: number; y: number; width: number; height: number }>();
+      currentState.selectedElementIds.forEach((id) => {
+        const el = allElements.find(e => e.id === id);
+        if (el && el.bounds) {
+          initialBounds.set(id, {
+            x: el.bounds.x || 0,
+            y: el.bounds.y || 0,
+            width: el.bounds.width || 100,
+            height: el.bounds.height || 50,
+          });
+        }
+      });
+      setSelectedElementsInitialBounds(initialBounds);
     }
 
     // Convert screen coordinates to canvas coordinates
@@ -104,21 +129,49 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
       // Convert screen coordinates to canvas coordinates
       const canvasPos = screenToCanvas(e.clientX, e.clientY, zoom, pan);
       
-      const newX = canvasPos.x - dragStart.x;
-      const newY = canvasPos.y - dragStart.y;
+      const deltaX = canvasPos.x - dragStart.x - (bounds.x || 0);
+      const deltaY = canvasPos.y - dragStart.y - (bounds.y || 0);
       
-      const newBounds = {
-        ...bounds,
-        x: Math.max(0, Math.min(CANVAS_WIDTH - (bounds.width || 0), newX)),
-        y: Math.max(0, Math.min(CANVAS_HEIGHT - (bounds.height || 0), newY)),
-      };
+      // Get current state to check all selected elements
+      const currentState = editor.getState();
+      const currentDeck = currentState.deck;
+      const currentSlide = currentDeck?.slides[currentState.currentSlideIndex];
+      
+      if (currentSlide && currentState.selectedElementIds.size > 0) {
+        const allElements = [
+          ...(currentSlide.elements || []),
+          ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+        ];
+        
+        // Update all selected elements
+        currentState.selectedElementIds.forEach((id) => {
+          const el = allElements.find(e => e.id === id);
+          if (!el) return;
+          
+          const initialBounds = selectedElementsInitialBounds.get(id);
+          if (!initialBounds) return;
+          
+          const newX = Math.max(0, Math.min(CANVAS_WIDTH - initialBounds.width, initialBounds.x + deltaX));
+          const newY = Math.max(0, Math.min(CANVAS_HEIGHT - initialBounds.height, initialBounds.y + deltaY));
+          
+          const newBounds = {
+            ...el.bounds,
+            x: newX,
+            y: newY,
+            width: initialBounds.width,
+            height: initialBounds.height,
+          };
 
-      // Update dragging state for alignment guides
-      editor.setDraggingElement(element.id, newBounds);
+          // Update dragging state for alignment guides (only for the primary dragged element)
+          if (id === element.id) {
+            editor.setDraggingElement(element.id, newBounds);
+          }
 
-      editor.updateElement(element.id, {
-        bounds: newBounds,
-      });
+          editor.updateElement(id, {
+            bounds: newBounds,
+          });
+        });
+      }
     };
 
     const handleMouseUp = () => {
@@ -148,7 +201,7 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
       document.body.style.webkitUserSelect = '';
       document.body.style.cursor = '';
     };
-  }, [isDragging, dragStart, bounds, element.id, zoom, pan, editor]);
+  }, [isDragging, dragStart, bounds, element.id, zoom, pan, selectedElementsInitialBounds, editor]);
 
   return (
     <div

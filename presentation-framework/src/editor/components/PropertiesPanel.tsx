@@ -32,6 +32,23 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
   }
 
   const selectedElement = selectedElements[0];
+  
+  // Helper to update all selected elements
+  const updateAllSelected = (updates: Partial<ElementDefinition>) => {
+    selectedElementIds.forEach((id) => {
+      const el = selectedElements.find(e => e.id === id);
+      if (el) {
+        // For bounds updates, preserve relative positions/sizes
+        if (updates.bounds && el.bounds) {
+          editor.updateElement(id, {
+            bounds: { ...el.bounds, ...updates.bounds },
+          });
+        } else {
+          editor.updateElement(id, updates);
+        }
+      }
+    });
+  };
 
   return (
     <div className="properties-panel" style={{
@@ -76,30 +93,94 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
                 <PropertyInput
                   label="X"
                   value={selectedElement.bounds?.x || 0}
-                  onChange={(val) => editor.updateElement(selectedElement.id, {
-                    bounds: { ...selectedElement.bounds, x: val, width: selectedElement.bounds?.width || 100, height: selectedElement.bounds?.height || 50 },
-                  })}
+                  onChange={(val) => {
+                    if (selectedElementIds.size > 1) {
+                      // For multi-selection, apply relative offset
+                      const baseX = selectedElement.bounds?.x || 0;
+                      const offset = val - baseX;
+                      selectedElementIds.forEach((id) => {
+                        const el = selectedElements.find(e => e.id === id);
+                        if (el && el.bounds) {
+                          editor.updateElement(id, {
+                            bounds: { ...el.bounds, x: (el.bounds.x || 0) + offset },
+                          });
+                        }
+                      });
+                    } else {
+                      editor.updateElement(selectedElement.id, {
+                        bounds: { ...selectedElement.bounds, x: val, width: selectedElement.bounds?.width || 100, height: selectedElement.bounds?.height || 50 },
+                      });
+                    }
+                  }}
                 />
                 <PropertyInput
                   label="Y"
                   value={selectedElement.bounds?.y || 0}
-                  onChange={(val) => editor.updateElement(selectedElement.id, {
-                    bounds: { ...selectedElement.bounds, y: val, width: selectedElement.bounds?.width || 100, height: selectedElement.bounds?.height || 50 },
-                  })}
+                  onChange={(val) => {
+                    if (selectedElementIds.size > 1) {
+                      // For multi-selection, apply relative offset
+                      const baseY = selectedElement.bounds?.y || 0;
+                      const offset = val - baseY;
+                      selectedElementIds.forEach((id) => {
+                        const el = selectedElements.find(e => e.id === id);
+                        if (el && el.bounds) {
+                          editor.updateElement(id, {
+                            bounds: { ...el.bounds, y: (el.bounds.y || 0) + offset },
+                          });
+                        }
+                      });
+                    } else {
+                      editor.updateElement(selectedElement.id, {
+                        bounds: { ...selectedElement.bounds, y: val, width: selectedElement.bounds?.width || 100, height: selectedElement.bounds?.height || 50 },
+                      });
+                    }
+                  }}
                 />
                 <PropertyInput
                   label="W"
                   value={selectedElement.bounds?.width || 100}
-                  onChange={(val) => editor.updateElement(selectedElement.id, {
-                    bounds: { ...selectedElement.bounds, width: val, height: selectedElement.bounds?.height || 50 },
-                  })}
+                  onChange={(val) => {
+                    if (selectedElementIds.size > 1) {
+                      // For multi-selection, scale proportionally
+                      const baseWidth = selectedElement.bounds?.width || 100;
+                      const scale = val / baseWidth;
+                      selectedElementIds.forEach((id) => {
+                        const el = selectedElements.find(e => e.id === id);
+                        if (el && el.bounds) {
+                          editor.updateElement(id, {
+                            bounds: { ...el.bounds, width: Math.max(20, (el.bounds.width || 100) * scale) },
+                          });
+                        }
+                      });
+                    } else {
+                      editor.updateElement(selectedElement.id, {
+                        bounds: { ...selectedElement.bounds, width: val, height: selectedElement.bounds?.height || 50 },
+                      });
+                    }
+                  }}
                 />
                 <PropertyInput
                   label="H"
                   value={selectedElement.bounds?.height || 50}
-                  onChange={(val) => editor.updateElement(selectedElement.id, {
-                    bounds: { ...selectedElement.bounds, height: val },
-                  })}
+                  onChange={(val) => {
+                    if (selectedElementIds.size > 1) {
+                      // For multi-selection, scale proportionally
+                      const baseHeight = selectedElement.bounds?.height || 50;
+                      const scale = val / baseHeight;
+                      selectedElementIds.forEach((id) => {
+                        const el = selectedElements.find(e => e.id === id);
+                        if (el && el.bounds) {
+                          editor.updateElement(id, {
+                            bounds: { ...el.bounds, height: Math.max(20, (el.bounds.height || 50) * scale) },
+                          });
+                        }
+                      });
+                    } else {
+                      editor.updateElement(selectedElement.id, {
+                        bounds: { ...selectedElement.bounds, height: val },
+                      });
+                    }
+                  }}
                 />
               </div>
             </div>
@@ -137,9 +218,17 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
                   </label>
                   <ColorPicker
                     value={(selectedElement.style as any)?.fill || '#16C2C7'}
-                    onChange={(value) => editor.updateElement(selectedElement.id, {
-                      style: { ...selectedElement.style, fill: value },
-                    })}
+                    onChange={(value) => {
+                      // Update all selected shape elements
+                      selectedElementIds.forEach((id) => {
+                        const el = selectedElements.find(e => e.id === id);
+                        if (el && el.type === 'shape') {
+                          editor.updateElement(id, {
+                            style: { ...el.style, fill: value },
+                          });
+                        }
+                      });
+                    }}
                   />
                 </div>
                 <div>
@@ -148,9 +237,17 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
                   </label>
                   <ColorPicker
                     value={(selectedElement.style as any)?.stroke || 'transparent'}
-                    onChange={(value) => editor.updateElement(selectedElement.id, {
-                      style: { ...selectedElement.style, stroke: value },
-                    })}
+                    onChange={(value) => {
+                      // Update all selected shape elements
+                      selectedElementIds.forEach((id) => {
+                        const el = selectedElements.find(e => e.id === id);
+                        if (el && el.type === 'shape') {
+                          editor.updateElement(id, {
+                            style: { ...el.style, stroke: value },
+                          });
+                        }
+                      });
+                    }}
                   />
                 </div>
                 {(selectedElement.style as any)?.stroke && (selectedElement.style as any).stroke !== 'transparent' && (
@@ -163,9 +260,18 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
                       min="0"
                       max="50"
                       value={(selectedElement.style as any)?.strokeWidth || 1}
-                      onChange={(e) => editor.updateElement(selectedElement.id, {
-                        style: { ...selectedElement.style, strokeWidth: Math.max(0, parseInt(e.target.value) || 1) },
-                      })}
+                      onChange={(e) => {
+                        const strokeWidth = Math.max(0, parseInt(e.target.value) || 1);
+                        // Update all selected shape elements
+                        selectedElementIds.forEach((id) => {
+                          const el = selectedElements.find(e => e.id === id);
+                          if (el && el.type === 'shape') {
+                            editor.updateElement(id, {
+                              style: { ...el.style, strokeWidth },
+                            });
+                          }
+                        });
+                      }}
                       style={{
                         width: '100%',
                         padding: '8px',
