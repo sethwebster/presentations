@@ -59,30 +59,28 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
     );
   }
 
-  // Collect all elements from slide.elements and layers
-  const allElements: Array<{ element: any; layerId?: string; layerOrder?: number }> = [];
+  // Collect all elements in rendering order, then reverse to show topmost first
+  const allElements: Array<{ element: any; layerId?: string; layerOrder?: number; renderIndex?: number }> = [];
   
-  // Add elements directly on slide
+  let renderIndex = 0;
+  
+  // Add elements directly on slide (rendered first, so on bottom)
   (currentSlide.elements || []).forEach((el) => {
-    allElements.push({ element: el });
+    allElements.push({ element: el, renderIndex: renderIndex++ });
   });
 
-  // Add elements from layers
+  // Add elements from layers (rendered after slide.elements, sorted by order ascending)
+  // Lower order numbers render first (bottom), higher order numbers render last (top)
   (currentSlide.layers || [])
     .sort((a, b) => a.order - b.order)
     .forEach((layer) => {
       layer.elements.forEach((el) => {
-        allElements.push({ element: el, layerId: layer.id, layerOrder: layer.order });
+        allElements.push({ element: el, layerId: layer.id, layerOrder: layer.order, renderIndex: renderIndex++ });
       });
     });
 
-  // Sort by z-index (layer order first, then by element order)
-  allElements.sort((a, b) => {
-    const orderA = a.layerOrder ?? -1;
-    const orderB = b.layerOrder ?? -1;
-    if (orderA !== orderB) return orderB - orderA; // Higher order on top
-    return 0;
-  });
+  // Reverse the order so topmost elements (rendered last) appear at the top of the list
+  allElements.reverse();
 
   const toggleLayer = (layerId: string) => {
     const newExpanded = new Set(expandedLayers);
