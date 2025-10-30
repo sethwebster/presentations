@@ -311,54 +311,41 @@ function GroupElementContainer({ element, slideId }: { element: GroupElementDefi
     >
       {/* Render children with relative positioning inside the group */}
       {/* Children are rendered but cannot intercept mouse events - group container handles all interactions */}
-      {/* Use capture phase to intercept events before they reach children */}
+      {element.children?.map((child) => {
+        // Render children with pointerEvents: 'none' so they can't be event targets
+        return (
+          <div
+            key={child.id}
+            style={{
+              position: 'absolute',
+              left: `${child.bounds?.x || 0}px`,
+              top: `${child.bounds?.y || 0}px`,
+              width: `${child.bounds?.width || 100}px`,
+              height: `${child.bounds?.height || 50}px`,
+              pointerEvents: 'none', // Critical: Children cannot receive pointer events
+            }}
+          >
+            <ElementRenderer element={child} slideId={slideId} />
+          </div>
+        );
+      })}
+      
+      {/* Transparent overlay that covers entire group to capture all events */}
+      {/* This ensures events are always handled by group container, not children */}
       <div
-        onMouseDownCapture={(e) => {
-          // Capture phase: intercept before children can handle
-          // Don't stop propagation - let it bubble to group container
-        }}
-        onMouseMoveCapture={(e) => {
-          // Let move events pass through to group
-        }}
-        onMouseUpCapture={(e) => {
-          // Let up events pass through to group
-        }}
-        onClickCapture={(e) => {
-          // Don't let clicks reach children
-          e.stopPropagation();
-        }}
-        onDoubleClickCapture={(e) => {
-          // Don't let double-clicks reach children
-          e.stopPropagation();
-        }}
         style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          pointerEvents: 'auto', // Container captures events
+          pointerEvents: 'auto',
+          zIndex: 1, // Above children (but group border is still visible)
+          background: 'transparent',
         }}
-      >
-        {element.children?.map((child) => {
-          // Render children with pointerEvents: 'none' so they can't be event targets
-          return (
-            <div
-              key={child.id}
-              style={{
-                position: 'absolute',
-                left: `${child.bounds?.x || 0}px`,
-                top: `${child.bounds?.y || 0}px`,
-                width: `${child.bounds?.width || 100}px`,
-                height: `${child.bounds?.height || 50}px`,
-                pointerEvents: 'none', // Children cannot receive pointer events
-              }}
-            >
-              <ElementRenderer element={child} slideId={slideId} />
-            </div>
-          );
-        })}
-      </div>
+        // Events on this overlay will bubble to parent group container
+        // No handlers needed - just let events bubble naturally
+      />
     </div>
   );
 }
