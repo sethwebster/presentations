@@ -1,19 +1,20 @@
 "use client";
 
-import { useEditorStore } from '../store/editorStore';
+import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { ColorPicker } from './ColorPicker';
 import { useMemo } from 'react';
 
 export function DocumentProperties() {
-  const deck = useEditorStore((state) => state.deck);
-  const updateDeckSettings = useEditorStore((state) => state.updateDeckSettings);
-  const updateDeckMeta = useEditorStore((state) => state.updateDeckMeta);
+  // Observe editor state (triggers re-render when state changes)
+  const state = useEditor();
+  // Get editor instance to call methods
+  const editor = useEditorInstance();
 
   // Memoize settings and meta to avoid creating new object references on every render
-  const settings = useMemo(() => deck?.settings || {}, [deck?.settings]);
-  const meta = useMemo(() => deck?.meta || {}, [deck?.meta]);
+  const settings = useMemo(() => state.deck?.settings || {}, [state.deck?.settings]);
+  const meta = useMemo(() => state.deck?.meta || {}, [state.deck?.meta]);
 
-  if (!deck) {
+  if (!state.deck) {
     return (
       <div style={{
         color: 'rgba(236, 236, 236, 0.6)',
@@ -35,7 +36,7 @@ export function DocumentProperties() {
         <input
           type="text"
           value={meta.title || ''}
-          onChange={(e) => updateDeckMeta({ title: e.target.value })}
+          onChange={(e) => editor.updateDeckMeta({ title: e.target.value })}
           style={{
             width: '100%',
             padding: '8px',
@@ -55,7 +56,7 @@ export function DocumentProperties() {
         </label>
         <textarea
           value={meta.description || ''}
-          onChange={(e) => updateDeckMeta({ description: e.target.value })}
+          onChange={(e) => editor.updateDeckMeta({ description: e.target.value })}
           style={{
             width: '100%',
             minHeight: '60px',
@@ -107,7 +108,7 @@ export function DocumentProperties() {
                 break;
             }
 
-            updateDeckSettings({
+            editor.updateDeckSettings({
               slideSize: {
                 width,
                 height,
@@ -148,7 +149,7 @@ export function DocumentProperties() {
               <input
                 type="number"
                 value={settings.slideSize?.width || 1280}
-                onChange={(e) => updateDeckSettings({
+                onChange={(e) => editor.updateDeckSettings({
                   slideSize: {
                     ...settings.slideSize,
                     width: parseInt(e.target.value) || 1280,
@@ -174,7 +175,7 @@ export function DocumentProperties() {
               <input
                 type="number"
                 value={settings.slideSize?.height || 720}
-                onChange={(e) => updateDeckSettings({
+                onChange={(e) => editor.updateDeckSettings({
                   slideSize: {
                     ...settings.slideSize,
                     height: parseInt(e.target.value) || 720,
@@ -229,7 +230,7 @@ export function DocumentProperties() {
         </label>
         <ColorPicker
           value={typeof settings.defaultBackground === 'string' ? settings.defaultBackground : '#ffffff'}
-          onChange={(value) => updateDeckSettings({
+          onChange={(value) => editor.updateDeckSettings({
             defaultBackground: value,
           })}
         />
@@ -277,7 +278,7 @@ export function DocumentProperties() {
                 min="1"
                 max="300"
                 value={settings.presentation?.autoAdvanceDelay || 5}
-                onChange={(e) => updateDeckSettings({
+                onChange={(e) => editor.updateDeckSettings({
                   presentation: {
                     autoAdvanceDelay: parseInt(e.target.value) || 5,
                   },
@@ -335,7 +336,7 @@ export function DocumentProperties() {
                 <input
                   type="checkbox"
                   checked={settings.grid?.snapToGrid || false}
-                  onChange={(e) => updateDeckSettings({
+                  onChange={(e) => editor.updateDeckSettings({
                     grid: {
                       snapToGrid: e.target.checked,
                     },
@@ -353,7 +354,7 @@ export function DocumentProperties() {
                   min="5"
                   max="100"
                   value={settings.grid?.size || 20}
-                  onChange={(e) => updateDeckSettings({
+                  onChange={(e) => editor.updateDeckSettings({
                     grid: {
                       size: parseInt(e.target.value) || 20,
                     },
