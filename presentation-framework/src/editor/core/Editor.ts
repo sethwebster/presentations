@@ -1054,25 +1054,37 @@ export class Editor {
       ...(slide.layers?.flatMap(l => l.elements) || []),
     ];
 
-    // Find elements to group
-    const elementsToGroup = allElements.filter(el => elementIds.includes(el.id));
+    // Find elements to group - preserve their original order
+    const elementsToGroup = elementIds
+      .map(id => allElements.find(el => el.id === id))
+      .filter((el): el is ElementDefinition => el !== undefined);
+    
     if (elementsToGroup.length < 2) return;
 
-    // Calculate group bounds from children
+    // Calculate group bounds from children's absolute positions
+    // This finds the bounding box that contains all elements
     const groupBounds = this.calculateGroupBounds(elementsToGroup);
     if (!groupBounds) return;
 
-    // Adjust children bounds to be relative to group origin
-    const adjustedChildren = elementsToGroup.map(child => ({
-      ...child,
-      bounds: child.bounds ? {
-        ...child.bounds,
-        x: (child.bounds.x || 0) - groupBounds.x,
-        y: (child.bounds.y || 0) - groupBounds.y,
-      } : undefined,
-    }));
+    // Adjust children bounds to be relative to group origin (top-left of bounding box)
+    // This preserves their visual positions: group at groupBounds + children at relative positions = same visual result
+    const adjustedChildren = elementsToGroup.map(child => {
+      if (!child.bounds) return child;
+      
+      return {
+        ...child,
+        bounds: {
+          ...child.bounds,
+          x: (child.bounds.x || 0) - groupBounds.x,
+          y: (child.bounds.y || 0) - groupBounds.y,
+          // Preserve width and height
+          width: child.bounds.width,
+          height: child.bounds.height,
+        },
+      };
+    });
 
-    // Create group element
+    // Create group element with bounds at the calculated position
     const groupElement: GroupElementDefinition = {
       id: `group-${Date.now()}`,
       type: 'group',
@@ -1080,7 +1092,7 @@ export class Editor {
       children: adjustedChildren,
     };
 
-    // Remove grouped elements from slide
+    // Remove grouped elements from slide (preserve elements not being grouped)
     const updatedSlide: SlideDefinition = {
       ...slide,
       elements: (slide.elements || []).filter(el => !elementIds.includes(el.id)),
@@ -1090,7 +1102,7 @@ export class Editor {
       })),
     };
 
-    // Add group to slide
+    // Add group to slide at the end (preserves relative rendering order)
     updatedSlide.elements = [...(updatedSlide.elements || []), groupElement];
 
     const updatedDeck: DeckDefinition = {
