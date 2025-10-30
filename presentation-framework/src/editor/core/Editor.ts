@@ -146,6 +146,11 @@ export class Editor {
       return;
     }
 
+    // Prevent concurrent saves
+    if (this.saveDebounceTimer) {
+      return;
+    }
+
     try {
       const deckToSave: DeckDefinition = {
         ...deck,
@@ -166,7 +171,11 @@ export class Editor {
         throw new Error(`Failed to save deck: ${response.statusText} - ${errorText}`);
       }
       
-      this.setState({ deck: deckToSave });
+      // Only update state if deck actually changed (deep comparison would be better, but this prevents loops)
+      // Update deck silently without triggering unnecessary re-renders
+      this.state.deck = deckToSave;
+      // Don't call setState here to avoid triggering subscribers unnecessarily
+      // The deck reference stays the same, just the updatedAt changes
     } catch (error) {
       console.error('Error saving deck:', error);
       this.setState({

@@ -23,7 +23,8 @@ export function EditorLayout({ deckId }: EditorLayoutProps) {
 
   useEffect(() => {
     editor.loadDeck(deckId);
-  }, [deckId, editor]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deckId]); // editor is a stable singleton
 
   // Auto-save every 30 seconds (if enabled)
   useEffect(() => {
@@ -31,21 +32,14 @@ export function EditorLayout({ deckId }: EditorLayoutProps) {
       return;
     }
 
-    // Save immediately on mount/change if deck exists
-    const saveImmediately = () => {
-      if (state.deck) {
-        editor.saveDeck();
-      }
-    };
-
-    // Save immediately, then set up interval
-    saveImmediately();
+    // Only set up interval, don't save immediately (saves are triggered by state changes via StatusBar)
     const interval = setInterval(() => {
       editor.saveDeck();
     }, 30000); // 30 seconds
 
     return () => clearInterval(interval);
-  }, [state.deck, state.autosaveEnabled, editor]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.autosaveEnabled]); // Only re-run if autosave is toggled, not on every deck change
 
   // Enable keyboard shortcuts
   useKeyboardShortcuts();

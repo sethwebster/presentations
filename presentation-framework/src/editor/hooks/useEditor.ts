@@ -16,7 +16,8 @@ export function useEditor(): EditorState {
       setState(newState);
     });
     return unsubscribe;
-  }, [editor]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // editor is a stable singleton, no need to include in deps
 
   return state;
 }
