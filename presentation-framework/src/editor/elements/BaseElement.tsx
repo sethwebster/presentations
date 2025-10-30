@@ -104,9 +104,10 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
     const canvasPos = screenToCanvas(e.clientX, e.clientY, zoom, pan);
     
     setIsDragging(true);
+    // Store the initial mouse position in canvas coordinates
     setDragStart({
-      x: canvasPos.x - (bounds.x || 0),
-      y: canvasPos.y - (bounds.y || 0),
+      x: canvasPos.x,
+      y: canvasPos.y,
     });
   };
 
@@ -129,8 +130,9 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
       // Convert screen coordinates to canvas coordinates
       const canvasPos = screenToCanvas(e.clientX, e.clientY, zoom, pan);
       
-      const deltaX = canvasPos.x - dragStart.x - (bounds.x || 0);
-      const deltaY = canvasPos.y - dragStart.y - (bounds.y || 0);
+      // Calculate delta from initial mouse position
+      const deltaX = canvasPos.x - dragStart.x;
+      const deltaY = canvasPos.y - dragStart.y;
       
       // Get current state to check all selected elements
       const currentState = editor.getState();
@@ -143,6 +145,14 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
           ...(currentSlide.layers?.flatMap(l => l.elements) || []),
         ];
         
+        // Get the initial bounds of the primary element being dragged
+        const primaryInitialBounds = selectedElementsInitialBounds.get(element.id);
+        if (!primaryInitialBounds) return;
+        
+        // Calculate the offset of the mouse from the element's initial position
+        const initialMouseOffsetX = dragStart.x - primaryInitialBounds.x;
+        const initialMouseOffsetY = dragStart.y - primaryInitialBounds.y;
+        
         // Update all selected elements
         currentState.selectedElementIds.forEach((id) => {
           const el = allElements.find(e => e.id === id);
@@ -151,8 +161,9 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
           const initialBounds = selectedElementsInitialBounds.get(id);
           if (!initialBounds) return;
           
-          const newX = Math.max(0, Math.min(CANVAS_WIDTH - initialBounds.width, initialBounds.x + deltaX));
-          const newY = Math.max(0, Math.min(CANVAS_HEIGHT - initialBounds.height, initialBounds.y + deltaY));
+          // Calculate new position: current mouse position minus the initial offset
+          const newX = Math.max(0, Math.min(CANVAS_WIDTH - initialBounds.width, canvasPos.x - initialMouseOffsetX));
+          const newY = Math.max(0, Math.min(CANVAS_HEIGHT - initialBounds.height, canvasPos.y - initialMouseOffsetY));
           
           const newBounds = {
             ...el.bounds,
