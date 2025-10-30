@@ -15,6 +15,9 @@ import type {
   LayerDefinition,
   ElementDefinition,
   TextElementDefinition,
+  RichTextElementDefinition,
+  CodeBlockElementDefinition,
+  TableElementDefinition,
   MediaElementDefinition,
   ShapeElementDefinition,
   ChartElementDefinition,
@@ -73,6 +76,114 @@ function TextContent({ value }: { value: string }) {
   return null;
 }
 
+export function RichTextElement(definition: RichTextElementDefinition) {
+  const { content, format, listStyle, linkStyle } = definition;
+  return (
+    <ElementNode element={definition}>
+      <RichTextContent
+        value={content}
+        format={format}
+        listStyle={listStyle}
+        linkStyle={linkStyle}
+      />
+    </ElementNode>
+  );
+}
+
+function RichTextContent({
+  value,
+  format,
+  listStyle,
+  linkStyle,
+}: {
+  value: string;
+  format?: RichTextElementDefinition['format'];
+  listStyle?: RichTextElementDefinition['listStyle'];
+  linkStyle?: RichTextElementDefinition['linkStyle'];
+}) {
+  return null;
+}
+
+export function CodeBlockElement(definition: CodeBlockElementDefinition) {
+  const { code, language, theme, showLineNumbers, highlightLines, startLineNumber, showCopyButton, fileName } = definition;
+  return (
+    <ElementNode element={definition}>
+      <CodeBlockContent
+        code={code}
+        language={language}
+        theme={theme}
+        showLineNumbers={showLineNumbers}
+        highlightLines={highlightLines}
+        startLineNumber={startLineNumber}
+        showCopyButton={showCopyButton}
+        fileName={fileName}
+      />
+    </ElementNode>
+  );
+}
+
+function CodeBlockContent({
+  code,
+  language,
+  theme,
+  showLineNumbers,
+  highlightLines,
+  startLineNumber,
+  showCopyButton,
+  fileName,
+}: {
+  code: string;
+  language?: string;
+  theme?: CodeBlockElementDefinition['theme'];
+  showLineNumbers?: boolean;
+  highlightLines?: number[];
+  startLineNumber?: number;
+  showCopyButton?: boolean;
+  fileName?: string;
+}) {
+  return null;
+}
+
+export function TableElement(definition: TableElementDefinition) {
+  const { headers, rows, columnAlignments, showBorders, zebraStripe, headerStyle, cellPadding, borderColor } = definition;
+  return (
+    <ElementNode element={definition}>
+      <TableContent
+        headers={headers}
+        rows={rows}
+        columnAlignments={columnAlignments}
+        showBorders={showBorders}
+        zebraStripe={zebraStripe}
+        headerStyle={headerStyle}
+        cellPadding={cellPadding}
+        borderColor={borderColor}
+      />
+    </ElementNode>
+  );
+}
+
+function TableContent({
+  headers,
+  rows,
+  columnAlignments,
+  showBorders,
+  zebraStripe,
+  headerStyle,
+  cellPadding,
+  borderColor,
+}: {
+  headers?: string[];
+  rows: Array<Array<string | number>>;
+  columnAlignments?: Array<'left' | 'center' | 'right'>;
+  showBorders?: boolean;
+  zebraStripe?: boolean;
+  headerStyle?: TableElementDefinition['headerStyle'];
+  cellPadding?: string | number;
+  borderColor?: string;
+}) {
+  return null;
+}
+
 export function MediaElement(definition: MediaElementDefinition) {
   const { src, mediaType, playback } = definition;
   return (
@@ -114,21 +225,43 @@ function ShapeData({
 }
 
 export function ChartElement(definition: ChartElementDefinition) {
-  const { chartType, dataRef, config } = definition;
+  const { chartType, data, dataKeys, colors, showLegend, showGrid, showTooltip, axisLabels, config } = definition;
   return (
     <ElementNode element={definition}>
-      <ChartSpec chartType={chartType} dataRef={dataRef} config={config} />
+      <ChartSpec
+        chartType={chartType}
+        data={data}
+        dataKeys={dataKeys}
+        colors={colors}
+        showLegend={showLegend}
+        showGrid={showGrid}
+        showTooltip={showTooltip}
+        axisLabels={axisLabels}
+        config={config}
+      />
     </ElementNode>
   );
 }
 
 function ChartSpec({
   chartType,
-  dataRef,
+  data,
+  dataKeys,
+  colors,
+  showLegend,
+  showGrid,
+  showTooltip,
+  axisLabels,
   config,
 }: {
-  chartType: string;
-  dataRef: string;
+  chartType: ChartElementDefinition['chartType'];
+  data: Array<Record<string, string | number>>;
+  dataKeys?: ChartElementDefinition['dataKeys'];
+  colors?: string[];
+  showLegend?: boolean;
+  showGrid?: boolean;
+  showTooltip?: boolean;
+  axisLabels?: ChartElementDefinition['axisLabels'];
   config?: Record<string, unknown>;
 }) {
   return null;

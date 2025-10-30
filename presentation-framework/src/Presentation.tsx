@@ -1,6 +1,7 @@
 "use client";
 
 import './styles/Presentation.css';
+import './styles/RscAnimations.css';
 import * as React from 'react';
 import {
   useState,
@@ -34,6 +35,7 @@ import { ReactionButtons } from './components/ReactionButtons';
 import { WelcomeToast } from './components/WelcomeToast';
 import { AutopilotHUD } from './autopilot/ui/AutopilotHUD';
 import { useAutopilot } from './autopilot/useAutopilot';
+import { ChartHydrator } from './components/ChartHydrator';
 import type { SlideData, PresentationConfig } from './types/presentation';
 import type { TimelineDefinition, TimelineSegmentDefinition, AnimationDefinition } from './rsc/types';
 
@@ -232,7 +234,13 @@ function useBuildPlayback({
     if (!container) {
       return;
     }
-    applyBuildState(container, buildSegmentsRef.current, buildIndex, pendingAnimationRef);
+
+    // Use requestAnimationFrame to batch DOM updates
+    const frame = requestAnimationFrame(() => {
+      applyBuildState(container, buildSegmentsRef.current, buildIndex, pendingAnimationRef);
+    });
+
+    return () => cancelAnimationFrame(frame);
   }, [buildIndex, buildSegments, slideId, slideRef, buildSegmentsRef, pendingAnimationRef]);
 }
 
@@ -361,39 +369,46 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
 
   const advance = useCallback(() => {
     const total = buildSegmentsRef.current.length;
-    let navigated = false;
+
     setBuildIndex((current) => {
       if (current < total) {
         pendingAnimationRef.current = current;
         return current + 1;
       }
-      navigated = true;
-      return current;
-    });
-    if (navigated) {
+
+      // At the end of builds, advance to next slide
       pendingAnimationRef.current = null;
       pendingCompleteRef.current = false;
-      setBuildIndex(0);
-      nextSlide();
-    }
+
+      // Use queueMicrotask to avoid double state update
+      queueMicrotask(() => {
+        setBuildIndex(0);
+        nextSlide();
+      });
+
+      return current;
+    });
   }, [nextSlide]);
 
   const retreat = useCallback(() => {
-    let navigated = false;
     setBuildIndex((current) => {
       if (current > 0) {
         pendingAnimationRef.current = null;
         return current - 1;
       }
-      navigated = true;
-      return current;
-    });
-    if (navigated) {
+
+      // At the beginning of builds, go to previous slide
       pendingAnimationRef.current = null;
       pendingCompleteRef.current = true;
-      setBuildIndex(0);
-      prevSlide();
-    }
+
+      // Use queueMicrotask to avoid double state update
+      queueMicrotask(() => {
+        setBuildIndex(0);
+        prevSlide();
+      });
+
+      return current;
+    });
   }, [prevSlide]);
 
   // Realtime features
@@ -422,13 +437,27 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
 
   // Only enable keyboard navigation for non-viewers
   useKeyboardNavigation(
-    isViewer ? () => {} : advance,
-    isViewer ? () => {} : retreat,
-    isViewer ? () => {} : goToSlideWithReset,
-    slides.length
+    advance,
+    retreat,
+    goToSlideWithReset,
+    slides.length,
+    !isViewer
   );
   const { openPresenterView, presenterWindowOpen } = useWindowSync(currentSlide, goToSlideWithReset);
   const { isIdle, hasMouseMoved } = useMouseIdle(500);
+
+  // Calculate scale to fit 1280x720 canvas in viewport
+  const [slideScale, setSlideScale] = useState(1);
+  useEffect(() => {
+    const updateScale = () => {
+      const scaleX = window.innerWidth / 1280;
+      const scaleY = window.innerHeight / 720;
+      setSlideScale(Math.min(scaleX, scaleY));
+    };
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    return () => window.removeEventListener('resize', updateScale);
+  }, []);
 
   if (isPresenterMode) {
     return (
@@ -446,6 +475,12 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
   const defaultSlideNumberRenderer = (): React.ReactElement => (
     <div className="slide-number">
       {currentSlide + 1} / {slides.length}
+      {totalBuilds > 0 && (
+        <div style={{ fontSize: '12px', opacity: 0.7, marginTop: '4px' }}>
+          Build: {buildIndex} / {totalBuilds}
+          {buildIndex >= totalBuilds && ' ✓'}
+        </div>
+      )}
     </div>
   );
 
@@ -509,6 +544,9 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
     <div className="app">
       <div className="progress-bar" style={{ width: `${progress}%` }} />
 
+      {/* Chart hydrator - renders Recharts client-side */}
+      <ChartHydrator slideId={currentSlideData.id} />
+
       {/* Welcome toast - subscribes to auth events */}
       <WelcomeToast isPresenterMode={isPresenterMode} />
 
@@ -520,6 +558,10 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
             ref={slideRef}
             data-build-count={totalBuilds}
             data-build-index={buildIndex}
+            style={{
+              transform: `scale(${slideScale})`,
+              transformOrigin: 'center center',
+            }}
           >
             {currentSlideData.content}
             {config.brandLogo && !currentSlideData.hideBrandLogo && (
@@ -726,6 +768,13 @@ function applyBuildState(
     return;
   }
 
+  console.log('🎬 applyBuildState:', {
+    buildIndex,
+    totalSegments: segments.length,
+    pendingIndex: pendingRef.current,
+    segmentIds: segments.map(s => s.id)
+  });
+
   const assignments = new Map<string, AnimationDefinition>();
   segments.forEach((segment) => {
     segment.targets.forEach((targetId) => {
@@ -735,6 +784,8 @@ function applyBuildState(
     });
   });
 
+  console.log('🎯 Target elements:', Array.from(assignments.keys()));
+
   resetElements(container, assignments);
 
   for (let index = 0; index < segments.length; index += 1) {
@@ -742,6 +793,7 @@ function applyBuildState(
       continue;
     }
     const animate = pendingRef.current === index;
+    console.log(`▶️ Playing segment ${index}:`, segments[index].id, 'animate:', animate);
     playSegment(container, segments[index], animate);
   }
 
@@ -768,12 +820,18 @@ interface AnimationPhases {
 function resetElements(container: HTMLElement, assignments: Map<string, AnimationDefinition>) {
   assignments.forEach((animation, targetId) => {
     const elements = findElements(container, targetId);
+    console.log(`🔄 Priming ${elements.length} elements for "${targetId}"`);
     elements.forEach((element) => primeElement(element, animation));
   });
 }
 
 function primeElement(element: HTMLElement, animation: AnimationDefinition) {
   const dataset = element.dataset as BuildDataset;
+
+  // Remove any CSS animation classes that were applied at render time
+  element.classList.remove('rsc-animate');
+  element.style.animation = 'none';
+
   if (dataset.originalOpacity === undefined) {
     dataset.originalOpacity = element.style.opacity ?? '';
   }
@@ -792,6 +850,15 @@ function primeElement(element: HTMLElement, animation: AnimationDefinition) {
   dataset.targetOpacity = finalOpacity;
   dataset.targetTransform = finalTransform;
   dataset.buildState = 'before';
+
+  console.log(`🎨 Priming element:`, {
+    id: element.dataset.elementId,
+    initialOpacity,
+    initialTransform,
+    finalOpacity,
+    finalTransform,
+    animationType: animation.type
+  });
 
   element.style.transition = 'none';
   element.style.willChange = 'opacity, transform';
@@ -1001,7 +1068,11 @@ function getDirectionalDefaults(type: string): { axis: 'x' | 'y'; sign: number }
 }
 
 function findElements(container: HTMLElement, targetId: string): HTMLElement[] {
-  return Array.from(container.querySelectorAll<HTMLElement>(`[data-element-id="${targetId}"]`));
+  const elements = Array.from(container.querySelectorAll<HTMLElement>(`[data-element-id="${targetId}"]`));
+  if (elements.length === 0) {
+    console.warn(`⚠️ No elements found for targetId: "${targetId}"`);
+  }
+  return elements;
 }
 
 function appendTransform(base: string | undefined, addition: string): string {

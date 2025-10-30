@@ -1,24 +1,53 @@
 import { describe, it, expect } from 'vitest';
-import { render } from '@testing-library/react';
-import { deckDefinitionToPresentation } from '@/rsc/bridge';
-import { demoDeck } from './fixtures';
-
-const ASSETS_BASE = '/presentations/demo-rsc-deck-assets';
+import { render, screen, cleanup } from '@testing-library/react';
+import React from 'react';
+import { deckDefinitionToPresentation } from '../bridge';
+import type { DeckDefinition } from '../types';
 
 describe('deckDefinitionToPresentation', () => {
-  it('converts deck structures into Presentation slides', () => {
-    const { slides, config } = deckDefinitionToPresentation(demoDeck, ASSETS_BASE);
+  afterEach(() => {
+    cleanup();
+  });
 
-    expect(slides).toHaveLength(demoDeck.slides.length);
-    expect(config).toBeDefined();
+  it('renders slides that provide elements instead of layers', () => {
+    const deck: DeckDefinition = {
+      meta: {
+        id: 'sample',
+        title: 'Sample Deck',
+      },
+      slides: [
+        {
+          id: 'first',
+          layout: 'custom-layout',
+          elements: [
+            {
+              id: 'headline',
+              type: 'text',
+              content: 'Hello JSConf',
+              style: {
+                color: '#fff',
+                fontSize: '48px',
+              },
+              bounds: {
+                x: 0,
+                y: 0,
+                width: 800,
+                height: 400,
+              },
+            },
+          ],
+        },
+      ],
+      theme: {
+        customCSS: '.custom-layout { background: black; }',
+      },
+    };
 
-    const introSlide = slides[0];
-    const { container } = render(<>{introSlide.content}</>);
+    const presentation = deckDefinitionToPresentation(deck, '/assets');
+    expect(presentation.slides).toHaveLength(1);
+    expect(presentation.config.customStyles).toContain('.custom-layout');
 
-    expect(container.textContent).toContain('Ignite memorable presentations with Lume');
-
-    const img = container.querySelector('img');
-    expect(img).not.toBeNull();
-    expect(img?.getAttribute('src')).toContain('demo-rsc-deck-assets/mark.svg');
+    render(<>{presentation.slides[0].content}</>);
+    expect(screen.getByText('Hello JSConf')).toBeInTheDocument();
   });
 });

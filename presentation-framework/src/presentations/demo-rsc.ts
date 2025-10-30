@@ -3,42 +3,43 @@ import type { DeckDefinition, SlideDefinition, AnimationDefinition, TimelineSegm
 import { animations } from '@/rsc/components/library/animations';
 import {
   textElement,
+  richTextElement,
+  codeBlockElement,
+  tableElement,
+  barChart,
+  lineChart,
+  pieChart,
   shapeElement,
   mediaElement,
   stackGroup,
   clusterGroup,
   gridGroup,
-  groupElement,
 } from '@/rsc/components/library/presets';
+import { titleLayout, twoColumnLayout, gridLayout } from '@/rsc/layouts';
 
 const assetsBase = '/presentations/demo-rsc-deck-assets';
-const authoredAt = '2025-01-01T00:00:00.000Z';
+const authoredAt = '2025-01-15T00:00:00.000Z';
 
 const slides: SlideDefinition[] = [
-  heroSlide(),
-  pillarsSlide(),
-  realtimeSlide(),
-  kitchenSlide(),
-  closingSlide(),
+  titleSlide(),
+  richTextSlide(),
+  codeBlockSlide(),
+  chartsSlide(),
+  tablesSlide(),
+  allTogetherSlide(),
 ];
 
 export const deckDefinition: DeckDefinition = {
   meta: {
     id: 'demo-rsc-deck',
-    title: 'Lume Kitchen Sink',
-    description: 'A React Server Component showcase that leans on the Lume design system primitives.',
-    authors: [{ name: 'Lume Design System' }],
-    tags: ['demo', 'rsc', 'lume'],
+    title: 'RSC Component Showcase',
+    description: 'A comprehensive kitchen sink demonstration of RichText, CodeBlock, Charts, and Tables',
+    authors: [{ name: 'Lume Framework' }],
+    tags: ['demo', 'rsc', 'components', 'kitchen-sink'],
     createdAt: authoredAt,
     updatedAt: authoredAt,
-    durationMinutes: 8,
-    coverImage: `${assetsBase}/hero.svg`,
+    durationMinutes: 10,
   },
-  assets: [
-    { id: 'hero-art', path: `${assetsBase}/hero.svg`, type: 'image' },
-    { id: 'brand-mark', path: `${assetsBase}/mark.svg`, type: 'image' },
-    { id: 'growth-data', path: `${assetsBase}/growth.json`, type: 'data' },
-  ],
   theme: {
     palette: {
       primary: '#16C2C7',
@@ -54,94 +55,62 @@ export const deckDefinition: DeckDefinition = {
         --lume-ember: #FF6A3D;
         --lume-midnight: #050A18;
         --lume-mist: #ECECEC;
-        --lume-font: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        --lume-font: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
       }
 
       .rsc-slide {
         position: relative;
-        padding: 112px 120px 140px;
         background:
-          radial-gradient(120% 160% at 0% 0%, rgba(22, 194, 199, 0.18), transparent),
-          radial-gradient(110% 140% at 100% 0%, rgba(200, 75, 210, 0.14), transparent),
-          #050a18;
+          radial-gradient(140% 180% at 10% 0%, rgba(22, 194, 199, 0.22), transparent 60%),
+          radial-gradient(130% 160% at 90% 100%, rgba(200, 75, 210, 0.18), transparent 65%),
+          linear-gradient(165deg, #030712 0%, #0a1428 50%, #050a18 100%);
         color: var(--lume-mist);
         overflow: hidden;
         font-family: var(--lume-font);
       }
 
-      .rsc-slide::before {
-        content: '';
-        position: absolute;
-        inset: -30% -20%;
-        background: radial-gradient(70% 70% at 50% 30%, rgba(22, 194, 199, 0.12), transparent);
-        pointer-events: none;
-        mix-blend-mode: screen;
-      }
-
-      .rsc-slide[data-slide-id='pillars'] {
-        background:
-          radial-gradient(110% 120% at 0% 0%, rgba(22, 194, 199, 0.16), transparent),
-          linear-gradient(155deg, #0a1429 0%, #0e1b36 55%, #0a1429 100%);
-      }
-
-      .rsc-slide[data-slide-id='realtime'] {
-        background:
-          radial-gradient(110% 140% at 100% 0%, rgba(255, 106, 61, 0.16), transparent),
-          linear-gradient(160deg, #071226 0%, #0a1a32 60%, #061225 100%);
-      }
-
-      .rsc-slide[data-slide-id='kitchen'] {
-        background:
-          radial-gradient(140% 110% at 50% 0%, rgba(200, 75, 210, 0.18), transparent),
-          linear-gradient(150deg, #081224 0%, #0a1730 60%, #05101f 100%);
-      }
-
-      .rsc-slide[data-slide-id='closing'] {
-        background:
-          radial-gradient(120% 140% at 50% 0%, rgba(22, 194, 199, 0.16), transparent),
-          linear-gradient(165deg, #061225 0%, #0a1a32 55%, #061225 100%);
-      }
-
       .rsc-text-element {
-        letter-spacing: -0.01em;
+        letter-spacing: -0.02em;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
       }
 
-      .rsc-text-element[data-element-id$='-eyebrow'] {
-        letter-spacing: 0.32em;
+      .rsc-richtext-element {
+        line-height: 1.7;
       }
 
-      .rsc-group-element {
-        backdrop-filter: blur(16px);
-        border-radius: 24px;
+      .rsc-richtext-element a {
+        color: var(--lume-primary);
+        text-decoration: none;
+        border-bottom: 2px solid rgba(22, 194, 199, 0.4);
+        transition: all 0.2s ease;
       }
 
-      .rsc-group-element[data-element-id='welcome-metric'],
-      .rsc-group-element[data-element-id='pillar-components'],
-      .rsc-group-element[data-element-id='pillar-streaming'],
-      .rsc-group-element[data-element-id='pillar-tokens'],
-      .rsc-group-element[data-element-id='realtime-panel'],
-      .rsc-group-element[data-element-id='kitchen-multiverse'],
-      .rsc-group-element[data-element-id='kitchen-cards'],
-      .rsc-group-element[data-element-id='closing-cta'] {
-        background: rgba(12, 20, 44, 0.76);
-        border: 1px solid rgba(236, 236, 236, 0.12);
+      .rsc-richtext-element a:hover {
+        color: #0BFFF5;
+        border-bottom-color: #0BFFF5;
       }
 
-      .rsc-group-element[data-element-id='welcome-cta'] {
-        color: #0b1022;
+      .rsc-richtext-element ul {
+        list-style: none;
+        padding-left: 0;
       }
 
-      .rsc-chart-element::after {
-        content: 'Chart placeholder — connect your viz runtime';
-        position: absolute;
-        inset: 16px;
-        border-radius: 18px;
-        border: 1px dashed rgba(236, 236, 236, 0.24);
-        display: grid;
-        place-items: center;
-        font-size: 12px;
-        color: rgba(236, 236, 236, 0.55);
-        letter-spacing: 0.08em;
+      .rsc-richtext-element ul li {
+        margin: 10px 0;
+      }
+
+      .rsc-richtext-element ul li::before {
+        content: '→';
+        color: var(--lume-primary);
+        margin-right: 14px;
+        font-weight: 600;
+        font-size: 18px;
+      }
+
+      /* Luxurious glass effect */
+      .rsc-shape-element[data-element-id$='-bg'] {
+        backdrop-filter: blur(20px) saturate(180%);
       }
     `,
   },
@@ -155,577 +124,625 @@ export const presentationConfig = presentationModule.presentationConfig;
 
 export default presentationModule;
 
-function heroSlide(): SlideDefinition {
+function titleSlide(): SlideDefinition {
+  const layout = titleLayout();
+
   return {
-    id: 'welcome',
-    title: 'Ignite with Lume',
+    id: 'title',
+    title: 'RSC Component Showcase',
     layout: 'hero',
     layers: [
       {
-        id: 'welcome-layer',
+        id: 'title-layer',
         order: 0,
         elements: [
           shapeElement({
-            id: 'welcome-aurora',
-            bounds: { x: -220, y: -180, width: 640, height: 640 },
+            id: 'title-glow-1',
+            bounds: { x: -150, y: -100, width: 500, height: 500 },
             variant: 'glow',
-            animation: animations.zoomIn('welcome-aurora-zoom', { duration: 900, easing: 'ease-in-out' }),
           }),
           shapeElement({
-            id: 'welcome-ribbon',
-            bounds: { x: 680, y: -160, width: 620, height: 620 },
+            id: 'title-glow-2',
+            bounds: { x: 800, y: -50, width: 500, height: 500 },
             variant: 'accent',
-            style: { opacity: 0.65 },
-            animation: animations.fadeIn('welcome-ribbon-fade', { duration: 820, delay: 120 }),
+            style: { opacity: 0.4 },
           }),
           textElement({
-            id: 'welcome-eyebrow',
-            content: 'LIVE RSC PAYLOAD',
+            id: 'title-eyebrow',
+            content: 'KITCHEN SINK DEMO',
             variant: 'eyebrow',
-            bounds: { x: 120, y: 120, width: 320, height: 28 },
-            metadata: { viewTransitionName: 'deck-eyebrow' },
-            animation: animations.enterLeft('welcome-eyebrow-enter', { duration: 360 }),
+            bounds: { x: layout.title.bounds.x, y: layout.title.bounds.y - 40, width: 400, height: 30 },
+            animation: animations.enterLeft('title-eyebrow-enter', { duration: 400 }),
           }),
           textElement({
-            id: 'welcome-title',
-            content: 'Ignite memorable presentations with Lume',
+            id: 'title-heading',
+            content: 'RSC Component Library',
             variant: 'title',
-            bounds: { x: 120, y: 168, width: 880, height: 148 },
-            metadata: { viewTransitionName: 'deck-headline' },
-            animation: animations.enterLeft('welcome-title-enter', { delay: 60, duration: 620 }),
+            bounds: layout.title.bounds,
+            animation: animations.enterLeft('title-heading-enter', { delay: 100, duration: 600 }),
           }),
           textElement({
-            id: 'welcome-subtitle',
-            content: 'Stream canonical RSC payloads, hydrate only what moves, and author beautiful decks in minutes.',
+            id: 'title-subtitle',
+            content: 'RichText, CodeBlocks, Charts, and Tables with full animation support',
             variant: 'subtitle',
-            bounds: { x: 120, y: 300, width: 640, height: 96 },
-            animation: animations.enterLeft('welcome-subtitle-enter', { delay: 140, duration: 520 }),
+            bounds: layout.subtitle.bounds,
+            animation: animations.enterLeft('title-subtitle-enter', { delay: 200, duration: 500 }),
           }),
-          stackGroup({
-            id: 'welcome-metric',
-            bounds: { x: 820, y: 300, width: 260, height: 160 },
-            gap: 12,
-            padding: '32px',
-            backgroundVariant: 'glass',
-            children: [
-              textElement({
-                id: 'welcome-metric-value',
-                content: '3×',
-                variant: 'metric',
-                bounds: { x: 820, y: 312, width: 120, height: 72 },
-              }),
-              textElement({
-                id: 'welcome-metric-caption',
-                content: 'Faster iteration with canonical components',
-                variant: 'caption',
-                bounds: { x: 820, y: 384, width: 220, height: 60 },
-              }),
-            ],
-            animation: animations.zoomIn('welcome-metric-pop', { delay: 240, duration: 520 }),
-          }),
-          clusterGroup({
-            id: 'welcome-cta',
-            bounds: { x: 120, y: 420, width: 360, height: 72 },
-            backgroundVariant: 'pill',
-            justify: 'center',
-            align: 'center',
-            padding: '0 24px',
-            children: [
-              textElement({
-                id: 'welcome-cta-text',
-                content: 'Launch collaborative authoring →',
-                variant: 'body',
-                bounds: { x: 120, y: 444, width: 320, height: 36 },
-                style: { color: '#0B1022', textAlign: 'center', fontWeight: 600, letterSpacing: '0.02em' },
-              }),
-            ],
-            animation: animations.enterUp('welcome-cta-rise', { delay: 300, duration: 560 }),
-          }),
-          mediaElement({
-            id: 'welcome-brand',
-            bounds: { x: 980, y: 110, width: 120, height: 120 },
-            src: 'mark.svg',
-            animation: animations.enterRight('welcome-brand-slide', { delay: 200, duration: 520 }),
+          textElement({
+            id: 'title-body',
+            content: '4 New Components • 6 Chart Types • 5 Code Themes',
+            variant: 'body',
+            bounds: layout.body.bounds,
+            style: { fontSize: 22, opacity: 0.85 },
+            animation: animations.enterUp('title-body-enter', { delay: 300, duration: 500 }),
           }),
         ],
       },
     ],
-    notes: {
-      presenter: 'Highlight that every element is serialized via the canonical schema and streamed into the runtime.',
-    },
     timeline: {
       tracks: [
         {
-          id: 'welcome-builds',
+          id: 'title-builds',
           trackType: 'animation',
           segments: [
-            segment('welcome-eyebrow-build', ['welcome-eyebrow'], animations.enterLeft('welcome-eyebrow-enter', { duration: 360 })),
-            segment('welcome-title-build', ['welcome-title'], animations.enterLeft('welcome-title-enter', { delay: 60, duration: 620 }), 120),
-            segment('welcome-subtitle-build', ['welcome-subtitle'], animations.enterLeft('welcome-subtitle-enter', { delay: 140, duration: 520 }), 220),
-            segment('welcome-metric-build', ['welcome-metric'], animations.zoomIn('welcome-metric-pop', { delay: 240, duration: 520 }), 320),
-            segment('welcome-cta-build', ['welcome-cta'], animations.enterUp('welcome-cta-rise', { delay: 300, duration: 560 }), 380),
-            segment('welcome-brand-build', ['welcome-brand'], animations.enterRight('welcome-brand-slide', { delay: 200, duration: 520 }), 440),
+            seg('title-eyebrow-build', ['title-eyebrow'], animations.enterLeft('title-eyebrow-enter', { duration: 400 })),
+            seg('title-heading-build', ['title-heading'], animations.enterLeft('title-heading-enter', { delay: 100, duration: 600 }), 100),
+            seg('title-subtitle-build', ['title-subtitle'], animations.enterLeft('title-subtitle-enter', { delay: 200, duration: 500 }), 200),
+            seg('title-body-build', ['title-body'], animations.enterUp('title-body-enter', { delay: 300, duration: 500 }), 300),
           ],
         },
       ],
     },
-    transitions: {
-      in: animations.fadeIn('welcome-in', { duration: 420 }),
-      out: animations.fadeOut('welcome-out', { duration: 320 }),
-      between: animations.magicMove('welcome-move', { duration: 560 }),
-    },
   };
 }
 
-function pillarsSlide(): SlideDefinition {
+function richTextSlide(): SlideDefinition {
+  const layout = twoColumnLayout({ leftWidth: 0.42 });
+
   return {
-    id: 'pillars',
-    title: 'Lume Pillars',
-    layout: 'pillars',
+    id: 'richtext',
+    title: 'RichText Component',
+    layout: 'content',
     layers: [
       {
-        id: 'pillars-layer',
+        id: 'richtext-layer',
         order: 0,
         elements: [
           shapeElement({
-            id: 'pillars-aurora',
-            bounds: { x: -140, y: -120, width: 540, height: 540 },
+            id: 'richtext-bg',
+            bounds: { x: -100, y: -50, width: 400, height: 400 },
             variant: 'glow',
-            animation: animations.fadeIn('pillars-aurora', { duration: 680 }),
           }),
           textElement({
-            id: 'pillars-eyebrow',
-            content: 'Platform pillars',
-            variant: 'eyebrow',
-            bounds: { x: 120, y: 120, width: 320, height: 28 },
-            animation: animations.enterLeft('pillars-eyebrow-enter', { duration: 340 }),
-          }),
-          textElement({
-            id: 'pillars-title',
-            content: 'Three fundamentals keep teams in flow',
+            id: 'richtext-title',
+            content: 'RichText Elements',
             variant: 'title',
-            bounds: { x: 120, y: 160, width: 720, height: 120 },
-            animation: animations.enterLeft('pillars-title-enter', { delay: 80, duration: 560 }),
+            bounds: { x: layout.header.bounds.x, y: layout.header.bounds.y, width: layout.header.bounds.width, height: 70 },
+            animation: animations.enterLeft('richtext-title-enter', { duration: 500 }),
           }),
-          stackGroup({
-            id: 'pillar-components',
-            bounds: { x: 120, y: 300, width: 360, height: 240 },
-            backgroundVariant: 'outline-card',
-            padding: '32px',
-            gap: 16,
-            children: [
-              textElement({
-                id: 'pillar-components-heading',
-                content: '✨ Canonical components',
-                variant: 'subtitle',
-                bounds: { x: 132, y: 312, width: 320, height: 40 },
-              }),
-              textElement({
-                id: 'pillar-components-body',
-                content: 'Deck, Slide, and Layer primitives with typed element schemas, animation metadata, and defaults.',
-                variant: 'body',
-                bounds: { x: 132, y: 360, width: 320, height: 120 },
-              }),
-            ],
-            animation: animations.enterUp('pillar-components-enter', { delay: 180 }),
+          textElement({
+            id: 'richtext-subtitle',
+            content: 'HTML and Markdown support with custom styling',
+            variant: 'subtitle',
+            bounds: { x: layout.header.bounds.x, y: layout.header.bounds.y + 80, width: layout.header.bounds.width, height: 50 },
+            animation: animations.enterLeft('richtext-subtitle-enter', { delay: 100, duration: 500 }),
           }),
-          stackGroup({
-            id: 'pillar-streaming',
-            bounds: { x: 500, y: 300, width: 360, height: 240 },
-            backgroundVariant: 'outline-card',
-            padding: '32px',
-            gap: 16,
-            children: [
-              textElement({
-                id: 'pillar-streaming-heading',
-                content: '⚡️ Streaming payloads',
-                variant: 'subtitle',
-                bounds: { x: 512, y: 312, width: 320, height: 40 },
-              }),
-              textElement({
-                id: 'pillar-streaming-body',
-                content: 'Render instantly over the wire, hydrate selectively, and export once for every playback surface.',
-                variant: 'body',
-                bounds: { x: 512, y: 360, width: 320, height: 120 },
-              }),
-            ],
-            animation: animations.enterUp('pillar-streaming-enter', { delay: 220 }),
+          shapeElement({
+            id: 'richtext-demo-bg',
+            bounds: layout.left.bounds,
+            variant: 'glass',
           }),
-          stackGroup({
-            id: 'pillar-tokens',
-            bounds: { x: 880, y: 300, width: 360, height: 240 },
-            backgroundVariant: 'outline-card',
-            padding: '32px',
-            gap: 16,
-            children: [
-              textElement({
-                id: 'pillar-tokens-heading',
-                content: '🧩 Theme-aware tokens',
-                variant: 'subtitle',
-                bounds: { x: 892, y: 312, width: 320, height: 40 },
-              }),
-              textElement({
-                id: 'pillar-tokens-body',
-                content: 'Brand kits and data bindings thread through every layer, enabling reuse without bespoke styling.',
-                variant: 'body',
-                bounds: { x: 892, y: 360, width: 320, height: 120 },
-              }),
-            ],
-            animation: animations.enterUp('pillar-tokens-enter', { delay: 260 }),
+          richTextElement({
+            id: 'richtext-demo',
+            content: `
+              <h3 style="margin: 0 0 16px 0; color: #16C2C7; font-size: 22px;">Rich Text Features</h3>
+              <p style="font-size: 16px; line-height: 1.7; margin: 12px 0;">RichText elements support <strong>bold</strong>, <em>italic</em>, and <u>underlined</u> text.</p>
+              <ul style="margin: 16px 0; padding-left: 0;">
+                <li style="margin: 8px 0;">Customizable link colors</li>
+                <li style="margin: 8px 0;">List styling with custom markers</li>
+                <li style="margin: 8px 0;">Full HTML support</li>
+                <li style="margin: 8px 0;">Markdown option available</li>
+              </ul>
+              <p style="font-size: 16px; margin-top: 16px;">Visit <a href="https://docs.lume.ai">docs.lume.ai</a></p>
+            `,
+            format: 'html',
+            bounds: { x: layout.left.bounds.x + 30, y: layout.left.bounds.y + 30, width: layout.left.bounds.width - 60, height: layout.left.bounds.height - 60 },
+            animation: animations.enterUp('richtext-demo-enter', { delay: 200, duration: 600 }),
+          }),
+          shapeElement({
+            id: 'richtext-features-bg',
+            bounds: layout.right.bounds,
+            variant: 'outline-card',
+          }),
+          textElement({
+            id: 'richtext-features-heading',
+            content: 'Typography Options',
+            variant: 'subtitle',
+            bounds: { x: layout.right.bounds.x + 30, y: layout.right.bounds.y + 30, width: layout.right.bounds.width - 60, height: 40 },
+            animation: animations.enterRight('richtext-features-enter', { delay: 300, duration: 600 }),
+          }),
+          textElement({
+            id: 'richtext-features-body',
+            content: '• HTML format with dangerouslySetInnerHTML\n• Markdown format (parser ready)\n• Custom link colors & hover states\n• List indentation control\n• Typography variants (title, body, etc.)\n• Full animation support',
+            variant: 'body',
+            bounds: { x: layout.right.bounds.x + 30, y: layout.right.bounds.y + 90, width: layout.right.bounds.width - 60, height: layout.right.bounds.height - 120 },
+            style: { fontSize: 16, lineHeight: 1.7 },
+            animation: animations.enterRight('richtext-features-enter', { delay: 300, duration: 600 }),
           }),
         ],
       },
     ],
-    notes: {
-      presenter: 'Walk through components, streaming payloads, and tokens—each is ready out-of-the-box for authors.',
-    },
     timeline: {
       tracks: [
         {
-          id: 'pillars-builds',
+          id: 'richtext-builds',
           trackType: 'animation',
           segments: [
-            segment('pillars-eyebrow-build', ['pillars-eyebrow'], animations.enterLeft('pillars-eyebrow-enter', { duration: 340 })),
-            segment('pillars-title-build', ['pillars-title'], animations.enterLeft('pillars-title-enter', { delay: 80, duration: 560 }), 80),
-            segment(
-              'pillars-cards-build',
-              ['pillar-components', 'pillar-streaming', 'pillar-tokens'],
-              animations.staggeredReveal('pillars-cascade', { staggerDelay: 160 }),
-              160,
-            ),
+            seg('richtext-title-build', ['richtext-title'], animations.enterLeft('richtext-title-enter', { duration: 500 })),
+            seg('richtext-subtitle-build', ['richtext-subtitle'], animations.enterLeft('richtext-subtitle-enter', { delay: 100, duration: 500 }), 100),
+            seg('richtext-demo-build', ['richtext-demo-bg', 'richtext-demo'], animations.enterUp('richtext-demo-enter', { delay: 200, duration: 600 }), 200),
+            seg('richtext-features-build', ['richtext-features-bg', 'richtext-features-heading', 'richtext-features-body'], animations.enterRight('richtext-features-enter', { delay: 300, duration: 600 }), 400),
           ],
         },
       ],
     },
-    transitions: {
-      in: animations.fadeIn('pillars-in', { duration: 420 }),
-      out: animations.fadeOut('pillars-out', { duration: 320 }),
-      between: animations.magicMove('pillars-between', { duration: 520 }),
-    },
   };
 }
 
-function realtimeSlide(): SlideDefinition {
+function codeBlockSlide(): SlideDefinition {
   return {
-    id: 'realtime',
-    title: 'Realtime Magic',
-    layout: 'realtime',
+    id: 'codeblock',
+    title: 'CodeBlock Component',
+    layout: 'content',
     layers: [
       {
-        id: 'realtime-layer',
+        id: 'codeblock-layer',
         order: 0,
         elements: [
           shapeElement({
-            id: 'realtime-aurora',
-            bounds: { x: 720, y: -120, width: 520, height: 520 },
-            variant: 'glow',
-            animation: animations.fadeIn('realtime-aurora-fade', { duration: 720 }),
+            id: 'codeblock-bg',
+            bounds: { x: 700, y: -100, width: 500, height: 500 },
+            variant: 'accent',
+            style: { opacity: 0.4 },
+            animation: animations.fadeIn('codeblock-bg-fade', { duration: 700 }),
           }),
-          groupElement({
-            id: 'realtime-panel',
-            bounds: { x: 100, y: 140, width: 1080, height: 420 },
-            backgroundVariant: 'glass',
-            animation: animations.zoomIn('realtime-panel-zoom', { duration: 520 }),
-            children: [
-              textElement({
-                id: 'realtime-eyebrow',
-                content: 'Live collaboration',
-                variant: 'eyebrow',
-                bounds: { x: 140, y: 180, width: 220, height: 24 },
-                animation: animations.enterLeft('realtime-eyebrow-enter', { duration: 360 }),
-              }),
-              textElement({
-                id: 'realtime-title',
-                content: 'Realtime sync keeps every screen aligned',
-                variant: 'title',
-                bounds: { x: 140, y: 214, width: 640, height: 96 },
-                metadata: { viewTransitionName: 'deck-subheadline' },
-                animation: animations.enterLeft('realtime-title-enter', { delay: 60, duration: 560 }),
-              }),
-              {
-                id: 'realtime-chart',
-                type: 'chart',
-                chartType: 'area',
-                dataRef: 'growth.json',
-                bounds: { x: 140, y: 310, width: 720, height: 220 },
-                style: {
-                  background: 'rgba(14, 23, 47, 0.55)',
-                  borderRadius: 20,
-                },
-                animation: animations.enterUp('realtime-chart-enter', { delay: 160, duration: 520 }),
-              },
-              stackGroup({
-                id: 'realtime-callout',
-                bounds: { x: 900, y: 260, width: 240, height: 180 },
-                gap: 16,
-                children: [
-                  textElement({
-                    id: 'realtime-callout-body',
-                    content:
-                      'Spectators follow presenters instantly across devices. Deck changes propagate in 118 ms median via Edge KV.',
-                    variant: 'body',
-                    bounds: { x: 900, y: 260, width: 240, height: 120 },
-                  }),
-                  textElement({
-                    id: 'realtime-callout-metric',
-                    content: '118 ms median sync',
-                    variant: 'caption',
-                    bounds: { x: 900, y: 360, width: 240, height: 60 },
-                    style: { letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.72 },
-                  }),
-                ],
-                animation: animations.enterRight('realtime-callout-enter', { delay: 220 }),
-              }),
-            ],
+          textElement({
+            id: 'codeblock-title',
+            content: 'Code Block Elements',
+            variant: 'title',
+            bounds: { x: 100, y: 80, width: 700, height: 80 },
+            animation: animations.enterLeft('codeblock-title-enter', { duration: 500 }),
+          }),
+          textElement({
+            id: 'codeblock-subtitle',
+            content: 'Syntax highlighting with 5 themes, line numbers, and copy buttons',
+            variant: 'subtitle',
+            bounds: { x: 100, y: 160, width: 700, height: 60 },
+            animation: animations.enterLeft('codeblock-subtitle-enter', { delay: 100, duration: 500 }),
+          }),
+          codeBlockElement({
+            id: 'codeblock-demo',
+            code: `import { textElement, richTextElement } from '@/rsc/library/presets';
+import { animations } from '@/rsc/library/animations';
+
+const slide = {
+  id: 'demo',
+  elements: [
+    textElement({
+      id: 'title',
+      content: 'Hello World',
+      variant: 'title',
+      bounds: { x: 100, y: 100, width: 600, height: 80 },
+      animation: animations.fadeIn('title-fade'),
+    }),
+  ],
+};`,
+            language: 'typescript',
+            theme: 'dark',
+            showLineNumbers: true,
+            highlightLines: [6, 7, 8, 9],
+            fileName: 'demo-slide.ts',
+            bounds: { x: 100, y: 240, width: 650, height: 340 },
+            animation: animations.enterUp('codeblock-demo-enter', { delay: 200, duration: 600 }),
+          }),
+          shapeElement({
+            id: 'codeblock-features-bg',
+            bounds: { x: 800, y: 240, width: 380, height: 340 },
+            variant: 'glass',
+          }),
+          textElement({
+            id: 'codeblock-features-heading',
+            content: 'Features',
+            variant: 'subtitle',
+            bounds: { x: 830, y: 270, width: 320, height: 40 },
+            animation: animations.enterRight('codeblock-features-enter', { delay: 400, duration: 600 }),
+          }),
+          textElement({
+            id: 'codeblock-features-list',
+            content: '✓ 5 themes\n✓ Line numbers\n✓ Highlight lines\n✓ File name display\n✓ Copy button\n✓ Custom start line\n✓ Monospace styling',
+            variant: 'body',
+            bounds: { x: 830, y: 320, width: 320, height: 240 },
+            style: { fontSize: 16, lineHeight: 1.8 },
+            animation: animations.enterRight('codeblock-features-enter', { delay: 400, duration: 600 }),
           }),
         ],
       },
     ],
-    notes: {
-      presenter: 'Call out the realtime service—presenters drive, viewers and autopilot follow with sub-120 ms lag.',
-    },
     timeline: {
       tracks: [
         {
-          id: 'realtime-builds',
+          id: 'codeblock-builds',
           trackType: 'animation',
           segments: [
-            segment('realtime-title-build', ['realtime-eyebrow', 'realtime-title'], animations.enterLeft('realtime-title-enter', { delay: 60, duration: 560 })),
-            segment('realtime-chart-build', ['realtime-chart'], animations.enterUp('realtime-chart-enter', { delay: 160, duration: 520 }), 160),
-            segment('realtime-callout-build', ['realtime-callout'], animations.enterRight('realtime-callout-enter', { delay: 220 }), 260),
+            seg('codeblock-title-build', ['codeblock-title'], animations.enterLeft('codeblock-title-enter', { duration: 500 })),
+            seg('codeblock-subtitle-build', ['codeblock-subtitle'], animations.enterLeft('codeblock-subtitle-enter', { delay: 100, duration: 500 }), 100),
+            seg('codeblock-demo-build', ['codeblock-demo'], animations.enterUp('codeblock-demo-enter', { delay: 200, duration: 600 }), 200),
+            seg('codeblock-features-build', ['codeblock-features-bg', 'codeblock-features-heading', 'codeblock-features-list'], animations.enterRight('codeblock-features-enter', { delay: 400, duration: 600 }), 400),
           ],
         },
       ],
     },
-    transitions: {
-      in: animations.fadeIn('realtime-in', { duration: 420 }),
-      out: animations.fadeOut('realtime-out', { duration: 320 }),
-      between: animations.magicMove('realtime-between', { duration: 520 }),
+  };
+}
+
+function chartsSlide(): SlideDefinition {
+  const chartData = [
+    { month: 'Jan', revenue: 4000, users: 2400, growth: 2400 },
+    { month: 'Feb', revenue: 3000, users: 1398, growth: 2210 },
+    { month: 'Mar', revenue: 2000, users: 9800, growth: 2290 },
+    { month: 'Apr', revenue: 2780, users: 3908, growth: 2000 },
+    { month: 'May', revenue: 1890, users: 4800, growth: 2181 },
+    { month: 'Jun', revenue: 2390, users: 3800, growth: 2500 },
+  ];
+
+  const pieData = [
+    { name: 'Charts', value: 30 },
+    { name: 'Tables', value: 25 },
+    { name: 'Code', value: 25 },
+    { name: 'RichText', value: 20 },
+  ];
+
+  return {
+    id: 'charts',
+    title: 'Chart Components',
+    layout: 'content',
+    layers: [
+      {
+        id: 'charts-layer',
+        order: 0,
+        elements: [
+          shapeElement({
+            id: 'charts-bg',
+            bounds: { x: -120, y: 200, width: 450, height: 450 },
+            variant: 'glow',
+          }),
+          textElement({
+            id: 'charts-title',
+            content: 'Data Visualization',
+            variant: 'title',
+            bounds: { x: 100, y: 80, width: 600, height: 80 },
+            animation: animations.enterLeft('charts-title-enter', { duration: 500 }),
+          }),
+          textElement({
+            id: 'charts-subtitle',
+            content: 'Recharts integration with 6 chart types',
+            variant: 'subtitle',
+            bounds: { x: 100, y: 170, width: 600, height: 50 },
+            animation: animations.enterLeft('charts-subtitle-enter', { delay: 100, duration: 500 }),
+          }),
+          barChart({
+            id: 'charts-bar',
+            data: chartData,
+            xKey: 'month',
+            yKeys: ['revenue', 'users'],
+            bounds: { x: 100, y: 250, width: 500, height: 220 },
+            colors: ['#16C2C7', '#C84BD2'],
+            animation: animations.enterUp('charts-bar-enter', { delay: 200, duration: 600 }),
+          }),
+          lineChart({
+            id: 'charts-line',
+            data: chartData,
+            xKey: 'month',
+            yKeys: ['growth'],
+            bounds: { x: 100, y: 490, width: 250, height: 170 },
+            colors: ['#14F195'],
+            animation: animations.enterLeft('charts-line-enter', { delay: 400, duration: 600 }),
+          }),
+          pieChart({
+            id: 'charts-pie',
+            data: pieData,
+            nameKey: 'name',
+            valueKey: 'value',
+            bounds: { x: 370, y: 490, width: 230, height: 170 },
+            animation: animations.zoomIn('charts-pie-enter', { delay: 500, duration: 600 }),
+          }),
+          shapeElement({
+            id: 'charts-info-bg',
+            bounds: { x: 650, y: 250, width: 530, height: 410 },
+            variant: 'outline-card',
+          }),
+          textElement({
+            id: 'charts-info-heading',
+            content: 'Chart Types',
+            variant: 'subtitle',
+            bounds: { x: 680, y: 280, width: 470, height: 40 },
+            animation: animations.enterRight('charts-info-enter', { delay: 300, duration: 600 }),
+          }),
+          textElement({
+            id: 'charts-info-list',
+            content: '1. Bar Charts - Compare categories\n2. Line Charts - Show trends\n3. Area Charts - Cumulative data\n4. Pie Charts - Part-to-whole\n5. Scatter Charts - Correlations\n6. Composed Charts - Multi-type\n\nAll charts support:\n• Multiple data series\n• Custom color palettes\n• Toggle legend/grid/tooltip\n• Responsive sizing',
+            variant: 'body',
+            bounds: { x: 680, y: 330, width: 470, height: 300 },
+            style: { fontSize: 16, lineHeight: 1.6 },
+            animation: animations.enterRight('charts-info-enter', { delay: 300, duration: 600 }),
+          }),
+        ],
+      },
+    ],
+    timeline: {
+      tracks: [
+        {
+          id: 'charts-builds',
+          trackType: 'animation',
+          segments: [
+            seg('charts-title-build', ['charts-title'], animations.enterLeft('charts-title-enter', { duration: 500 })),
+            seg('charts-subtitle-build', ['charts-subtitle'], animations.enterLeft('charts-subtitle-enter', { delay: 100, duration: 500 }), 100),
+            seg('charts-bar-build', ['charts-bar'], animations.enterUp('charts-bar-enter', { delay: 200, duration: 600 }), 200),
+            seg('charts-info-build', ['charts-info-bg', 'charts-info-heading', 'charts-info-list'], animations.enterRight('charts-info-enter', { delay: 300, duration: 600 }), 300),
+            seg('charts-line-build', ['charts-line'], animations.enterLeft('charts-line-enter', { delay: 400, duration: 600 }), 500),
+            seg('charts-pie-build', ['charts-pie'], animations.zoomIn('charts-pie-enter', { delay: 500, duration: 600 }), 600),
+          ],
+        },
+      ],
     },
   };
 }
 
-function kitchenSlide(): SlideDefinition {
+function tablesSlide(): SlideDefinition {
   return {
-    id: 'kitchen',
-    title: 'Kitchen Sink',
+    id: 'tables',
+    title: 'Table Component',
+    layout: 'content',
+    layers: [
+      {
+        id: 'tables-layer',
+        order: 0,
+        elements: [
+          shapeElement({
+            id: 'tables-bg',
+            bounds: { x: 600, y: -50, width: 500, height: 500 },
+            variant: 'accent',
+            style: { opacity: 0.35 },
+          }),
+          textElement({
+            id: 'tables-title',
+            content: 'Table Elements',
+            variant: 'title',
+            bounds: { x: 100, y: 80, width: 600, height: 80 },
+            animation: animations.enterLeft('tables-title-enter', { duration: 500 }),
+          }),
+          textElement({
+            id: 'tables-subtitle',
+            content: 'Data tables with headers, alignment, and styling',
+            variant: 'subtitle',
+            bounds: { x: 100, y: 170, width: 650, height: 50 },
+            animation: animations.enterLeft('tables-subtitle-enter', { delay: 100, duration: 500 }),
+          }),
+          tableElement({
+            id: 'tables-demo',
+            headers: ['Component', 'Type', 'LOC', 'Status'],
+            rows: [
+              ['RichText', 'Text', 85, '✓ Complete'],
+              ['CodeBlock', 'Display', 180, '✓ Complete'],
+              ['Chart', 'Data Viz', 220, '✓ Complete'],
+              ['Table', 'Data', 95, '✓ Complete'],
+              ['Arrow', 'Shape', 0, '⏳ Planned'],
+              ['Equation', 'Math', 0, '⏳ Planned'],
+            ],
+            columnAlignments: ['left', 'left', 'right', 'center'],
+            showBorders: true,
+            zebraStripe: true,
+            cellPadding: 14,
+            bounds: { x: 100, y: 250, width: 650, height: 380 },
+            animation: animations.enterUp('tables-demo-enter', { delay: 200, duration: 600 }),
+          }),
+          shapeElement({
+            id: 'tables-features-bg',
+            bounds: { x: 800, y: 250, width: 380, height: 380 },
+            variant: 'glass',
+          }),
+          textElement({
+            id: 'tables-features-heading',
+            content: 'Table Features',
+            variant: 'subtitle',
+            bounds: { x: 830, y: 280, width: 320, height: 40 },
+            animation: animations.enterRight('tables-features-enter', { delay: 400, duration: 600 }),
+          }),
+          textElement({
+            id: 'tables-features-list',
+            content: '• Optional headers\n• Per-column alignment\n• Zebra striping\n• Border customization\n• Cell padding control\n• Header styling\n• Responsive sizing\n• Full animations',
+            variant: 'body',
+            bounds: { x: 830, y: 330, width: 320, height: 270 },
+            style: { fontSize: 16, lineHeight: 1.7 },
+            animation: animations.enterRight('tables-features-enter', { delay: 400, duration: 600 }),
+          }),
+        ],
+      },
+    ],
+    timeline: {
+      tracks: [
+        {
+          id: 'tables-builds',
+          trackType: 'animation',
+          segments: [
+            seg('tables-title-build', ['tables-title'], animations.enterLeft('tables-title-enter', { duration: 500 })),
+            seg('tables-subtitle-build', ['tables-subtitle'], animations.enterLeft('tables-subtitle-enter', { delay: 100, duration: 500 }), 100),
+            seg('tables-demo-build', ['tables-demo'], animations.enterUp('tables-demo-enter', { delay: 200, duration: 600 }), 200),
+            seg('tables-features-build', ['tables-features-bg', 'tables-features-heading', 'tables-features-list'], animations.enterRight('tables-features-enter', { delay: 400, duration: 600 }), 400),
+          ],
+        },
+      ],
+    },
+  };
+}
+
+function allTogetherSlide(): SlideDefinition {
+  return {
+    id: 'alltogether',
+    title: 'All Together',
     layout: 'grid',
     layers: [
       {
-        id: 'kitchen-layer',
+        id: 'alltogether-layer',
         order: 0,
         elements: [
           shapeElement({
-            id: 'kitchen-aurora',
-            bounds: { x: -200, y: -160, width: 520, height: 520 },
+            id: 'alltogether-bg-1',
+            bounds: { x: -100, y: -80, width: 450, height: 450 },
             variant: 'glow',
-            animation: animations.fadeIn('kitchen-aurora', { duration: 720 }),
+          }),
+          shapeElement({
+            id: 'alltogether-bg-2',
+            bounds: { x: 750, y: 200, width: 450, height: 450 },
+            variant: 'accent',
+            style: { opacity: 0.4 },
           }),
           textElement({
-            id: 'kitchen-title',
-            content: 'Kitchen sink slide',
+            id: 'alltogether-title',
+            content: 'The Complete Toolkit',
             variant: 'title',
-            bounds: { x: 120, y: 120, width: 720, height: 96 },
-            animation: animations.enterLeft('kitchen-title-enter'),
+            bounds: { x: 100, y: 70, width: 800, height: 80 },
+            animation: animations.enterLeft('alltogether-title-enter', { duration: 500 }),
           }),
           textElement({
-            id: 'kitchen-subtitle',
-            content: 'Text, media, charts, custom elements, and view transitions—serialize once, render anywhere.',
+            id: 'alltogether-subtitle',
+            content: 'All components work together with full animation and build support',
             variant: 'subtitle',
-            bounds: { x: 120, y: 200, width: 720, height: 72 },
-            animation: animations.enterLeft('kitchen-subtitle-enter', { delay: 120 }),
+            bounds: { x: 100, y: 160, width: 750, height: 50 },
+            animation: animations.enterLeft('alltogether-subtitle-enter', { delay: 100, duration: 500 }),
           }),
-          gridGroup({
-            id: 'kitchen-cards',
-            bounds: { x: 120, y: 300, width: 960, height: 260 },
-            columns: 'repeat(3, minmax(0, 1fr))',
-            columnGap: 28,
-            rowGap: 0,
-            padding: '0',
-            children: [
-              stackGroup({
-                id: 'kitchen-typography',
-                bounds: { x: 120, y: 300, width: 300, height: 240 },
-                backgroundVariant: 'outline-card',
-                padding: '28px 32px',
-                gap: 16,
-                children: [
-                  textElement({
-                    id: 'kitchen-typography-heading',
-                    content: 'Typography presets',
-                    variant: 'subtitle',
-                    bounds: { x: 132, y: 312, width: 260, height: 40 },
-                  }),
-                  textElement({
-                    id: 'kitchen-typography-body',
-                    content: 'Title, subtitle, body, eyebrow, label, and metric variants keep authoring consistent.',
-                    variant: 'body',
-                    bounds: { x: 132, y: 360, width: 260, height: 120 },
-                  }),
-                ],
-              }),
-              stackGroup({
-                id: 'kitchen-media',
-                bounds: { x: 476, y: 300, width: 300, height: 240 },
-                backgroundVariant: 'outline-card',
-                padding: '28px 32px',
-                gap: 20,
-                children: [
-                  mediaElement({
-                    id: 'kitchen-media-mark',
-                    bounds: { x: 540, y: 324, width: 120, height: 120 },
-                    src: 'mark.svg',
-                    animation: animations.zoomIn('kitchen-media-zoom', { duration: 520 }),
-                  }),
-                  textElement({
-                    id: 'kitchen-media-caption',
-                    content: 'Media elements stream with playback metadata—images, videos, even live dashboards.',
-                    variant: 'body',
-                    bounds: { x: 516, y: 460, width: 260, height: 80 },
-                  }),
-                ],
-              }),
-              stackGroup({
-                id: 'kitchen-custom',
-                bounds: { x: 832, y: 300, width: 300, height: 240 },
-                backgroundVariant: 'outline-card',
-                padding: '28px 32px',
-                gap: 18,
-                children: [
-                  textElement({
-                    id: 'kitchen-custom-heading',
-                    content: 'Custom components',
-                    variant: 'subtitle',
-                    bounds: { x: 844, y: 312, width: 260, height: 40 },
-                  }),
-                  {
-                    id: 'kitchen-code-snippet',
-                    type: 'custom',
-                    componentName: 'CodeSnippet',
-                    props: {
-                      language: 'tsx',
-                      code: "renderToReadableStream(<Deck definition={definition} />)",
-                    },
-                    bounds: { x: 844, y: 360, width: 260, height: 140 },
-                  },
-                ],
-              }),
-            ],
-            animation: animations.staggeredReveal('kitchen-grid-stagger', { initialDelay: 200, staggerDelay: 160 }),
-          }),
-        ],
-      },
-    ],
-    notes: {
-      presenter: 'Remind the audience that every element shown is available to AI and authors—this is the kitchen sink.',
-    },
-    timeline: {
-      tracks: [
-        {
-          id: 'kitchen-builds',
-          trackType: 'animation',
-          segments: [
-            segment('kitchen-title-build', ['kitchen-title'], animations.enterLeft('kitchen-title-enter')),
-            segment('kitchen-subtitle-build', ['kitchen-subtitle'], animations.enterLeft('kitchen-subtitle-enter', { delay: 120 }), 120),
-            segment(
-              'kitchen-cards-build',
-              ['kitchen-cards'],
-              animations.staggeredReveal('kitchen-grid-stagger', { initialDelay: 200, staggerDelay: 160 }),
-              220,
-            ),
-          ],
-        },
-      ],
-    },
-    transitions: {
-      in: animations.fadeIn('kitchen-in', { duration: 420 }),
-      out: animations.fadeOut('kitchen-out', { duration: 320 }),
-      between: animations.magicMove('kitchen-between', { duration: 520 }),
-    },
-  };
-}
-
-function closingSlide(): SlideDefinition {
-  return {
-    id: 'closing',
-    title: 'Closing',
-    layout: 'closing',
-    layers: [
-      {
-        id: 'closing-layer',
-        order: 0,
-        elements: [
+          // Row 1
           shapeElement({
-            id: 'closing-aurora',
-            bounds: { x: 760, y: -120, width: 520, height: 520 },
-            variant: 'glow',
-            animation: animations.fadeIn('closing-aurora', { duration: 680 }),
+            id: 'summary-richtext-bg',
+            bounds: { x: 100, y: 240, width: 520, height: 160 },
+            variant: 'outline-card',
           }),
           textElement({
-            id: 'closing-title',
-            content: 'Ready to compose with Lume?',
-            variant: 'title',
-            bounds: { x: 120, y: 220, width: 720, height: 96 },
-            metadata: { viewTransitionName: 'deck-headline' },
-            animation: animations.enterLeft('closing-title-enter'),
+            id: 'summary-richtext-title',
+            content: '📝 RichText',
+            variant: 'subtitle',
+            bounds: { x: 130, y: 265, width: 460, height: 35 },
+            animation: animations.staggeredReveal('grid-1', { initialDelay: 300 }),
           }),
           textElement({
-            id: 'closing-body',
-            content: 'Grab the canonical component library, stream a test deck from the CLI, and share feedback in #lume-dev.',
+            id: 'summary-richtext-desc',
+            content: 'HTML & Markdown with custom link styling and typography',
             variant: 'body',
-            bounds: { x: 120, y: 320, width: 560, height: 96 },
-            animation: animations.enterLeft('closing-body-enter', { delay: 120 }),
+            bounds: { x: 130, y: 305, width: 460, height: 75 },
+            style: { fontSize: 15 },
+            animation: animations.staggeredReveal('grid-1', { initialDelay: 300 }),
           }),
-          stackGroup({
-            id: 'closing-cta',
-            bounds: { x: 120, y: 420, width: 420, height: 96 },
-            backgroundVariant: 'glass',
-            padding: '24px 32px',
-            gap: 8,
-            children: [
-              textElement({
-                id: 'closing-cta-label',
-                content: 'Install the toolkit',
-                variant: 'label',
-                bounds: { x: 132, y: 432, width: 200, height: 18 },
-              }),
-              textElement({
-                id: 'closing-cta-command',
-                content: 'npm create lume@latest',
-                variant: 'subtitle',
-                bounds: { x: 132, y: 456, width: 320, height: 36 },
-              }),
-            ],
-            animation: animations.zoomIn('closing-cta-enter', { delay: 220 }),
+          // Row 1 Col 2
+          shapeElement({
+            id: 'summary-code-bg',
+            bounds: { x: 660, y: 240, width: 520, height: 160 },
+            variant: 'outline-card',
+          }),
+          textElement({
+            id: 'summary-code-title',
+            content: '💻 CodeBlock',
+            variant: 'subtitle',
+            bounds: { x: 690, y: 265, width: 460, height: 35 },
+            animation: animations.staggeredReveal('grid-2', { initialDelay: 450 }),
+          }),
+          textElement({
+            id: 'summary-code-desc',
+            content: '5 themes, line numbers, syntax highlighting, copy button',
+            variant: 'body',
+            bounds: { x: 690, y: 305, width: 460, height: 75 },
+            style: { fontSize: 15 },
+            animation: animations.staggeredReveal('grid-2', { initialDelay: 450 }),
+          }),
+          // Row 2
+          shapeElement({
+            id: 'summary-charts-bg',
+            bounds: { x: 100, y: 430, width: 520, height: 160 },
+            variant: 'outline-card',
+          }),
+          textElement({
+            id: 'summary-charts-title',
+            content: '📊 Charts',
+            variant: 'subtitle',
+            bounds: { x: 130, y: 455, width: 460, height: 35 },
+            animation: animations.staggeredReveal('grid-3', { initialDelay: 600 }),
+          }),
+          textElement({
+            id: 'summary-charts-desc',
+            content: '6 chart types with Recharts: bar, line, area, pie, scatter, composed',
+            variant: 'body',
+            bounds: { x: 130, y: 495, width: 460, height: 75 },
+            style: { fontSize: 15 },
+            animation: animations.staggeredReveal('grid-3', { initialDelay: 600 }),
+          }),
+          // Row 2 Col 2
+          shapeElement({
+            id: 'summary-tables-bg',
+            bounds: { x: 660, y: 430, width: 520, height: 160 },
+            variant: 'outline-card',
+          }),
+          textElement({
+            id: 'summary-tables-title',
+            content: '📋 Tables',
+            variant: 'subtitle',
+            bounds: { x: 690, y: 455, width: 460, height: 35 },
+            animation: animations.staggeredReveal('grid-4', { initialDelay: 750 }),
+          }),
+          textElement({
+            id: 'summary-tables-desc',
+            content: 'Headers, alignment, zebra striping, and border customization',
+            variant: 'body',
+            bounds: { x: 690, y: 495, width: 460, height: 75 },
+            style: { fontSize: 15 },
+            animation: animations.staggeredReveal('grid-4', { initialDelay: 750 }),
+          }),
+          // CTA
+          shapeElement({
+            id: 'alltogether-cta-bg',
+            bounds: { x: 390, y: 620, width: 500, height: 60 },
+            variant: 'pill',
+          }),
+          textElement({
+            id: 'alltogether-cta-text',
+            content: '🚀 Start building with RSC components',
+            variant: 'body',
+            bounds: { x: 420, y: 637, width: 440, height: 26 },
+            style: { color: '#0B1022', fontWeight: 600, textAlign: 'center' },
+            animation: animations.enterUp('alltogether-cta-enter', { delay: 800, duration: 600 }),
           }),
         ],
       },
     ],
-    notes: {
-      presenter: 'Close with a clear CTA. Mention the open design tokens and welcome folks to contribute.',
-    },
     timeline: {
       tracks: [
         {
-          id: 'closing-builds',
+          id: 'alltogether-builds',
           trackType: 'animation',
           segments: [
-            segment('closing-title-build', ['closing-title'], animations.enterLeft('closing-title-enter')),
-            segment('closing-body-build', ['closing-body'], animations.enterLeft('closing-body-enter', { delay: 120 }), 140),
-            segment('closing-cta-build', ['closing-cta'], animations.zoomIn('closing-cta-enter', { delay: 220 }), 260),
+            seg('alltogether-title-build', ['alltogether-title'], animations.enterLeft('alltogether-title-enter', { duration: 500 })),
+            seg('alltogether-subtitle-build', ['alltogether-subtitle'], animations.enterLeft('alltogether-subtitle-enter', { delay: 100, duration: 500 }), 100),
+            seg('alltogether-grid-1-build', ['summary-richtext-bg', 'summary-richtext-title', 'summary-richtext-desc'], animations.staggeredReveal('grid-1', { initialDelay: 300 }), 300),
+            seg('alltogether-grid-2-build', ['summary-code-bg', 'summary-code-title', 'summary-code-desc'], animations.staggeredReveal('grid-2', { initialDelay: 450 }), 450),
+            seg('alltogether-grid-3-build', ['summary-charts-bg', 'summary-charts-title', 'summary-charts-desc'], animations.staggeredReveal('grid-3', { initialDelay: 600 }), 600),
+            seg('alltogether-grid-4-build', ['summary-tables-bg', 'summary-tables-title', 'summary-tables-desc'], animations.staggeredReveal('grid-4', { initialDelay: 750 }), 750),
+            seg('alltogether-cta-build', ['alltogether-cta-bg', 'alltogether-cta-text'], animations.enterUp('alltogether-cta-enter', { delay: 800, duration: 600 }), 900),
           ],
         },
       ],
     },
-    transitions: {
-      in: animations.fadeIn('closing-in', { duration: 420 }),
-      out: animations.fadeOut('closing-out', { duration: 320 }),
-      between: animations.magicMove('closing-between', { duration: 520 }),
-    },
   };
 }
 
-function segment(
+function seg(
   id: string,
   targets: string[],
   animation: AnimationDefinition,

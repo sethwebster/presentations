@@ -1,7 +1,11 @@
 import type {
   TextElementDefinition,
+  RichTextElementDefinition,
+  CodeBlockElementDefinition,
+  TableElementDefinition,
   MediaElementDefinition,
   ShapeElementDefinition,
+  ChartElementDefinition,
   GroupElementDefinition,
   ElementDefinition,
   Bounds,
@@ -91,6 +95,91 @@ export function textElement({
       ...TEXT_PRESETS[variant],
       ...style,
     },
+    animation,
+    metadata,
+  };
+}
+
+interface RichTextElementOptions extends BaseOptions<RichTextElementDefinition> {
+  content: string;
+  format?: 'html' | 'markdown';
+  variant?: TextVariant;
+  listStyle?: RichTextElementDefinition['listStyle'];
+  linkStyle?: RichTextElementDefinition['linkStyle'];
+}
+
+export function richTextElement({
+  id,
+  content,
+  bounds,
+  format = 'html',
+  variant = 'body',
+  style,
+  animation,
+  metadata,
+  listStyle,
+  linkStyle,
+}: RichTextElementOptions): RichTextElementDefinition {
+  return {
+    id,
+    type: 'richtext',
+    content,
+    format,
+    bounds,
+    style: {
+      ...TEXT_PRESETS[variant],
+      ...style,
+    },
+    animation,
+    metadata,
+    listStyle,
+    linkStyle: linkStyle ?? {
+      color: '#16C2C7',
+      underline: true,
+      hoverColor: '#0BFFF5',
+    },
+  };
+}
+
+interface CodeBlockElementOptions extends BaseOptions<CodeBlockElementDefinition> {
+  code: string;
+  language?: string;
+  theme?: CodeBlockElementDefinition['theme'];
+  showLineNumbers?: boolean;
+  highlightLines?: number[];
+  startLineNumber?: number;
+  showCopyButton?: boolean;
+  fileName?: string;
+}
+
+export function codeBlockElement({
+  id,
+  code,
+  bounds,
+  language = 'typescript',
+  theme = 'dark',
+  showLineNumbers = true,
+  highlightLines,
+  startLineNumber = 1,
+  showCopyButton = true,
+  fileName,
+  style,
+  animation,
+  metadata,
+}: CodeBlockElementOptions): CodeBlockElementDefinition {
+  return {
+    id,
+    type: 'codeblock',
+    code,
+    language,
+    theme,
+    showLineNumbers,
+    highlightLines,
+    startLineNumber,
+    showCopyButton,
+    fileName,
+    bounds,
+    style,
     animation,
     metadata,
   };
@@ -331,4 +420,213 @@ export function gridGroup({
       ...style,
     },
   });
+}
+
+interface ChartElementOptions extends BaseOptions<ChartElementDefinition> {
+  chartType: ChartElementDefinition['chartType'];
+  data: Array<Record<string, string | number>>;
+  dataKeys?: ChartElementDefinition['dataKeys'];
+  colors?: string[];
+  showLegend?: boolean;
+  showGrid?: boolean;
+  showTooltip?: boolean;
+  axisLabels?: ChartElementDefinition['axisLabels'];
+}
+
+export function chartElement({
+  id,
+  bounds,
+  chartType,
+  data,
+  dataKeys,
+  colors,
+  showLegend = true,
+  showGrid = true,
+  showTooltip = true,
+  axisLabels,
+  style,
+  animation,
+  metadata,
+}: ChartElementOptions): ChartElementDefinition {
+  return {
+    id,
+    type: 'chart',
+    chartType,
+    data,
+    dataKeys,
+    colors,
+    showLegend,
+    showGrid,
+    showTooltip,
+    axisLabels,
+    bounds,
+    style,
+    animation,
+    metadata,
+  };
+}
+
+export function barChart({
+  id,
+  bounds,
+  data,
+  xKey = 'name',
+  yKeys = ['value'],
+  colors,
+  style,
+  animation,
+  metadata,
+}: Omit<ChartElementOptions, 'chartType' | 'dataKeys'> & {
+  xKey?: string;
+  yKeys?: string | string[];
+}): ChartElementDefinition {
+  return chartElement({
+    id,
+    bounds,
+    chartType: 'bar',
+    data,
+    dataKeys: {
+      x: xKey,
+      y: yKeys,
+    },
+    colors,
+    style,
+    animation,
+    metadata,
+  });
+}
+
+export function lineChart({
+  id,
+  bounds,
+  data,
+  xKey = 'name',
+  yKeys = ['value'],
+  colors,
+  style,
+  animation,
+  metadata,
+}: Omit<ChartElementOptions, 'chartType' | 'dataKeys'> & {
+  xKey?: string;
+  yKeys?: string | string[];
+}): ChartElementDefinition {
+  return chartElement({
+    id,
+    bounds,
+    chartType: 'line',
+    data,
+    dataKeys: {
+      x: xKey,
+      y: yKeys,
+    },
+    colors,
+    style,
+    animation,
+    metadata,
+  });
+}
+
+export function areaChart({
+  id,
+  bounds,
+  data,
+  xKey = 'name',
+  yKeys = ['value'],
+  colors,
+  style,
+  animation,
+  metadata,
+}: Omit<ChartElementOptions, 'chartType' | 'dataKeys'> & {
+  xKey?: string;
+  yKeys?: string | string[];
+}): ChartElementDefinition {
+  return chartElement({
+    id,
+    bounds,
+    chartType: 'area',
+    data,
+    dataKeys: {
+      x: xKey,
+      y: yKeys,
+    },
+    colors,
+    style,
+    animation,
+    metadata,
+  });
+}
+
+export function pieChart({
+  id,
+  bounds,
+  data,
+  nameKey = 'name',
+  valueKey = 'value',
+  colors,
+  style,
+  animation,
+  metadata,
+}: Omit<ChartElementOptions, 'chartType' | 'dataKeys'> & {
+  nameKey?: string;
+  valueKey?: string;
+}): ChartElementDefinition {
+  return chartElement({
+    id,
+    bounds,
+    chartType: 'pie',
+    data,
+    dataKeys: {
+      name: nameKey,
+      value: valueKey,
+    },
+    colors,
+    showGrid: false,
+    style,
+    animation,
+    metadata,
+  });
+}
+
+interface TableElementOptions extends BaseOptions<TableElementDefinition> {
+  headers?: string[];
+  rows: Array<Array<string | number>>;
+  columnAlignments?: Array<'left' | 'center' | 'right'>;
+  showBorders?: boolean;
+  zebraStripe?: boolean;
+  headerStyle?: TableElementDefinition['headerStyle'];
+  cellPadding?: string | number;
+  borderColor?: string;
+}
+
+export function tableElement({
+  id,
+  bounds,
+  headers,
+  rows,
+  columnAlignments,
+  showBorders = true,
+  zebraStripe = true,
+  headerStyle,
+  cellPadding = 12,
+  borderColor = 'rgba(236, 236, 236, 0.15)',
+  style,
+  animation,
+  metadata,
+}: TableElementOptions): TableElementDefinition {
+  return {
+    id,
+    type: 'table',
+    headers,
+    rows,
+    columnAlignments,
+    showBorders,
+    zebraStripe,
+    headerStyle,
+    cellPadding,
+    borderColor,
+    bounds,
+    style,
+    animation,
+    metadata,
+  };
 }

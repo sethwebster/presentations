@@ -3,6 +3,7 @@ import React from 'react';
 const { useState, useEffect } = React;
 import { SlideData } from '../types/presentation';
 import '../styles/Presentation.css';
+import '../styles/RscAnimations.css';
 
 interface PresentationThumbnailProps {
   slides: SlideData[];

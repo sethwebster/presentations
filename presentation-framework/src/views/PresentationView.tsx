@@ -41,50 +41,60 @@ export function PresentationView() {
     setAssetsPath(assetsDir);
 
     const loadPresentationData = async () => {
-      let usedRsc = false;
-
-      const rscUrl = `/api/rsc/${presentationName}`;
-  try {
-    const deck = await fetchDeckDefinition(rscUrl);
-    if (!cancelled) {
-      const { slides, config } = deckDefinitionToPresentation(deck, assetsDir);
-      setPresentation({ slides, config, source: 'rsc' });
-      setDeckDefinition(deck);
-      usedRsc = true;
-    }
-  } catch (rscError) {
-    if (!cancelled) {
-      console.warn('RSC deck load failed:', rscError);
-    }
-  }
+      let moduleLoaded = false;
+      let deckLoaded = false;
+      let lastModuleError: unknown = null;
+      let lastRscError: unknown = null;
 
       try {
         const module = await loadPresentation(presentationName);
         if (!cancelled) {
           setPresentationModule(module as PresentationModule);
+          const { getSlides, getBrandLogo, presentationConfig, customStyles } = module as PresentationModule;
+          const slides = getSlides(assetsDir);
+          const config: PresentationConfig = {
+            ...(presentationConfig ?? {}),
+            brandLogo: getBrandLogo ? getBrandLogo(assetsDir) : undefined,
+          };
 
-          if (!usedRsc) {
-            const { getSlides, getBrandLogo, presentationConfig, customStyles } = module as PresentationModule;
-            const slides = getSlides(assetsDir);
-            const config: PresentationConfig = {
-              ...(presentationConfig ?? {}),
-              brandLogo: getBrandLogo ? getBrandLogo(assetsDir) : undefined,
-            };
-
-            if (customStyles) {
-              config.customStyles = [config.customStyles, customStyles].filter(Boolean).join('\n');
-            }
-
-            setPresentation({ slides, config, source: 'module' });
-            setDeckDefinition(null);
+          if (customStyles) {
+            config.customStyles = [config.customStyles, customStyles].filter(Boolean).join('\n');
           }
+
+          if (!deckLoaded) {
+            setPresentation({ slides, config, source: 'module' });
+          }
+          moduleLoaded = true;
+          setError(null);
         }
       } catch (moduleError) {
-        if (!cancelled && !usedRsc) {
-          const errorMessage = moduleError instanceof Error ? moduleError.message : 'Unknown error';
-          setError(`Failed to load presentation: ${errorMessage}`);
-          setLoading(false);
+        lastModuleError = moduleError;
+        console.warn('Presentation module load failed:', moduleError);
+      }
+
+      const rscUrl = `/api/rsc/${presentationName}`;
+      try {
+        const deck = await fetchDeckDefinition(rscUrl);
+        if (!cancelled) {
+          setDeckDefinition(deck);
+          deckLoaded = true;
+          const { slides, config } = deckDefinitionToPresentation(deck, assetsDir);
+          setPresentation({ slides, config, source: 'rsc' });
+          setError(null);
         }
+      } catch (rscError) {
+        lastRscError = rscError;
+        console.warn('RSC deck load failed:', rscError);
+      }
+
+      if (!cancelled && !moduleLoaded && !deckLoaded) {
+        const message =
+          lastModuleError instanceof Error
+            ? lastModuleError.message
+            : lastRscError instanceof Error
+            ? lastRscError.message
+            : 'Unknown error';
+        setError(`Failed to load presentation: ${message}`);
       }
     };
 

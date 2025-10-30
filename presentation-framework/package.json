@@ -32,6 +32,7 @@
     "qrcode.react": "^4.2.0",
     "react": "^19.3.0-canary-d7215b49-20251013",
     "react-dom": "^19.3.0-canary-d7215b49-20251013",
+    "recharts": "^3.3.0",
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {

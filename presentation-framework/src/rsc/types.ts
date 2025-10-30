@@ -27,6 +27,15 @@ export interface DeckSettings {
     overviewSlideId?: string;
   };
   autopilot?: Record<string, unknown>;
+  branding?: {
+    logo?: {
+      src: string;
+      alt?: string;
+      width?: number;
+      height?: number;
+      style?: Record<string, unknown>;
+    };
+  };
 }
 
 export interface AssetDefinition {
@@ -48,7 +57,8 @@ export interface SlideDefinition {
   id: string;
   title?: string;
   layout?: string;
-  layers: LayerDefinition[];
+  layers?: LayerDefinition[];
+  elements?: ElementDefinition[];
   timeline?: TimelineDefinition;
   notes?: SlideNotes;
   zoomFrame?: ZoomFrame;
@@ -56,12 +66,16 @@ export interface SlideDefinition {
   metadata?: Record<string, unknown>;
 }
 
-export interface SlideNotes {
-  presenter?: string;
-  viewer?: string;
-  aiSuggestions?: string[];
-  metadata?: Record<string, unknown>;
-}
+export type SlideNotes =
+  | {
+      presenter?: string;
+      viewer?: string;
+      aiSuggestions?: string[];
+      metadata?: Record<string, unknown>;
+    }
+  | string
+  | null
+  | undefined;
 
 export interface ZoomFrame {
   x: number;
@@ -85,6 +99,9 @@ export interface LayerDefinition {
 
 export type ElementDefinition =
   | TextElementDefinition
+  | RichTextElementDefinition
+  | CodeBlockElementDefinition
+  | TableElementDefinition
   | MediaElementDefinition
   | GroupElementDefinition
   | ShapeElementDefinition
@@ -107,6 +124,50 @@ export interface TextElementDefinition extends BaseElementDefinition {
   content: string;
 }
 
+export interface RichTextElementDefinition extends BaseElementDefinition {
+  type: 'richtext';
+  content: string;
+  format?: 'html' | 'markdown';
+  listStyle?: {
+    type?: 'bullet' | 'number' | 'none';
+    marker?: string;
+    indent?: number;
+  };
+  linkStyle?: {
+    color?: string;
+    underline?: boolean;
+    hoverColor?: string;
+  };
+}
+
+export interface CodeBlockElementDefinition extends BaseElementDefinition {
+  type: 'codeblock';
+  code: string;
+  language?: string;
+  theme?: 'dark' | 'light' | 'nord' | 'dracula' | 'github';
+  showLineNumbers?: boolean;
+  highlightLines?: number[];
+  startLineNumber?: number;
+  showCopyButton?: boolean;
+  fileName?: string;
+}
+
+export interface TableElementDefinition extends BaseElementDefinition {
+  type: 'table';
+  headers?: string[];
+  rows: Array<Array<string | number>>;
+  columnAlignments?: Array<'left' | 'center' | 'right'>;
+  showBorders?: boolean;
+  zebraStripe?: boolean;
+  headerStyle?: {
+    background?: string;
+    color?: string;
+    fontWeight?: string | number;
+  };
+  cellPadding?: string | number;
+  borderColor?: string;
+}
+
 export interface MediaElementDefinition extends BaseElementDefinition {
   type: 'media';
   src: string;
@@ -122,8 +183,22 @@ export interface ShapeElementDefinition extends BaseElementDefinition {
 
 export interface ChartElementDefinition extends BaseElementDefinition {
   type: 'chart';
-  chartType: string;
-  dataRef: string;
+  chartType: 'bar' | 'line' | 'area' | 'pie' | 'scatter' | 'composed';
+  data: Array<Record<string, string | number>>;
+  dataKeys?: {
+    x?: string;
+    y?: string | string[];
+    name?: string;
+    value?: string;
+  };
+  colors?: string[];
+  showLegend?: boolean;
+  showGrid?: boolean;
+  showTooltip?: boolean;
+  axisLabels?: {
+    x?: string;
+    y?: string;
+  };
   config?: Record<string, unknown>;
 }
 

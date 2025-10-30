@@ -6,6 +6,9 @@ import {
   SlideComponent,
   LayerComponent,
   TextElement,
+  RichTextElement,
+  CodeBlockElement,
+  TableElement,
   MediaElement,
   ShapeElement,
   ChartElement,
@@ -38,8 +41,18 @@ export function Deck({ definition }: DeckProps) {
 }
 
 function renderSlideTree(slide: SlideDefinition) {
-  const { layers, notes, timeline, zoomFrame, transitions, ...slideProps } = slide;
-  const layerList = Array.isArray(layers) ? layers : [];
+  const { layers, elements, notes, timeline, zoomFrame, transitions, ...slideProps } = slide;
+  const layerList = Array.isArray(layers)
+    ? layers
+    : Array.isArray(elements)
+    ? [
+        {
+          id: `${slide.id}-layer`,
+          order: 0,
+          elements,
+        },
+      ]
+    : [];
   return (
     <SlideComponent key={slide.id} {...slideProps} layers={layerList}>
       {layerList.map((layer) => renderLayerTree(layer))}
@@ -64,6 +77,15 @@ function renderLayerTree(layer: LayerDefinition) {
 function renderElementTree(element: ElementDefinition): ReactNode {
   if (element.type === 'text') {
     return <TextElement key={element.id} {...element} />;
+  }
+  if (element.type === 'richtext') {
+    return <RichTextElement key={element.id} {...element} />;
+  }
+  if (element.type === 'codeblock') {
+    return <CodeBlockElement key={element.id} {...element} />;
+  }
+  if (element.type === 'table') {
+    return <TableElement key={element.id} {...element} />;
   }
   if (element.type === 'media') {
     return <MediaElement key={element.id} {...element} />;
