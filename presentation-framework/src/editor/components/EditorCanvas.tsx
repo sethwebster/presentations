@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
-import { useEditorStore } from '../store/editorStore';
+import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { ElementRenderer } from './ElementRenderer';
 import { AlignmentGuides } from './AlignmentGuides';
 
@@ -11,16 +11,18 @@ interface EditorCanvasProps {
 
 export function EditorCanvas({ deckId }: EditorCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
-  const zoom = useEditorStore((state) => state.zoom);
-  const pan = useEditorStore((state) => state.pan);
-  const setZoom = useEditorStore((state) => state.setZoom);
-  const setPan = useEditorStore((state) => state.setPan);
-  const showGrid = useEditorStore((state) => state.showGrid);
-  const showGuides = useEditorStore((state) => state.showGuides);
-  const deck = useEditorStore((state) => state.deck);
-  const currentSlideIndex = useEditorStore((state) => state.currentSlideIndex);
-  const draggingElementId = useEditorStore((state) => state.draggingElementId);
-  const draggingBounds = useEditorStore((state) => state.draggingBounds);
+  // Use Editor class instead of Zustand store
+  const state = useEditor();
+  const editor = useEditorInstance();
+  
+  const zoom = state.zoom;
+  const pan = state.pan;
+  const showGrid = state.showGrid;
+  const showGuides = state.showGuides;
+  const deck = state.deck;
+  const currentSlideIndex = state.currentSlideIndex;
+  const draggingElementId = state.draggingElementId;
+  const draggingBounds = state.draggingBounds;
   
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
@@ -33,11 +35,9 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
       const delta = e.deltaY > 0 ? 0.9 : 1.1;
-      setZoom(Math.max(0.25, Math.min(2, zoom * delta)));
+      editor.setZoom(Math.max(0.25, Math.min(2, zoom * delta)));
     }
   };
-
-  const clearSelection = useEditorStore((state) => state.clearSelection);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     // Don't interfere if clicking on an element
@@ -49,7 +49,7 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
     // Clear selection when clicking on canvas background
     if (e.target === e.currentTarget || target.closest('.editor-canvas') === e.currentTarget) {
       e.preventDefault();
-      clearSelection();
+      editor.clearSelection();
     }
 
     // Pan with middle mouse button or shift + left click
@@ -62,7 +62,7 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (isPanning) {
-      setPan({
+      editor.setPan({
         x: e.clientX - panStart.x,
         y: e.clientY - panStart.y,
       });
@@ -138,7 +138,27 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
             height: '100%',
             position: 'relative',
             overflow: 'hidden',
-            background: currentSlide?.style?.background as string || '#ffffff',
+            background: (() => {
+              // Check slide-specific background first
+              if (currentSlide?.background) {
+                if (typeof currentSlide.background === 'string') {
+                  return currentSlide.background;
+                }
+                if (currentSlide.background.type === 'color') {
+                  return currentSlide.background.value as string;
+                }
+              }
+              // Then check slide style background
+              if (currentSlide?.style?.background) {
+                return currentSlide.style.background as string;
+              }
+              // Finally use default background from deck settings
+              const defaultBg = deck?.settings?.defaultBackground;
+              if (typeof defaultBg === 'string') {
+                return defaultBg;
+              }
+              return '#ffffff';
+            })(),
           }}
         >
           {/* Grid overlay */}
@@ -241,7 +261,7 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
         border: '1px solid rgba(236, 236, 236, 0.1)',
       }}>
         <button
-          onClick={() => setZoom(Math.min(2, zoom + 0.1))}
+          onClick={() => editor.setZoom(Math.min(2, zoom + 0.1))}
           style={{
             width: '32px',
             height: '24px',
@@ -271,7 +291,7 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
           {Math.round(zoom * 100)}%
         </div>
         <button
-          onClick={() => setZoom(Math.max(0.25, zoom - 0.1))}
+          onClick={() => editor.setZoom(Math.max(0.25, zoom - 0.1))}
           style={{
             width: '32px',
             height: '24px',
