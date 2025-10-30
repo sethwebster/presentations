@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { ElementRenderer } from './ElementRenderer';
 import { AlignmentGuides } from './AlignmentGuides';
+import { SelectionBoundingBox } from './SelectionBoundingBox';
 
 interface EditorCanvasProps {
   deckId: string;
@@ -203,6 +204,11 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
                 pointerEvents: 'none',
               }}
             />
+          )}
+
+          {/* Selection Bounding Box - Show when multiple elements are selected */}
+          {currentSlide && state.selectedElementIds.size >= 2 && (
+            <SelectionBoundingBox slideId={currentSlide.id} />
           )}
 
           {/* Alignment Guides */}
