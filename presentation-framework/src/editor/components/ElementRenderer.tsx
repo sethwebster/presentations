@@ -288,6 +288,7 @@ function GroupElementContainer({ element, slideId }: { element: GroupElementDefi
 
   // Render the group container with children inside
   // Children are rendered with relative positioning (their bounds are already relative to group)
+  // When group is closed, children should not intercept mouse events - they should pass through to group container
   return (
     <div
       data-element-id={element.id}
@@ -309,10 +310,35 @@ function GroupElementContainer({ element, slideId }: { element: GroupElementDefi
       }}
     >
       {/* Render children with relative positioning inside the group */}
-      {element.children?.map((child) => {
-        // Children already have relative bounds, render them directly
-        return <ElementRenderer key={child.id} element={child} slideId={slideId} />;
-      })}
+      {/* Wrap children in a container that blocks pointer events so group container handles all interactions */}
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: '100%',
+          pointerEvents: 'none', // Children don't intercept events when group is closed
+        }}
+      >
+        {element.children?.map((child) => {
+          // Children already have relative bounds, render them directly
+          // But wrap each child to allow visual rendering while blocking interactions
+          return (
+            <div
+              key={child.id}
+              style={{
+                position: 'absolute',
+                left: `${child.bounds?.x || 0}px`,
+                top: `${child.bounds?.y || 0}px`,
+                width: `${child.bounds?.width || 100}px`,
+                height: `${child.bounds?.height || 50}px`,
+                pointerEvents: 'none', // Prevent children from capturing events
+              }}
+            >
+              <ElementRenderer element={child} slideId={slideId} />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
