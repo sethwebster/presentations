@@ -3,6 +3,8 @@ import { kv } from '@vercel/kv';
 import type { DeckDefinition } from '@/rsc/types';
 
 export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 type DeckRouteContext = {
   params: Promise<{ deckId: string }>;
