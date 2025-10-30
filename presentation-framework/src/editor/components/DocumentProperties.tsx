@@ -229,7 +229,7 @@ export function DocumentProperties() {
           Default Background
         </label>
         <ColorPicker
-          value={typeof settings.defaultBackground === 'string' ? settings.defaultBackground : '#ffffff'}
+          value={settings.defaultBackground || '#ffffff'}
           onChange={(value) => editor.updateDeckSettings({
             defaultBackground: value,
           })}

@@ -139,6 +139,20 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
             position: 'relative',
             overflow: 'hidden',
             background: (() => {
+              // Helper function to convert gradient object to CSS string
+              const gradientToCSS = (grad: any): string => {
+                if (!grad || typeof grad !== 'object') return '#ffffff';
+                if (grad.type === 'linear') {
+                  const stops = grad.stops?.map((s: any) => `${s.color} ${s.position}%`).join(', ') || '';
+                  return `linear-gradient(${grad.angle || 0}deg, ${stops})`;
+                }
+                if (grad.type === 'radial') {
+                  const stops = grad.stops?.map((s: any) => `${s.color} ${s.position}%`).join(', ') || '';
+                  return `radial-gradient(${stops})`;
+                }
+                return '#ffffff';
+              };
+
               // Check slide-specific background first
               if (currentSlide?.background) {
                 if (typeof currentSlide.background === 'string') {
@@ -147,17 +161,28 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
                 if (currentSlide.background.type === 'color') {
                   return currentSlide.background.value as string;
                 }
+                if (currentSlide.background.type === 'gradient') {
+                  return gradientToCSS(currentSlide.background.value);
+                }
               }
               // Then check slide style background
               if (currentSlide?.style?.background) {
-                return currentSlide.style.background as string;
+                const bg = currentSlide.style.background;
+                if (typeof bg === 'string') {
+                  return bg;
+                }
+                return gradientToCSS(bg);
               }
               // Finally use default background from deck settings
               const defaultBg = deck?.settings?.defaultBackground;
+              if (!defaultBg) {
+                return '#ffffff';
+              }
               if (typeof defaultBg === 'string') {
                 return defaultBg;
               }
-              return '#ffffff';
+              // Handle gradient object
+              return gradientToCSS(defaultBg);
             })(),
           }}
         >
