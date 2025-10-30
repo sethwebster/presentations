@@ -21,6 +21,9 @@ export function AlignmentTools() {
     ...(currentSlide.layers?.flatMap(l => l.elements) || []),
   ];
 
+  // Compute selected elements for display
+  const selectedElements = allElements.filter(el => selectedElementIds.has(el.id));
+
   // Helper to get fresh selected elements from current state
   const getSelectedElements = () => {
     const currentState = editor.getState();
