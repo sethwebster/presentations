@@ -27,10 +27,28 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
   
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionBoxStart, setSelectionBoxStart] = useState<{ x: number; y: number } | null>(null);
+  const [selectionBoxEnd, setSelectionBoxEnd] = useState<{ x: number; y: number } | null>(null);
 
   // Canvas dimensions (matching presentation format)
   const CANVAS_WIDTH = 1280;
   const CANVAS_HEIGHT = 720;
+
+  // Convert screen coordinates to canvas coordinates
+  const screenToCanvas = (screenX: number, screenY: number): { x: number; y: number } => {
+    const canvasContainer = document.querySelector('[data-canvas-container]') as HTMLElement;
+    if (!canvasContainer) {
+      return { x: screenX, y: screenY };
+    }
+
+    const rect = canvasContainer.getBoundingClientRect();
+    // Account for the transform: translate(calc(-50% + pan.x), calc(-50% + pan.y)) scale(zoom)
+    // The rect already reflects this transform, so we need to account for zoom
+    const canvasX = (screenX - rect.left) / zoom;
+    const canvasY = (screenY - rect.top) / zoom;
+    return { x: canvasX, y: canvasY };
+  };
 
   const handleWheel = (e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
@@ -47,17 +65,22 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
       return;
     }
 
-    // Clear selection when clicking on canvas background
-    if (e.target === e.currentTarget || target.closest('.editor-canvas') === e.currentTarget) {
-      e.preventDefault();
-      editor.clearSelection();
-    }
-
     // Pan with middle mouse button or shift + left click
     if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
       e.preventDefault();
       setIsPanning(true);
       setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+      return;
+    }
+
+    // Start selection box on left click on canvas background
+    if (e.button === 0 && (e.target === e.currentTarget || target.closest('.editor-canvas') === e.currentTarget)) {
+      e.preventDefault();
+      const canvasPos = screenToCanvas(e.clientX, e.clientY);
+      setIsSelecting(true);
+      setSelectionBoxStart(canvasPos);
+      setSelectionBoxEnd(canvasPos);
+      // Don't clear selection immediately - wait until mouse up to see if it's a drag or click
     }
   };
 
@@ -67,13 +90,100 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
         x: e.clientX - panStart.x,
         y: e.clientY - panStart.y,
       });
+      return;
+    }
+
+    if (isSelecting && selectionBoxStart) {
+      const canvasPos = screenToCanvas(e.clientX, e.clientY);
+      setSelectionBoxEnd(canvasPos);
     }
   };
   
   const currentSlide = deck?.slides[currentSlideIndex];
 
   const handleMouseUp = () => {
-    setIsPanning(false);
+    if (isPanning) {
+      setIsPanning(false);
+      return;
+    }
+
+    if (isSelecting && selectionBoxStart && selectionBoxEnd) {
+      // Calculate selection box bounds
+      const minX = Math.min(selectionBoxStart.x, selectionBoxEnd.x);
+      const minY = Math.min(selectionBoxStart.y, selectionBoxEnd.y);
+      const maxX = Math.max(selectionBoxStart.x, selectionBoxEnd.x);
+      const maxY = Math.max(selectionBoxStart.y, selectionBoxEnd.y);
+      const boxWidth = maxX - minX;
+      const boxHeight = maxY - minY;
+
+      // If selection box is too small, treat it as a click and clear selection
+      if (boxWidth < 5 && boxHeight < 5) {
+        editor.clearSelection();
+      } else {
+        // Find all elements that intersect with the selection box
+        const currentSlide = deck?.slides[currentSlideIndex];
+        if (currentSlide) {
+          const allElements = [
+            ...(currentSlide.elements || []),
+            ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+          ];
+
+          const selectedIds = new Set<string>();
+
+          // Check each element for intersection with selection box
+          for (const element of allElements) {
+            if (!element.bounds) continue;
+
+            // Skip groups - we'll handle them separately if needed
+            if (element.type === 'group') {
+              // For groups, check if selection box intersects with group bounds
+              const elX = element.bounds.x || 0;
+              const elY = element.bounds.y || 0;
+              const elWidth = element.bounds.width || 0;
+              const elHeight = element.bounds.height || 0;
+
+              // Check if selection box intersects with element bounds
+              if (
+                minX < elX + elWidth &&
+                maxX > elX &&
+                minY < elY + elHeight &&
+                maxY > elY
+              ) {
+                selectedIds.add(element.id);
+              }
+            } else {
+              // For regular elements, check intersection
+              const elX = element.bounds.x || 0;
+              const elY = element.bounds.y || 0;
+              const elWidth = element.bounds.width || 0;
+              const elHeight = element.bounds.height || 0;
+
+              // Check if selection box intersects with element bounds
+              if (
+                minX < elX + elWidth &&
+                maxX > elX &&
+                minY < elY + elHeight &&
+                maxY > elY
+              ) {
+                selectedIds.add(element.id);
+              }
+            }
+          }
+
+          // Update selection
+          if (selectedIds.size > 0) {
+            editor.selectElements(Array.from(selectedIds));
+          } else {
+            editor.clearSelection();
+          }
+        }
+      }
+
+      // Reset selection box
+      setIsSelecting(false);
+      setSelectionBoxStart(null);
+      setSelectionBoxEnd(null);
+    }
   };
 
   useEffect(() => {
@@ -115,7 +225,17 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+      onMouseLeave={() => {
+        // Cancel selection box if mouse leaves canvas
+        if (isSelecting) {
+          setIsSelecting(false);
+          setSelectionBoxStart(null);
+          setSelectionBoxEnd(null);
+        }
+        if (isPanning) {
+          setIsPanning(false);
+        }
+      }}
     >
       {/* Canvas Container */}
       <div
@@ -202,6 +322,23 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
                 `,
                 backgroundSize: '20px 20px',
                 pointerEvents: 'none',
+              }}
+            />
+          )}
+
+          {/* Selection Box - Show when dragging to select */}
+          {isSelecting && selectionBoxStart && selectionBoxEnd && (
+            <div
+              style={{
+                position: 'absolute',
+                left: `${Math.min(selectionBoxStart.x, selectionBoxEnd.x)}px`,
+                top: `${Math.min(selectionBoxStart.y, selectionBoxEnd.y)}px`,
+                width: `${Math.abs(selectionBoxEnd.x - selectionBoxStart.x)}px`,
+                height: `${Math.abs(selectionBoxEnd.y - selectionBoxStart.y)}px`,
+                border: '1px dashed var(--lume-primary)',
+                background: 'rgba(22, 194, 199, 0.1)',
+                pointerEvents: 'none',
+                zIndex: 1001,
               }}
             />
           )}
