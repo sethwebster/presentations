@@ -23,6 +23,13 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
   const [draggedElementId, setDraggedElementId] = useState<string | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
+  useEffect(() => {
+    if (editingLayerId && layerNameInputRef.current) {
+      layerNameInputRef.current.focus();
+      layerNameInputRef.current.select();
+    }
+  }, [editingLayerId]);
+
   const currentSlide = deck?.slides[currentSlideIndex];
   if (!currentSlide) {
     return (
@@ -154,13 +161,6 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
     setEditingLayerId(null);
     setEditingLayerName('');
   };
-
-  useEffect(() => {
-    if (editingLayerId && layerNameInputRef.current) {
-      layerNameInputRef.current.focus();
-      layerNameInputRef.current.select();
-    }
-  }, [editingLayerId]);
 
   const handleDragStart = (e: React.DragEvent, elementId: string, index: number) => {
     const element = allElements[index]?.element;
