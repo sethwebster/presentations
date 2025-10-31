@@ -324,6 +324,21 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
         if (typeof slide.background === 'string') return slide.background;
         if (slide.background.type === 'color') return slide.background.value as string;
         if (slide.background.type === 'gradient') return gradientToCSS(slide.background.value);
+        if (slide.background.type === 'image') {
+          const value = slide.background.value;
+          if (typeof value === 'string') return `url(${value}) center / cover no-repeat`;
+          if (value && typeof value === 'object') {
+            const src = (value as any).src || (value as any).url;
+            if (typeof src === 'string' && src.length > 0) {
+              const position = (value as any).position || 'center';
+              const fit = (value as any).fit || 'cover';
+              const repeat = (value as any).repeat || 'no-repeat';
+              const base = (value as any).baseColor;
+              const declaration = `url(${src}) ${position} / ${fit} ${repeat}`;
+              return base ? `${base} ${declaration}` : declaration;
+            }
+          }
+        }
       }
       if (slide.style?.background) {
         const bg = slide.style.background;

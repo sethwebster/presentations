@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { AlignmentTools } from './AlignmentTools';
+import { ImageBackgroundModal } from './ImageBackgroundModal';
 
 interface ToolbarProps {
   deckId: string;
@@ -13,17 +14,23 @@ interface ToolbarProps {
 export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
   const state = useEditor();
   const editor = useEditorInstance();
-  
+
   const showGrid = state.showGrid;
   const deck = state.deck;
   const currentSlideIndex = state.currentSlideIndex;
   const selectedElementIds = state.selectedElementIds;
   const autosaveEnabled = state.autosaveEnabled;
   const lastShapeStyle = state.lastShapeStyle;
-  
+  const activeSlideId = state.selectedSlideId ?? deck?.slides?.[currentSlideIndex]?.id ?? null;
+
   const [showAlignMenu, setShowAlignMenu] = useState(false);
   const alignMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const backgroundFileInputRef = useRef<HTMLInputElement>(null);
+  const [showBackgroundModal, setShowBackgroundModal] = useState(false);
+  const [backgroundStatus, setBackgroundStatus] = useState<{ isGenerating: boolean; error: string | null; success: string | null }>(
+    { isGenerating: false, error: null, success: null }
+  );
   
   // Close align menu when clicking outside
   useEffect(() => {
@@ -298,6 +305,194 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       el.click(); // MUST be synchronous - no await/promise before this
     }
   }, [processImageFiles]);
+
+  const setBackgroundFeedback = useCallback((partial: Partial<{ isGenerating: boolean; error: string | null; success: string | null }>) => {
+    setBackgroundStatus((prev) => ({
+      isGenerating: partial.isGenerating ?? prev.isGenerating,
+      error: partial.error ?? null,
+      success: partial.success ?? null,
+    }));
+  }, []);
+
+  const compressBackgroundFile = useCallback(async (file: File) => {
+    const readFileAsDataUrl = () =>
+      new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string') {
+            resolve(reader.result);
+          } else {
+            reject(new Error('Unable to read image file'));
+          }
+        };
+        reader.onerror = () => reject(new Error('Failed to read image file'));
+        reader.readAsDataURL(file);
+      });
+
+    const loadImage = (dataUrl: string) =>
+      new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = dataUrl;
+      });
+
+    const originalDataUrl = await readFileAsDataUrl();
+    const img = await loadImage(originalDataUrl);
+
+    const maxWidth = 2560;
+    const maxHeight = 1440;
+    const scale = Math.min(maxWidth / img.width, maxHeight / img.height, 1);
+
+    const targetWidth = Math.max(1, Math.round(img.width * scale));
+    const targetHeight = Math.max(1, Math.round(img.height * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('Failed to prepare image canvas');
+    }
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+    const prefersPng = file.type === 'image/png' && file.size < 1_500_000;
+    const mime = prefersPng ? 'image/png' : 'image/jpeg';
+    const quality = mime === 'image/jpeg' ? 0.92 : undefined;
+
+    const dataUrl = canvas.toDataURL(mime, quality);
+
+    return {
+      dataUrl,
+      width: targetWidth,
+      height: targetHeight,
+      mime,
+      originalWidth: img.width,
+      originalHeight: img.height,
+    };
+  }, []);
+
+  const handleBackgroundFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setBackgroundFeedback({ error: 'Please choose an image file.' });
+      return;
+    }
+
+    if (!activeSlideId) {
+      setBackgroundFeedback({ error: 'Select a slide before setting a background.' });
+      return;
+    }
+
+    try {
+      setBackgroundFeedback({ isGenerating: true, error: null, success: null });
+      const processed = await compressBackgroundFile(file);
+      editor.updateSlide(activeSlideId, {
+        background: {
+          type: 'image',
+          value: {
+            src: processed.dataUrl,
+            width: processed.width,
+            height: processed.height,
+            mimeType: processed.mime,
+            originalWidth: processed.originalWidth,
+            originalHeight: processed.originalHeight,
+            updatedAt: new Date().toISOString(),
+            source: 'upload',
+            name: file.name,
+          },
+          opacity: 1,
+        },
+      });
+      setBackgroundFeedback({ isGenerating: false, success: 'Background updated from upload.' });
+      setTimeout(() => setShowBackgroundModal(false), 1200);
+    } catch (error) {
+      console.error('Failed to process background upload:', error);
+      setBackgroundFeedback({
+        isGenerating: false,
+        error: error instanceof Error ? error.message : 'Failed to process image upload.',
+      });
+    }
+  }, [activeSlideId, compressBackgroundFile, editor, setBackgroundFeedback]);
+
+  const triggerBackgroundUpload = useCallback(() => {
+    if (!activeSlideId) {
+      setBackgroundFeedback({ error: 'Select a slide before setting a background.' });
+      return;
+    }
+    setBackgroundStatus({ isGenerating: false, error: null, success: null });
+    const el = backgroundFileInputRef.current;
+    if (el) {
+      el.value = '';
+      el.click();
+    }
+  }, [activeSlideId, setBackgroundFeedback]);
+
+  const handleGenerateBackground = useCallback(async (prompt: string) => {
+    if (!activeSlideId) {
+      setBackgroundFeedback({ error: 'Select a slide before generating a background.' });
+      return;
+    }
+
+    try {
+      setBackgroundFeedback({ isGenerating: true, error: null, success: null });
+      const response = await fetch('/api/ai/background', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        const message = errorBody?.error || `Image generation failed (${response.status}).`;
+        throw new Error(message);
+      }
+
+      const data = await response.json();
+      const imageData: string | undefined = data?.image;
+      const meta = data?.meta;
+
+      if (!imageData) {
+        throw new Error('No image returned by generator.');
+      }
+
+      editor.updateSlide(activeSlideId, {
+        background: {
+          type: 'image',
+          value: {
+            src: imageData,
+            prompt,
+            generatedAt: new Date().toISOString(),
+            source: 'ai',
+            provider: meta?.provider ?? 'openai',
+            quality: meta?.quality ?? 'hd',
+          },
+          opacity: 1,
+        },
+      });
+
+      setBackgroundFeedback({ isGenerating: false, success: 'AI background applied to slide.' });
+      setTimeout(() => setShowBackgroundModal(false), 1500);
+    } catch (error) {
+      console.error('AI background generation failed:', error);
+      setBackgroundFeedback({
+        isGenerating: false,
+        error: error instanceof Error ? error.message : 'Background generation failed.',
+      });
+    }
+  }, [activeSlideId, editor, setBackgroundFeedback]);
   return (
     <div className="editor-toolbar editor-panel-muted flex items-center gap-3 px-4 h-14 border-b border-[var(--editor-border-strong)] shadow-[0_18px_40px_-30px_var(--editor-shadow)]">
       {/* Insert Tools */}
@@ -323,7 +518,10 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
         </ToolbarButton>
         <ToolbarButton 
           title="Insert Image" 
-          onClick={handleInsertImageClick}
+          onClick={() => {
+            setBackgroundStatus({ isGenerating: false, error: null, success: null });
+            setShowBackgroundModal(true);
+          }}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -336,6 +534,14 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
           type="file"
           accept="image/*"
           onChange={handleFileInputChange}
+          className="absolute w-px h-px p-0 -m-px overflow-hidden clip-[rect(0,0,0,0)] whitespace-nowrap border-0"
+          tabIndex={-1}
+        />
+        <input
+          ref={backgroundFileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleBackgroundFileChange}
           className="absolute w-px h-px p-0 -m-px overflow-hidden clip-[rect(0,0,0,0)] whitespace-nowrap border-0"
           tabIndex={-1}
         />
@@ -655,6 +861,25 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
           </svg>
         </ToolbarButton>
       </div>
+
+      <ImageBackgroundModal
+        open={showBackgroundModal}
+        onClose={() => {
+          setShowBackgroundModal(false);
+          setBackgroundStatus({ isGenerating: false, error: null, success: null });
+        }}
+        onGenerate={handleGenerateBackground}
+        onUpload={() => {
+          setBackgroundFeedback({ error: null, success: null });
+          triggerBackgroundUpload();
+        }}
+        onInsertImageElement={() => {
+          setShowBackgroundModal(false);
+          setBackgroundStatus({ isGenerating: false, error: null, success: null });
+          handleInsertImageClick();
+        }}
+        status={backgroundStatus}
+      />
     </div>
   );
 }
