@@ -46,50 +46,27 @@ export function EditorLayout({ deckId }: EditorLayoutProps) {
   useKeyboardShortcuts();
 
   return (
-    <div className="editor-layout" style={{
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100vh',
-      width: '100vw',
-      background: 'var(--lume-midnight)',
-      color: 'var(--lume-mist)',
-      overflow: 'hidden',
-      fontFamily: "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-    }}>
+    <div className="editor-shell flex flex-col h-screen w-screen overflow-hidden font-sans">
       {/* Top Toolbar */}
       <Toolbar deckId={deckId} onToggleTimeline={() => setShowTimeline(!showTimeline)} />
 
       {/* Main Content Area */}
-      <div style={{
-        display: 'flex',
-        flex: 1,
-        overflow: 'hidden',
-        position: 'relative',
-      }}>
+      <div className="flex flex-1 overflow-hidden relative">
         {/* Left Sidebar - Layer Panel */}
         <LayerPanel deckId={deckId} />
 
         {/* Center - Canvas Area */}
-        <div style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          position: 'relative',
-        }}>
+        <div className="flex-1 flex flex-col overflow-hidden relative">
           <EditorCanvas deckId={deckId} />
         </div>
 
         {/* Right Sidebar - Properties Panel */}
-        <PropertiesPanel deckId={deckId} />
+        <PropertiesPanel />
       </div>
 
       {/* Bottom - Timeline Editor (conditional) */}
       {showTimeline && (
-        <div style={{
-          height: '200px',
-          borderTop: '1px solid rgba(236, 236, 236, 0.1)',
-        }}>
+        <div className="h-[200px] border-t border-lume-mist/10">
           <TimelineEditor deckId={deckId} />
         </div>
       )}

@@ -13,15 +13,22 @@ const CANVAS_HEIGHT = 720;
 const SNAP_THRESHOLD = 5;
 
 // Convert screen coordinates to canvas coordinates
-function screenToCanvas(screenX: number, screenY: number, zoom: number, pan: { x: number; y: number }): { x: number; y: number } {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function screenToCanvas(screenX: number, screenY: number, _zoom: number, _pan: { x: number; y: number }): { x: number; y: number } {
   const canvasContainer = document.querySelector('[data-canvas-container]') as HTMLElement;
   if (!canvasContainer) {
     return { x: screenX, y: screenY };
   }
 
   const rect = canvasContainer.getBoundingClientRect();
-  const canvasX = (screenX - rect.left) / zoom;
-  const canvasY = (screenY - rect.top) / zoom;
+  
+  // Calculate effective scale from actual rendered size vs canvas dimensions
+  // The rect already accounts for both outer wrapper scale(fitScale) and inner scale(zoom)
+  const CANVAS_WIDTH = 1280;
+  const effectiveScale = rect.width / CANVAS_WIDTH;
+  
+  const canvasX = (screenX - rect.left) / effectiveScale;
+  const canvasY = (screenY - rect.top) / effectiveScale;
   return { x: canvasX, y: canvasY };
 }
 
@@ -236,6 +243,10 @@ function GroupBoundsOverlay({
     document.body.style.webkitUserSelect = 'none';
     document.body.style.cursor = 'grabbing';
 
+    // Throttle drag updates to prevent excessive re-renders and memory issues
+    let rafId: number | null = null;
+    let pendingDelta: { deltaX: number; deltaY: number } | null = null;
+
     const handleMouseMove = (e: MouseEvent) => {
       e.preventDefault();
       const canvasPos = screenToCanvas(e.clientX, e.clientY, zoom, pan);
@@ -283,45 +294,96 @@ function GroupBoundsOverlay({
       const primaryDeltaX = primaryNewX - primaryInitialBounds.x;
       const primaryDeltaY = primaryNewY - primaryInitialBounds.y;
       
-      // Helper to recursively update all children (including nested groups)
-      const updateGroupChildren = (children: ElementDefinition[], deltaX: number, deltaY: number) => {
-        children.forEach((child) => {
-          const initialBounds = selectedElementsInitialBounds.get(child.id);
-          if (!initialBounds) return;
-          
-          // No bounds constraints - allow elements to go outside canvas
-          const newX = initialBounds.x + deltaX;
-          const newY = initialBounds.y + deltaY;
-          
-          // Update the child
-          editor.updateElement(child.id, {
-            bounds: {
-              ...child.bounds,
-              x: newX,
-              y: newY,
-              width: initialBounds.width,
-              height: initialBounds.height,
-            },
-          });
-          
-          // If child is a nested group, recursively update its children
-          if (child.type === 'group') {
-            const nestedGroup = child as GroupElementDefinition;
-            if (nestedGroup.children) {
-              updateGroupChildren(nestedGroup.children, deltaX, deltaY);
-            }
+      // Store pending delta
+      pendingDelta = { deltaX: primaryDeltaX, deltaY: primaryDeltaY };
+
+      // Throttle updates using requestAnimationFrame
+      if (rafId === null) {
+        rafId = requestAnimationFrame(() => {
+          if (pendingDelta && element.children) {
+            // Helper to recursively update all children (including nested groups)
+            const updateGroupChildren = (children: ElementDefinition[], deltaX: number, deltaY: number) => {
+              children.forEach((child) => {
+                const initialBounds = selectedElementsInitialBounds.get(child.id);
+                if (!initialBounds) return;
+                
+                // No bounds constraints - allow elements to go outside canvas
+                const newX = initialBounds.x + deltaX;
+                const newY = initialBounds.y + deltaY;
+                
+                // Update the child
+                editor.updateElement(child.id, {
+                  bounds: {
+                    ...child.bounds,
+                    x: newX,
+                    y: newY,
+                    width: initialBounds.width,
+                    height: initialBounds.height,
+                  },
+                });
+                
+                // If child is a nested group, recursively update its children
+                if (child.type === 'group') {
+                  const nestedGroup = child as GroupElementDefinition;
+                  if (nestedGroup.children) {
+                    updateGroupChildren(nestedGroup.children, deltaX, deltaY);
+                  }
+                }
+              });
+            };
+            
+            // Update all group children (including nested groups) with the same delta
+            updateGroupChildren(element.children, pendingDelta.deltaX, pendingDelta.deltaY);
+            pendingDelta = null;
           }
+          rafId = null;
         });
-      };
-      
-      // Update all group children (including nested groups) with the same delta
-      updateGroupChildren(element.children, primaryDeltaX, primaryDeltaY);
-      
-      // Group bounds will be recalculated automatically when children are updated
+      }
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
+      
+      // Apply any pending update immediately on mouse up
+      if (pendingDelta && element.children) {
+        // Helper to recursively update all children (including nested groups)
+        const updateGroupChildren = (children: ElementDefinition[], deltaX: number, deltaY: number) => {
+          children.forEach((child) => {
+            const initialBounds = selectedElementsInitialBounds.get(child.id);
+            if (!initialBounds) return;
+            
+            const newX = initialBounds.x + deltaX;
+            const newY = initialBounds.y + deltaY;
+            
+            editor.updateElement(child.id, {
+              bounds: {
+                ...child.bounds,
+                x: newX,
+                y: newY,
+                width: initialBounds.width,
+                height: initialBounds.height,
+              },
+            });
+            
+            if (child.type === 'group') {
+              const nestedGroup = child as GroupElementDefinition;
+              if (nestedGroup.children) {
+                updateGroupChildren(nestedGroup.children, deltaX, deltaY);
+              }
+            }
+          });
+        };
+        
+        updateGroupChildren(element.children, pendingDelta.deltaX, pendingDelta.deltaY);
+        pendingDelta = null;
+      }
+      
+      // Cancel any pending animation frame
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      
       document.body.style.userSelect = '';
       document.body.style.webkitUserSelect = '';
       document.body.style.cursor = '';
@@ -339,6 +401,13 @@ function GroupBoundsOverlay({
       window.removeEventListener('selectstart', preventSelection);
       window.removeEventListener('dragstart', preventSelection);
       document.removeEventListener('contextmenu', preventSelection);
+      
+      // Clean up animation frame
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      
       document.body.style.userSelect = '';
       document.body.style.webkitUserSelect = '';
       document.body.style.cursor = '';

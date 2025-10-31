@@ -18,16 +18,19 @@ export function StatusBar({ deckId }: StatusBarProps) {
   const error = state.error;
   const isLoading = state.isLoading;
   const selectedElementIds = state.selectedElementIds;
+  const draggingElementId = state.draggingElementId;
   
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [previousDeckHash, setPreviousDeckHash] = useState<string>('');
+  const [pendingSaveHash, setPendingSaveHash] = useState<string>('');
 
   // Track save status by monitoring deck changes
   useEffect(() => {
     if (!deck) {
       setSaveStatus('saved');
       setPreviousDeckHash('');
+      setPendingSaveHash('');
       return;
     }
 
@@ -44,7 +47,18 @@ export function StatusBar({ deckId }: StatusBarProps) {
       setSaveStatus('unsaved');
     }
 
-    // Auto-save if enabled and deck content has changed
+    // CRITICAL: Don't autosave while dragging/resizing - wait until drag completes
+    const isDragging = draggingElementId !== null;
+    
+    if (isDragging) {
+      // Store the hash for saving after drag completes
+      if (deckHash !== previousDeckHash) {
+        setPendingSaveHash(deckHash);
+      }
+      return; // Skip autosave while dragging
+    }
+
+    // Auto-save if enabled and deck content has changed (and not dragging)
     if (autosaveEnabled && deckHash !== previousDeckHash && previousDeckHash !== '') {
       console.log('Deck changed, scheduling autosave...', { deckHash: deckHash.substring(0, 50), previousHash: previousDeckHash.substring(0, 50) });
       const saveTimeout = setTimeout(async () => {
@@ -56,6 +70,7 @@ export function StatusBar({ deckId }: StatusBarProps) {
           setSaveStatus('saved');
           setLastSaved(new Date());
           setPreviousDeckHash(deckHash);
+          setPendingSaveHash(''); // Clear pending save
         } catch (error) {
           console.error('Save failed:', error);
           setSaveStatus('unsaved');
@@ -65,12 +80,33 @@ export function StatusBar({ deckId }: StatusBarProps) {
       return () => clearTimeout(saveTimeout);
     }
 
+    // If drag just completed and we have a pending save
+    if (!isDragging && pendingSaveHash && pendingSaveHash !== previousDeckHash) {
+      console.log('Drag completed, saving pending changes...');
+      const saveTimeout = setTimeout(async () => {
+        setSaveStatus('saving');
+        try {
+          await editor.saveDeck();
+          console.log('Post-drag autosave completed successfully');
+          setSaveStatus('saved');
+          setLastSaved(new Date());
+          setPreviousDeckHash(pendingSaveHash);
+          setPendingSaveHash('');
+        } catch (error) {
+          console.error('Post-drag save failed:', error);
+          setSaveStatus('unsaved');
+        }
+      }, 500); // Shorter debounce after drag
+
+      return () => clearTimeout(saveTimeout);
+    }
+
     // Initialize hash on first load
     if (previousDeckHash === '') {
       console.log('Initializing deck hash on first load');
       setPreviousDeckHash(deckHash);
     }
-  }, [deck, autosaveEnabled, previousDeckHash, editor]);
+  }, [deck, autosaveEnabled, previousDeckHash, editor, draggingElementId, pendingSaveHash]);
 
   const currentSlide = deck?.slides[currentSlideIndex];
   const elementCount = currentSlide 
@@ -87,44 +123,20 @@ export function StatusBar({ deckId }: StatusBarProps) {
   };
 
   return (
-    <div style={{
-      height: '22px',
-      borderTop: '1px solid rgba(236, 236, 236, 0.1)',
-      background: 'rgba(11, 16, 34, 0.95)',
-      backdropFilter: 'blur(10px)',
-      display: 'flex',
-      alignItems: 'center',
-      padding: '0 8px',
-      fontSize: '11px',
-      color: 'rgba(236, 236, 236, 0.8)',
-      fontFamily: "'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace",
-      userSelect: 'none',
-      zIndex: 100,
-    }}>
+    <div className="editor-panel-muted h-[26px] border-t border-[var(--editor-border-strong)] flex items-center px-3 text-[11px] font-mono select-none z-[100] text-[var(--editor-text-muted)]">
       {/* Left side - Status indicators */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
+      <div className="flex items-center gap-4 flex-1">
         {/* Save Status */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <div className="flex items-center gap-1">
           {saveStatus === 'saving' && (
             <>
-              <div style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: 'var(--lume-primary)',
-                animation: 'statusBarPulse 1s ease-in-out infinite',
-              }} />
+              <div className="w-2 h-2 rounded-full bg-lume-primary animate-[statusBarPulse_1s_ease-in-out_infinite]" />
               <span>Saving...</span>
             </>
           )}
           {saveStatus === 'saved' && (
             <>
-              <div style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: '#10B981',
-              }} />
+              <div className="w-2 h-2 rounded-full bg-[#10B981]" />
               <span>
                 {lastSaved ? `Saved ${formatTime(lastSaved)}` : 'Saved'}
               </span>
@@ -132,12 +144,7 @@ export function StatusBar({ deckId }: StatusBarProps) {
           )}
           {saveStatus === 'unsaved' && !autosaveEnabled && (
             <>
-              <div style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: '#F59E0B',
-              }} />
+              <div className="w-2 h-2 rounded-full bg-[#F59E0B]" />
               <span>Unsaved</span>
             </>
           )}
@@ -145,8 +152,8 @@ export function StatusBar({ deckId }: StatusBarProps) {
 
         {/* Autosave Status */}
         {autosaveEnabled && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', opacity: 0.7 }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '12px', height: '12px' }}>
+          <div className="flex items-center gap-1 opacity-70">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3">
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
               <circle cx="18" cy="8" r="1" fill="currentColor"/>
             </svg>
@@ -156,8 +163,8 @@ export function StatusBar({ deckId }: StatusBarProps) {
 
         {/* Error Status */}
         {error && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#EF4444' }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '12px', height: '12px' }}>
+          <div className="flex items-center gap-1 text-[#EF4444]">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3">
               <circle cx="12" cy="12" r="10"/>
               <line x1="12" y1="8" x2="12" y2="12"/>
               <line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -168,45 +175,38 @@ export function StatusBar({ deckId }: StatusBarProps) {
 
         {/* Loading Status */}
         {isLoading && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <div style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              border: '1px solid currentColor',
-              borderTopColor: 'transparent',
-              animation: 'statusBarSpin 0.6s linear infinite',
-            }} />
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full border border-current border-t-transparent animate-[statusBarSpin_0.6s_linear_infinite]" />
             <span>Loading...</span>
           </div>
         )}
       </div>
 
       {/* Right side - Info */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div className="flex items-center gap-4">
         {/* Selection Info */}
         {selectedElementIds.size > 0 && (
-          <div style={{ opacity: 0.7 }}>
+          <div className="opacity-70">
             {selectedElementIds.size} {selectedElementIds.size === 1 ? 'element' : 'elements'} selected
           </div>
         )}
 
         {/* Slide Info */}
         {deck && (
-          <div style={{ opacity: 0.7 }}>
+          <div className="opacity-70">
             Slide {currentSlideIndex + 1} of {deck.slides.length}
           </div>
         )}
 
         {/* Element Count */}
         {currentSlide && (
-          <div style={{ opacity: 0.7 }}>
+          <div className="opacity-70">
             {elementCount} {elementCount === 1 ? 'element' : 'elements'}
           </div>
         )}
 
         {/* Zoom Level */}
-        <div style={{ opacity: 0.7 }}>
+        <div className="opacity-70">
           {Math.round(zoom * 100)}%
         </div>
       </div>

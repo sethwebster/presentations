@@ -5,12 +5,10 @@ import type { ElementDefinition } from '@/rsc/types';
 import { AlignmentTools } from './AlignmentTools';
 import { ColorPicker } from './ColorPicker';
 import { DocumentProperties } from './DocumentProperties';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
-interface PropertiesPanelProps {
-  deckId: string;
-}
-
-export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
+export function PropertiesPanel() {
   const state = useEditor();
   const editor = useEditorInstance();
   
@@ -32,64 +30,28 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
   }
 
   const selectedElement = selectedElements[0];
-  
-  // Helper to update all selected elements
-  const updateAllSelected = (updates: Partial<ElementDefinition>) => {
-    selectedElementIds.forEach((id) => {
-      const el = selectedElements.find(e => e.id === id);
-      if (el) {
-        // For bounds updates, preserve relative positions/sizes
-        if (updates.bounds && el.bounds) {
-          editor.updateElement(id, {
-            bounds: { ...el.bounds, ...updates.bounds },
-          });
-        } else {
-          editor.updateElement(id, updates);
-        }
-      }
-    });
-  };
 
   return (
-    <div className="properties-panel" style={{
-      width: '280px',
-      borderLeft: '1px solid rgba(236, 236, 236, 0.1)',
-      background: 'rgba(11, 16, 34, 0.6)',
-      backdropFilter: 'blur(10px)',
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-    }}>
-      <div style={{
-        padding: '16px',
-        borderBottom: '1px solid rgba(236, 236, 236, 0.1)',
-        fontSize: '14px',
-        fontWeight: '600',
-        color: 'var(--lume-mist)',
-        letterSpacing: '0.01em',
-      }}>
+    <div className="editor-panel w-[280px] flex flex-col overflow-hidden border-l border-[var(--editor-border-strong)]">
+      <div className="editor-panel-header px-5 py-5 border-b border-[var(--editor-border-strong)]">
         Properties
         {selectedElementIds.size > 1 && (
-          <span style={{ fontSize: '12px', opacity: 0.6, marginLeft: '8px' }}>
+          <span className="ml-2 text-xs text-[var(--editor-text-muted)]">
             ({selectedElementIds.size} selected)
           </span>
         )}
       </div>
-      <div style={{
-        flex: 1,
-        padding: '16px',
-        overflowY: 'auto',
-      }}>
+      <div className="flex-1 p-5 overflow-y-auto editor-panel-body">
         {!selectedElement ? (
           <DocumentProperties />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="flex flex-col gap-4">
             {/* Position & Size */}
             <div>
-              <label style={{ fontSize: '12px', color: 'rgba(236, 236, 236, 0.8)', marginBottom: '4px', display: 'block' }}>
-                Position & Size
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <Label className="mb-2 editor-section-heading">
+                Position &amp; Size
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
                 <PropertyInput
                   label="X"
                   value={selectedElement.bounds?.x || 0}
@@ -108,7 +70,12 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
                       });
                     } else {
                       editor.updateElement(selectedElement.id, {
-                        bounds: { ...selectedElement.bounds, x: val, width: selectedElement.bounds?.width || 100, height: selectedElement.bounds?.height || 50 },
+                        bounds: { 
+                          x: val, 
+                          y: selectedElement.bounds?.y || 0,
+                          width: selectedElement.bounds?.width || 100, 
+                          height: selectedElement.bounds?.height || 50 
+                        },
                       });
                     }
                   }}
@@ -131,7 +98,12 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
                       });
                     } else {
                       editor.updateElement(selectedElement.id, {
-                        bounds: { ...selectedElement.bounds, y: val, width: selectedElement.bounds?.width || 100, height: selectedElement.bounds?.height || 50 },
+                        bounds: { 
+                          x: selectedElement.bounds?.x || 0,
+                          y: val, 
+                          width: selectedElement.bounds?.width || 100, 
+                          height: selectedElement.bounds?.height || 50 
+                        },
                       });
                     }
                   }}
@@ -154,7 +126,12 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
                       });
                     } else {
                       editor.updateElement(selectedElement.id, {
-                        bounds: { ...selectedElement.bounds, width: val, height: selectedElement.bounds?.height || 50 },
+                        bounds: { 
+                          x: selectedElement.bounds?.x || 0,
+                          y: selectedElement.bounds?.y || 0,
+                          width: val, 
+                          height: selectedElement.bounds?.height || 50 
+                        },
                       });
                     }
                   }}
@@ -177,7 +154,12 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
                       });
                     } else {
                       editor.updateElement(selectedElement.id, {
-                        bounds: { ...selectedElement.bounds, height: val },
+                        bounds: { 
+                          x: selectedElement.bounds?.x || 0,
+                          y: selectedElement.bounds?.y || 0,
+                          width: selectedElement.bounds?.width || 100,
+                          height: val 
+                        },
                       });
                     }
                   }}
@@ -188,23 +170,13 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
             {/* Text Properties */}
             {selectedElement.type === 'text' && (
               <div>
-                <label style={{ fontSize: '12px', color: 'rgba(236, 236, 236, 0.8)', marginBottom: '4px', display: 'block' }}>
+                <Label className="mb-2 editor-section-heading">
                   Text
-                </label>
+                </Label>
                 <textarea
                   value={(selectedElement as any).content || ''}
                   onChange={(e) => editor.updateElement(selectedElement.id, { content: e.target.value })}
-                  style={{
-                    width: '100%',
-                    minHeight: '60px',
-                    padding: '8px',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(236, 236, 236, 0.2)',
-                    borderRadius: '4px',
-                    color: 'var(--lume-mist)',
-                    fontSize: '14px',
-                    fontFamily: 'inherit',
-                  }}
+                  className="w-full min-h-[60px] p-2 bg-background dark:bg-muted/50 border border-border/20 dark:border-border/30 dark:border-border/10 rounded text-foreground text-sm font-inherit resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-lume-primary/50"
                 />
               </div>
             )}
@@ -213,9 +185,9 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
             {selectedElement.type === 'shape' && (
               <>
                 <div>
-                  <label style={{ fontSize: '12px', color: 'rgba(236, 236, 236, 0.8)', marginBottom: '4px', display: 'block' }}>
+                  <Label className="mb-2 editor-section-heading">
                     Fill Color
-                  </label>
+                  </Label>
                   <ColorPicker
                     value={(selectedElement.style as any)?.fill || '#16C2C7'}
                     onChange={(value) => {
@@ -232,9 +204,9 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: '12px', color: 'rgba(236, 236, 236, 0.8)', marginBottom: '4px', display: 'block' }}>
+                  <Label className="mb-2 editor-section-heading">
                     Stroke Color
-                  </label>
+                  </Label>
                   <ColorPicker
                     value={(selectedElement.style as any)?.stroke || 'transparent'}
                     onChange={(value) => {
@@ -252,10 +224,10 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
                 </div>
                 {(selectedElement.style as any)?.stroke && (selectedElement.style as any).stroke !== 'transparent' && (
                   <div>
-                    <label style={{ fontSize: '12px', color: 'rgba(236, 236, 236, 0.8)', marginBottom: '4px', display: 'block' }}>
+                    <Label className="mb-2 editor-section-heading">
                       Stroke Width
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       type="number"
                       min="0"
                       max="50"
@@ -272,24 +244,64 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
                           }
                         });
                       }}
-                      style={{
-                        width: '100%',
-                        padding: '8px',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(236, 236, 236, 0.2)',
-                        borderRadius: '4px',
-                        color: 'var(--lume-mist)',
-                        fontSize: '14px',
-                      }}
+                      className="w-full bg-background dark:bg-muted/50 border-border/30 dark:border-border/10 text-foreground"
                     />
                   </div>
                 )}
               </>
             )}
 
+            {/* Opacity - Available for all element types */}
+            <div>
+              <Label className="mb-2 editor-section-heading">
+                Opacity
+              </Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={((selectedElement.style as any)?.opacity ?? 100)}
+                  onChange={(e) => {
+                    const opacity = parseInt(e.target.value);
+                    // Update all selected elements
+                    selectedElementIds.forEach((id) => {
+                      const el = selectedElements.find(e => e.id === id);
+                      if (el) {
+                        editor.updateElement(id, {
+                          style: { ...el.style, opacity },
+                        });
+                      }
+                    });
+                  }}
+                  className="flex-1 h-1 rounded-sm outline-none bg-border/30 dark:bg-white/10 accent-lume-primary"
+                />
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={((selectedElement.style as any)?.opacity ?? 100)}
+                  onChange={(e) => {
+                    const opacity = Math.max(0, Math.min(100, parseInt(e.target.value) || 100));
+                    // Update all selected elements
+                    selectedElementIds.forEach((id) => {
+                      const el = selectedElements.find(e => e.id === id);
+                      if (el) {
+                        editor.updateElement(id, {
+                          style: { ...el.style, opacity },
+                        });
+                      }
+                    });
+                  }}
+                  className="w-[60px] h-7 px-2 py-1 bg-background dark:bg-muted/50 border-border/30 dark:border-border/10 text-foreground text-xs"
+                />
+                <span className="text-xs text-foreground/60 min-w-[12px]">%</span>
+              </div>
+            </div>
+
             {/* Alignment Tools - Show when multiple elements selected */}
             {selectedElementIds.size >= 2 && (
-              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(236, 236, 236, 0.1)' }}>
+              <div className="pt-4 mt-4 border-t border-border/8 dark:border-border/30 dark:border-border/10">
                 <AlignmentTools />
               </div>
             )}
@@ -300,25 +312,17 @@ export function PropertiesPanel({ deckId }: PropertiesPanelProps) {
   );
 }
 
-function PropertyInput({ label, value, onChange }: { label: string; value: number; onChange: (val: number) => void }) {
+function PropertyInput({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
   return (
     <div>
-      <label style={{ fontSize: '10px', color: 'rgba(236, 236, 236, 0.6)', display: 'block', marginBottom: '2px' }}>
+      <Label className="block mb-1 text-[0.65rem] font-semibold tracking-[0.08em] uppercase text-[var(--editor-text-muted)]">
         {label}
-      </label>
-      <input
+      </Label>
+      <Input
         type="number"
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        style={{
-          width: '100%',
-          padding: '4px 8px',
-          background: 'rgba(255, 255, 255, 0.05)',
-          border: '1px solid rgba(236, 236, 236, 0.2)',
-          borderRadius: '4px',
-          color: 'var(--lume-mist)',
-          fontSize: '12px',
-        }}
+        className="text-sm editor-input h-9"
       />
     </div>
   );

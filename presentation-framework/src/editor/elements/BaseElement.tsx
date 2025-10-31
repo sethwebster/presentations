@@ -10,7 +10,8 @@ const CANVAS_HEIGHT = 720;
 const SNAP_THRESHOLD = 5; // pixels - same as GUIDE_THRESHOLD
 
 // Convert screen coordinates to canvas coordinates
-function screenToCanvas(screenX: number, screenY: number, zoom: number, pan: { x: number; y: number }): { x: number; y: number } {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function screenToCanvas(screenX: number, screenY: number, _zoom: number, _pan: { x: number; y: number }): { x: number; y: number } {
   // Get canvas container (centered on screen)
   const canvasContainer = document.querySelector('[data-canvas-container]') as HTMLElement;
   if (!canvasContainer) {
@@ -19,16 +20,22 @@ function screenToCanvas(screenX: number, screenY: number, zoom: number, pan: { x
 
   const rect = canvasContainer.getBoundingClientRect();
   
-  // The canvas container has transform: translate(calc(-50% + pan.x), calc(-50% + pan.y)) scale(zoom)
-  // The bounding rect already reflects this transform
-  // Canvas center in screen space (accounting for pan and scale)
+  // The canvas container has nested transforms:
+  // Outer wrapper: scale(fitScale)
+  // Inner container: translate(calc(-50% + pan.x), calc(-50% + pan.y)) scale(zoom)
+  // The bounding rect already reflects both transforms
+  // Calculate effective scale from actual rendered size vs canvas dimensions
+  const CANVAS_WIDTH = 1280;
+  const effectiveScale = rect.width / CANVAS_WIDTH; // rect already accounts for all transforms
+  
+  // Canvas top-left in screen space
   const canvasTopLeftScreenX = rect.left;
   const canvasTopLeftScreenY = rect.top;
   
   // Convert screen coordinates to canvas coordinates
-  // Account for zoom: divide by zoom to get canvas space
-  const canvasX = (screenX - canvasTopLeftScreenX) / zoom;
-  const canvasY = (screenY - canvasTopLeftScreenY) / zoom;
+  // Divide by effective scale (which includes both zoom and fitScale)
+  const canvasX = (screenX - canvasTopLeftScreenX) / effectiveScale;
+  const canvasY = (screenY - canvasTopLeftScreenY) / effectiveScale;
 
   return { x: canvasX, y: canvasY };
 }
@@ -161,6 +168,7 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [selectedElementsInitialBounds, setSelectedElementsInitialBounds] = useState<Map<string, { x: number; y: number; width: number; height: number }>>(new Map());
+  const [draggedSelectedIds, setDraggedSelectedIds] = useState<Set<string>>(new Set());
   const [isEditingText, setIsEditingText] = useState(false);
 
   const handleClick = (e: React.MouseEvent) => {
@@ -250,6 +258,8 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
         }
       });
       setSelectedElementsInitialBounds(initialBounds);
+      // Capture selected IDs at drag start to avoid reading state during drag
+      setDraggedSelectedIds(new Set(currentState.selectedElementIds));
     }
 
     // Convert screen coordinates to canvas coordinates
@@ -276,6 +286,11 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
     document.body.style.webkitUserSelect = 'none';
     document.body.style.cursor = 'grabbing';
 
+    // Throttle drag updates to prevent excessive re-renders and memory issues
+    let rafId: number | null = null;
+    let pendingUpdates: Map<string, { x: number; y: number; width: number; height: number }> | null = null;
+    let pendingDraggingElement: { id: string; bounds: { x: number; y: number; width: number; height: number } } | null = null;
+
     const handleMouseMove = (e: MouseEvent) => {
       e.preventDefault();
       
@@ -286,41 +301,36 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
       const deltaX = canvasPos.x - dragStart.x;
       const deltaY = canvasPos.y - dragStart.y;
       
-      // Get current state to check all selected elements
+      // Get the initial bounds of the primary element being dragged
+      const primaryInitialBounds = selectedElementsInitialBounds.get(element.id);
+      if (!primaryInitialBounds) return;
+      
+      // Calculate the offset of the mouse from the primary element's initial position
+      const initialMouseOffsetX = dragStart.x - primaryInitialBounds.x;
+      const initialMouseOffsetY = dragStart.y - primaryInitialBounds.y;
+      
+      // Calculate where the primary element should be (follows cursor)
+      let primaryNewX = canvasPos.x - initialMouseOffsetX;
+      let primaryNewY = canvasPos.y - initialMouseOffsetY;
+      
+      // Get current state ONLY for snap points (read once, don't use for updates)
+      // Use captured selected IDs from drag start instead of reading from state
       const currentState = editor.getState();
       const currentDeck = currentState.deck;
       const currentSlide = currentDeck?.slides[currentState.currentSlideIndex];
       
-      if (currentSlide && currentState.selectedElementIds.size > 0) {
+      // Build list of elements for snap points (excluding the dragged element and other selected elements)
+      // Use draggedSelectedIds captured at drag start instead of currentState.selectedElementIds
+      let snapPoints = { snapX: null as number | null, snapY: null as number | null };
+      if (currentSlide) {
         const allElements = [
           ...(currentSlide.elements || []),
           ...(currentSlide.layers?.flatMap(l => l.elements) || []),
         ];
         
-        // Get the initial bounds of the primary element being dragged
-        const primaryInitialBounds = selectedElementsInitialBounds.get(element.id);
-        if (!primaryInitialBounds) return;
-        
-        // Calculate the offset of the mouse from the primary element's initial position
-        const initialMouseOffsetX = dragStart.x - primaryInitialBounds.x;
-        const initialMouseOffsetY = dragStart.y - primaryInitialBounds.y;
-        
-        // Calculate where the primary element should be (follows cursor)
-        let primaryNewX = canvasPos.x - initialMouseOffsetX;
-        let primaryNewY = canvasPos.y - initialMouseOffsetY;
-        
-        // Build list of elements for snap points (excluding the dragged element and other selected elements)
         const elementsForSnap = allElements.filter(el => {
           if (el.id === element.id) return false;
-          if (currentState.selectedElementIds.has(el.id)) return false;
-          // If group is opened, also include its children with absolute bounds for snapping
-          if (currentState.openedGroupId && el.type === 'group') {
-            const group = el as any;
-            const groupX = group.bounds?.x || 0;
-            const groupY = group.bounds?.y || 0;
-            // Add group children with absolute bounds for snap detection
-            return true; // Include group itself, children will be handled separately if needed
-          }
+          if (draggedSelectedIds.has(el.id)) return false;
           return true;
         });
         
@@ -331,53 +341,99 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
           width: primaryInitialBounds.width,
           height: primaryInitialBounds.height,
         };
-        const snapPoints = findSnapPoints(tempBounds, elementsForSnap);
+        snapPoints = findSnapPoints(tempBounds, elementsForSnap);
+      }
+      
+      // Apply snapping if within threshold
+      if (snapPoints.snapX !== null && Math.abs(snapPoints.snapX - primaryNewX) < SNAP_THRESHOLD) {
+        primaryNewX = snapPoints.snapX;
+      }
+      if (snapPoints.snapY !== null && Math.abs(snapPoints.snapY - primaryNewY) < SNAP_THRESHOLD) {
+        primaryNewY = snapPoints.snapY;
+      }
+      
+      // Calculate the delta of the primary element
+      const primaryDeltaX = primaryNewX - primaryInitialBounds.x;
+      const primaryDeltaY = primaryNewY - primaryInitialBounds.y;
+      
+      // Store pending updates for all selected elements
+      // Use selectedElementsInitialBounds Map keys instead of reading from state
+      const updates = new Map<string, { x: number; y: number; width: number; height: number }>();
+      
+      // Iterate over the initial bounds map instead of selectedElementIds from state
+      selectedElementsInitialBounds.forEach((initialBounds, id) => {
+        // Calculate new absolute position (no bounds constraints)
+        const newX = initialBounds.x + primaryDeltaX;
+        const newY = initialBounds.y + primaryDeltaY;
         
-        // Apply snapping if within threshold
-        if (snapPoints.snapX !== null && Math.abs(snapPoints.snapX - primaryNewX) < SNAP_THRESHOLD) {
-          primaryNewX = snapPoints.snapX;
-        }
-        if (snapPoints.snapY !== null && Math.abs(snapPoints.snapY - primaryNewY) < SNAP_THRESHOLD) {
-          primaryNewY = snapPoints.snapY;
-        }
-        
-        // Calculate the delta of the primary element
-        const primaryDeltaX = primaryNewX - primaryInitialBounds.x;
-        const primaryDeltaY = primaryNewY - primaryInitialBounds.y;
-        
-        // Update all selected elements
-        // updateElement will handle conversion to relative bounds if element is a group child
-        currentState.selectedElementIds.forEach((id) => {
-          const initialBounds = selectedElementsInitialBounds.get(id);
-          if (!initialBounds) return;
-          
-          // Calculate new absolute position (no bounds constraints)
-          const newX = initialBounds.x + primaryDeltaX;
-          const newY = initialBounds.y + primaryDeltaY;
-          
-          const newBounds = {
-            x: newX,
-            y: newY,
-            width: initialBounds.width,
-            height: initialBounds.height,
-          };
+        const newBounds = {
+          x: newX,
+          y: newY,
+          width: initialBounds.width,
+          height: initialBounds.height,
+        };
 
-          // Update dragging state for alignment guides (only for the primary dragged element)
-          if (id === element.id) {
-            editor.setDraggingElement(element.id, newBounds);
+        updates.set(id, newBounds);
+
+        // Store dragging state for alignment guides (only for the primary dragged element)
+        if (id === element.id) {
+          pendingDraggingElement = { id, bounds: newBounds };
+        }
+      });
+
+      pendingUpdates = updates;
+
+      // Throttle updates using requestAnimationFrame
+      if (rafId === null) {
+        rafId = requestAnimationFrame(() => {
+          if (pendingUpdates) {
+            // Update all selected elements
+            pendingUpdates.forEach((newBounds, id) => {
+              editor.updateElement(id, {
+                bounds: newBounds,
+              });
+            });
+            pendingUpdates = null;
           }
 
-          // updateElement will convert absolute bounds to relative if this is a group child
-          editor.updateElement(id, {
-            bounds: newBounds,
-          });
+          // Update dragging state for alignment guides
+          if (pendingDraggingElement) {
+            editor.setDraggingElement(pendingDraggingElement.id, pendingDraggingElement.bounds);
+            pendingDraggingElement = null;
+          }
+
+          rafId = null;
         });
       }
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
+      
+      // Apply any pending updates immediately on mouse up
+      if (pendingUpdates) {
+        pendingUpdates.forEach((newBounds, id) => {
+          editor.updateElement(id, {
+            bounds: newBounds,
+          });
+        });
+        pendingUpdates = null;
+      }
+
+      // Update dragging state one final time
+      if (pendingDraggingElement) {
+        editor.setDraggingElement(pendingDraggingElement.id, pendingDraggingElement.bounds);
+        pendingDraggingElement = null;
+      }
+
       editor.setDraggingElement(null, null); // Clear dragging state
+      
+      // Cancel any pending animation frame
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      
       // Restore text selection
       document.body.style.userSelect = '';
       document.body.style.webkitUserSelect = '';
@@ -397,12 +453,30 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
       window.removeEventListener('selectstart', preventSelection);
       window.removeEventListener('dragstart', preventSelection);
       document.removeEventListener('contextmenu', preventSelection);
+      
+      // Clean up animation frame
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      
       // Restore in case component unmounts during drag
       document.body.style.userSelect = '';
       document.body.style.webkitUserSelect = '';
       document.body.style.cursor = '';
     };
-  }, [isDragging, dragStart, bounds, element.id, zoom, pan, selectedElementsInitialBounds, editor]);
+  }, [isDragging, dragStart, element.id, zoom, pan, selectedElementsInitialBounds, draggedSelectedIds, editor]);
+
+  // Extract opacity from style and convert from 0-100 to 0-1
+  const elementStyle = element.style as any;
+  const opacityValue = elementStyle?.opacity !== undefined 
+    ? (typeof elementStyle.opacity === 'number' && elementStyle.opacity > 1 
+        ? elementStyle.opacity / 100 
+        : elementStyle.opacity)
+    : 1;
+
+  // Extract style properties, excluding opacity (we handle it separately)
+  const { opacity, ...otherStyles } = (element.style || {}) as any;
 
   return (
     <div
@@ -410,17 +484,18 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
       data-element-id={element.id}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
+      className={`
+        absolute outline-none select-none
+        ${isSelected ? 'border-2 border-lume-primary' : 'border-2 border-transparent'}
+        ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}
+      `}
       style={{
-        position: 'absolute',
         left: `${bounds.x}px`,
         top: `${bounds.y}px`,
         width: `${bounds.width}px`,
         height: `${bounds.height}px`,
-        border: isSelected ? '2px solid var(--lume-primary)' : '2px solid transparent',
-        cursor: isDragging ? 'grabbing' : 'grab',
-        outline: 'none',
-        userSelect: 'none',
-        ...(element.style as React.CSSProperties),
+        opacity: opacityValue,
+        ...otherStyles,
       }}
       onMouseDown={handleMouseDown}
     >
@@ -459,20 +534,14 @@ function TextElementContent({ element }: { element: ElementDefinition }) {
   
   return (
     <div
+      className="w-full h-full flex items-center p-2 whitespace-pre-wrap break-words"
       style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        padding: '8px',
         fontSize: textElement.style?.fontSize || '16px',
         fontFamily: textElement.style?.fontFamily || 'inherit',
         color: textElement.style?.color || '#000000',
         fontWeight: textElement.style?.fontWeight || 'normal',
         fontStyle: textElement.style?.fontStyle || 'normal',
         textAlign: textElement.style?.textAlign || 'left',
-        whiteSpace: 'pre-wrap',
-        wordBreak: 'break-word',
       }}
     >
       {textElement.content || 'Text'}
@@ -530,9 +599,8 @@ function ImageElementContent({ element }: { element: ElementDefinition }) {
     <img
       src={imageElement.src || imageElement.url || ''}
       alt={imageElement.alt || ''}
+      className="w-full h-full"
       style={{
-        width: '100%',
-        height: '100%',
         objectFit: imageElement.objectFit || 'cover',
       }}
       onError={(e) => {
@@ -549,21 +617,7 @@ function GroupElementContent({ element }: { element: ElementDefinition }) {
   const childCount = groupElement.children?.length || 0;
   
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(22, 194, 199, 0.1)',
-        border: '1px dashed rgba(22, 194, 199, 0.5)',
-        borderRadius: '4px',
-        color: 'var(--lume-primary)',
-        fontSize: '12px',
-        fontWeight: '500',
-      }}
-    >
+    <div className="w-full h-full flex items-center justify-center bg-lume-primary/10 border border-dashed border-lume-primary/50 rounded text-lume-primary text-xs font-medium">
       Group ({childCount} {childCount === 1 ? 'element' : 'elements'})
     </div>
   );
@@ -586,6 +640,9 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
     e.preventDefault();
     e.stopPropagation();
     setIsResizing(handle);
+    
+    // Set draggingElementId to block autosave during resize
+    editor.setDraggingElement(element.id, bounds);
     
     // Store initial mouse position in canvas coordinates
     const initialMouseCanvas = screenToCanvas(e.clientX, e.clientY, zoom, pan);
@@ -615,6 +672,10 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
 
     document.body.style.userSelect = 'none';
     document.body.style.webkitUserSelect = 'none';
+
+    // Throttle resize updates to prevent excessive re-renders and memory issues
+    let rafId: number | null = null;
+    let pendingUpdate: { x: number; y: number; width: number; height: number } | null = null;
 
     const handleMouseMove = (e: MouseEvent) => {
       e.preventDefault();
@@ -652,20 +713,48 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
         newY = resizeStart.initialBounds.y + deltaY;
       }
 
-      // No bounds constraints - allow elements to go outside canvas
+      // Store pending update
+      pendingUpdate = {
+        x: newX,
+        y: newY,
+        width: newWidth,
+        height: newHeight,
+      };
 
-      editor.updateElement(element.id, {
-        bounds: {
-          x: newX,
-          y: newY,
-          width: newWidth,
-          height: newHeight,
-        },
-      });
+      // Throttle updates using requestAnimationFrame
+      if (rafId === null) {
+        rafId = requestAnimationFrame(() => {
+          if (pendingUpdate) {
+            editor.updateElement(element.id, {
+              bounds: pendingUpdate,
+            });
+            pendingUpdate = null;
+          }
+          rafId = null;
+        });
+      }
     };
 
     const handleMouseUp = () => {
       setIsResizing(false);
+      
+      // Clear draggingElementId to allow autosave after resize completes
+      editor.setDraggingElement(null, null);
+      
+      // Apply any pending update immediately on mouse up
+      if (pendingUpdate) {
+        editor.updateElement(element.id, {
+          bounds: pendingUpdate,
+        });
+        pendingUpdate = null;
+      }
+      
+      // Cancel any pending animation frame
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      
       document.body.style.userSelect = '';
       document.body.style.webkitUserSelect = '';
     };
@@ -680,55 +769,54 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
       window.removeEventListener('mouseup', handleMouseUp);
       window.removeEventListener('selectstart', preventSelection);
       window.removeEventListener('dragstart', preventSelection);
+      
+      // Clean up animation frame
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      
       document.body.style.userSelect = '';
       document.body.style.webkitUserSelect = '';
     };
   }, [isResizing, resizeStart, element.id, zoom, pan, editor]);
 
-  const handleStyle: React.CSSProperties = {
-    position: 'absolute',
-    width: '8px',
-    height: '8px',
-    background: 'var(--lume-primary)',
-    border: '1px solid white',
-    borderRadius: '2px',
-    cursor: `${isResizing || 'nwse'}-resize`,
-  };
+  const handleBaseClasses = "absolute w-2 h-2 bg-lume-primary border border-white rounded-sm";
 
   return (
     <>
       {/* Corner handles */}
       <div
-        style={{ ...handleStyle, top: '-4px', left: '-4px', cursor: 'nwse-resize' }}
+        className={`${handleBaseClasses} -top-1 -left-1 cursor-nwse-resize`}
         onMouseDown={(e) => handleResizeStart(e, 'nw')}
       />
       <div
-        style={{ ...handleStyle, top: '-4px', right: '-4px', cursor: 'nesw-resize' }}
+        className={`${handleBaseClasses} -top-1 -right-1 cursor-nesw-resize`}
         onMouseDown={(e) => handleResizeStart(e, 'ne')}
       />
       <div
-        style={{ ...handleStyle, bottom: '-4px', left: '-4px', cursor: 'nesw-resize' }}
+        className={`${handleBaseClasses} -bottom-1 -left-1 cursor-nesw-resize`}
         onMouseDown={(e) => handleResizeStart(e, 'sw')}
       />
       <div
-        style={{ ...handleStyle, bottom: '-4px', right: '-4px', cursor: 'nwse-resize' }}
+        className={`${handleBaseClasses} -bottom-1 -right-1 cursor-nwse-resize`}
         onMouseDown={(e) => handleResizeStart(e, 'se')}
       />
       {/* Edge handles */}
       <div
-        style={{ ...handleStyle, top: '-4px', left: '50%', transform: 'translateX(-50%)', cursor: 'ns-resize' }}
+        className={`${handleBaseClasses} -top-1 left-1/2 -translate-x-1/2 cursor-ns-resize`}
         onMouseDown={(e) => handleResizeStart(e, 'n')}
       />
       <div
-        style={{ ...handleStyle, bottom: '-4px', left: '50%', transform: 'translateX(-50%)', cursor: 'ns-resize' }}
+        className={`${handleBaseClasses} -bottom-1 left-1/2 -translate-x-1/2 cursor-ns-resize`}
         onMouseDown={(e) => handleResizeStart(e, 's')}
       />
       <div
-        style={{ ...handleStyle, left: '-4px', top: '50%', transform: 'translateY(-50%)', cursor: 'ew-resize' }}
+        className={`${handleBaseClasses} -left-1 top-1/2 -translate-y-1/2 cursor-ew-resize`}
         onMouseDown={(e) => handleResizeStart(e, 'w')}
       />
       <div
-        style={{ ...handleStyle, right: '-4px', top: '50%', transform: 'translateY(-50%)', cursor: 'ew-resize' }}
+        className={`${handleBaseClasses} -right-1 top-1/2 -translate-y-1/2 cursor-ew-resize`}
         onMouseDown={(e) => handleResizeStart(e, 'e')}
       />
     </>

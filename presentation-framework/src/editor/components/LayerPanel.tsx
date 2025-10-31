@@ -1,8 +1,10 @@
 "use client";
 
+import React from 'react';
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { useState, useRef, useEffect } from 'react';
-import type { GroupElementDefinition } from '@/rsc/types';
+import type { GroupElementDefinition, SlideDefinition } from '@/rsc/types';
+import { ElementRenderer } from './ElementRenderer';
 
 interface LayerPanelProps {
   deckId: string;
@@ -15,6 +17,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
   const deck = state.deck;
   const currentSlideIndex = state.currentSlideIndex;
   const selectedElementIds = state.selectedElementIds;
+  const [activeTab, setActiveTab] = useState<'slides' | 'layers'>('slides');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandedLayers, setExpandedLayers] = useState<Set<string>>(new Set());
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
@@ -33,36 +36,12 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
   const currentSlide = deck?.slides[currentSlideIndex];
   if (!currentSlide) {
     return (
-      <div className="layer-panel" style={{
-        width: '240px',
-        borderRight: '1px solid rgba(236, 236, 236, 0.1)',
-        background: 'rgba(11, 16, 34, 0.6)',
-        backdropFilter: 'blur(10px)',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          padding: '16px',
-          borderBottom: '1px solid rgba(236, 236, 236, 0.1)',
-          fontSize: '14px',
-          fontWeight: '600',
-          color: 'var(--lume-mist)',
-          letterSpacing: '0.01em',
-        }}>
+      <div className="editor-panel w-[260px] flex flex-col border-r border-[var(--editor-border-strong)]">
+        <div className="editor-panel-header px-5 py-5 border-b border-[var(--editor-border-strong)]">
           Layers
         </div>
-        <div style={{
-          flex: 1,
-          padding: '8px',
-          overflowY: 'auto',
-        }}>
-          <div style={{
-            color: 'rgba(236, 236, 236, 0.6)',
-            fontSize: '12px',
-            padding: '8px',
-            fontStyle: 'italic',
-          }}>
+        <div className="editor-panel-body flex-1 p-4 overflow-y-auto">
+          <div className="text-xs italic text-[var(--editor-text-muted)]">
             No slide selected
           </div>
         </div>
@@ -319,33 +298,175 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
     setDragOverIndex(null);
   };
 
-  return (
-    <div className="layer-panel" style={{
-      width: '240px',
-      borderRight: '1px solid rgba(236, 236, 236, 0.1)',
-      background: 'rgba(11, 16, 34, 0.6)',
-      backdropFilter: 'blur(10px)',
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-    }}>
-      <div style={{
-        padding: '16px',
-        borderBottom: '1px solid rgba(236, 236, 236, 0.1)',
-        fontSize: '14px',
-        fontWeight: '600',
-        color: 'var(--lume-mist)',
-        letterSpacing: '0.01em',
-      }}>
-        Layers
+  // Slide Preview Component - renders at scale for efficient preview
+  const SlidePreview = ({ slide, index }: { slide: SlideDefinition; index: number }) => {
+    const isSelected = currentSlideIndex === index;
+    const previewScale = 0.15;
+    const previewWidth = 1280 * previewScale;
+    const previewHeight = 720 * previewScale;
+
+    // Helper to convert gradient object to CSS string
+    const gradientToCSS = (grad: any): string => {
+      if (!grad || typeof grad !== 'object') return '#ffffff';
+      if (grad.type === 'linear') {
+        const stops = grad.stops?.map((s: any) => `${s.color} ${s.position}%`).join(', ') || '';
+        return `linear-gradient(${grad.angle || 0}deg, ${stops})`;
+      }
+      if (grad.type === 'radial') {
+        const stops = grad.stops?.map((s: any) => `${s.color} ${s.position}%`).join(', ') || '';
+        return `radial-gradient(${stops})`;
+      }
+      return '#ffffff';
+    };
+
+    // Get background
+    const getBackground = () => {
+      if (slide.background) {
+        if (typeof slide.background === 'string') return slide.background;
+        if (slide.background.type === 'color') return slide.background.value as string;
+        if (slide.background.type === 'gradient') return gradientToCSS(slide.background.value);
+      }
+      if (slide.style?.background) {
+        const bg = slide.style.background;
+        if (typeof bg === 'string') return bg;
+        return gradientToCSS(bg);
+      }
+      const defaultBg = deck?.settings?.defaultBackground;
+      if (!defaultBg) return '#ffffff';
+      if (typeof defaultBg === 'string') return defaultBg;
+      return gradientToCSS(defaultBg);
+    };
+
+    return (
+      <div
+        onClick={() => editor.setCurrentSlide(index)}
+        className="relative cursor-pointer transition-all mx-auto"
+        style={{
+          width: `${previewWidth + 8}px`,
+          height: `${previewHeight + 24}px`,
+        }}
+      >
+        {/* Slide preview wrapper with border and shadow */}
+        <div
+          className={`
+            relative mx-auto mt-1 rounded-lg
+            transition-all duration-200 ease-out
+            ${isSelected 
+              ? 'border-2 border-lume-primary/60 shadow-[0_8px_24px_rgba(0,0,0,0.15),0_2px_8px_rgba(0,0,0,0.08)]' 
+              : 'border border-black/20 shadow-[0_4px_12px_rgba(0,0,0,0.1),0_2px_4px_rgba(0,0,0,0.06)] hover:border-black/25 hover:shadow-[0_6px_20px_rgba(0,0,0,0.12),0_2px_6px_rgba(0,0,0,0.08)]'
+            }
+          `}
+          style={{
+            width: `${previewWidth}px`,
+            height: `${previewHeight}px`,
+          }}
+        >
+          {/* Slide preview - rendered at scale for efficient display */}
+          <div
+            className="relative overflow-hidden rounded-lg origin-top-left"
+            style={{
+              width: `${previewWidth}px`,
+              height: `${previewHeight}px`,
+              background: getBackground(),
+              transform: `scale(${previewScale})`,
+            }}
+          >
+          {/* Render elements at full size, scaled down */}
+          <div className="relative pointer-events-none w-[1280px] h-[720px]">
+            {slide.elements?.map((element) => (
+              <ElementRenderer
+                key={element.id}
+                element={element}
+                slideId={slide.id}
+              />
+            ))}
+            {slide.layers
+              ?.sort((a, b) => a.order - b.order)
+              .map((layer) =>
+                layer.elements.map((element) => (
+                  <ElementRenderer
+                    key={element.id}
+                    element={element}
+                    slideId={slide.id}
+                  />
+                ))
+              )}
+          </div>
+          </div>
+        </div>
+        
+        {/* Slide number badge */}
+        <div
+          className={`
+            absolute -bottom-1 left-1/2 -translate-x-1/2 
+            px-2 py-0.5 rounded text-xs font-semibold
+            ${isSelected
+              ? 'bg-lume-primary text-lume-midnight dark:text-white'
+              : 'bg-background/90 text-foreground dark:text-foreground/70'
+            }
+          `}
+        >
+          {index + 1}
+        </div>
       </div>
-      <div style={{
-        flex: 1,
-        padding: '8px',
-        overflowY: 'auto',
-      }}>
-        {/* Render layers */}
-        {(currentSlide.layers || []).length > 0 && (
+    );
+  };
+
+  return (
+    <div className="editor-panel w-[260px] flex flex-col border-r border-[var(--editor-border-strong)]">
+      {/* Tabs */}
+      <div className="flex border-b border-[var(--editor-border-strong)]">
+        <button
+          onClick={() => setActiveTab('slides')}
+          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+            activeTab === 'slides'
+              ? 'text-foreground border-b-2 border-lume-primary bg-card'
+              : 'text-muted-foreground hover:text-foreground hover:bg-card/50'
+          }`}
+        >
+          Slides
+        </button>
+        <button
+          onClick={() => setActiveTab('layers')}
+          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+            activeTab === 'layers'
+              ? 'text-foreground border-b-2 border-lume-primary bg-card'
+              : 'text-muted-foreground hover:text-foreground hover:bg-card/50'
+          }`}
+        >
+          Layers
+        </button>
+      </div>
+      
+      <div className="editor-panel-body flex-1 overflow-y-auto">
+        {activeTab === 'slides' ? (
+          /* Slides Tab */
+          <div className="p-4">
+            {!deck || deck.slides.length === 0 ? (
+              <div className="text-xs italic text-[var(--editor-text-muted)]">
+                No slides yet
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {deck.slides.map((slide, index) => (
+                  <SlidePreview key={slide.id} slide={slide} index={index} />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Layers Tab */
+          <>
+            {!currentSlide ? (
+              <div className="p-4">
+                <div className="text-xs italic text-[var(--editor-text-muted)]">
+                  No slide selected
+                </div>
+              </div>
+            ) : (
+              <div className="p-4">
+                {/* Render layers */}
+                {(currentSlide.layers || []).length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginBottom: '8px' }}>
             {(currentSlide.layers || [])
               .sort((a, b) => a.order - b.order)
@@ -359,7 +480,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                     <div
                       style={{
                         padding: '6px 8px',
-                        background: 'rgba(236, 236, 236, 0.05)',
+                        background: 'var(--editor-surface-muted)',
                         borderRadius: '4px',
                         display: 'flex',
                         alignItems: 'center',
@@ -367,7 +488,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                         cursor: 'pointer',
                         fontSize: '11px',
                         fontWeight: '600',
-                        color: 'rgba(236, 236, 236, 0.8)',
+                        color: 'var(--editor-text)',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
                       }}
@@ -406,14 +527,14 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                           onClick={(e) => e.stopPropagation()}
                           style={{
                             flex: 1,
-                            background: 'rgba(236, 236, 236, 0.1)',
-                            border: '1px solid var(--lume-primary)',
-                            borderRadius: '2px',
+                            background: 'var(--editor-surface)',
+                            border: `1px solid var(--editor-border)` ,
+                            borderRadius: '4px',
                             padding: '2px 4px',
                             fontSize: '11px',
-                            color: 'var(--lume-mist)',
+                            color: 'var(--editor-text)',
                             fontFamily: 'inherit',
-                            fontWeight: '600',
+                            fontWeight: 600,
                             textTransform: 'uppercase',
                           }}
                         />
@@ -437,7 +558,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
 
         {allElements.length === 0 ? (
           <div style={{
-            color: 'rgba(236, 236, 236, 0.6)',
+            color: 'var(--editor-text-muted)',
             fontSize: '12px',
             padding: '8px',
             fontStyle: 'italic',
@@ -486,33 +607,33 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                   style={{
                     padding: '8px 12px',
                     paddingLeft: isGroupChild ? '24px' : '12px',
-                    background: isSelected 
-                      ? 'rgba(22, 194, 199, 0.2)' 
+                    background: isSelected
+                      ? 'color-mix(in srgb, var(--editor-accent) 18%, transparent)'
                       : isDragOver
-                      ? 'rgba(22, 194, 199, 0.1)'
+                      ? 'color-mix(in srgb, var(--editor-accent) 10%, transparent)'
                       : 'transparent',
-                    border: isSelected 
-                      ? '1px solid var(--lume-primary)' 
+                    border: isSelected
+                      ? `1px solid var(--editor-accent)`
                       : isDragOver
-                      ? '1px dashed var(--lume-primary)'
-                      : '1px solid transparent',
-                    borderRadius: '4px',
+                      ? `1px dashed var(--editor-accent)`
+                      : `1px solid transparent`,
+                    borderRadius: '6px',
                     cursor: isLocked ? 'not-allowed' : 'pointer',
                     fontSize: '12px',
-                    color: isSelected 
-                      ? 'var(--lume-primary)' 
+                    color: isSelected
+                      ? 'var(--editor-accent)'
                       : isLocked
-                      ? 'rgba(236, 236, 236, 0.4)'
-                      : 'var(--lume-mist)',
+                      ? 'var(--editor-text-subtle)'
+                      : 'var(--editor-text)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    transition: 'all 0.2s',
+                    transition: 'all 0.18s ease',
                     opacity: isDragging ? 0.5 : 1,
                   }}
                   onMouseEnter={(e) => {
                     if (!isSelected && !isLocked) {
-                      e.currentTarget.style.background = 'rgba(236, 236, 236, 0.05)';
+                      e.currentTarget.style.background = 'color-mix(in srgb, var(--editor-accent) 12%, transparent)';
                     }
                   }}
                   onMouseLeave={(e) => {
@@ -559,7 +680,6 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                         e.stopPropagation();
                         editor.toggleElementLock(element.id);
                       }}
-                      title="Unlock"
                     >
                       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
@@ -571,7 +691,6 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                       stroke="currentColor"
                       strokeWidth="2"
                       style={{ width: '14px', height: '14px', flexShrink: 0, cursor: isGroupChild ? 'default' : 'grab' }}
-                      title={isGroupChild ? '' : "Drag to reorder"}
                     >
                       <circle cx="9" cy="5" r="1" />
                       <circle cx="9" cy="12" r="1" />
@@ -586,8 +705,8 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                   <div style={{
                     width: '12px',
                     height: '12px',
-                    borderRadius: '2px',
-                    background: isSelected ? 'var(--lume-primary)' : 'rgba(236, 236, 236, 0.3)',
+                    borderRadius: '3px',
+                    background: isSelected ? 'var(--editor-accent)' : 'var(--editor-border)',
                     flexShrink: 0,
                   }} />
                   
@@ -608,12 +727,12 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                       onClick={(e) => e.stopPropagation()}
                       style={{
                         flex: 1,
-                        background: 'rgba(236, 236, 236, 0.1)',
-                        border: '1px solid var(--lume-primary)',
-                        borderRadius: '2px',
+                        background: 'var(--editor-surface)',
+                        border: `1px solid var(--editor-border)`,
+                        borderRadius: '4px',
                         padding: '2px 4px',
                         fontSize: '12px',
-                        color: 'var(--lume-mist)',
+                        color: 'var(--editor-text)',
                         fontFamily: 'inherit',
                       }}
                     />
@@ -685,6 +804,10 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
               );
             })}
           </div>
+        )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

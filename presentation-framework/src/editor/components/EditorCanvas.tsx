@@ -31,6 +31,7 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
   const [selectionBoxStart, setSelectionBoxStart] = useState<{ x: number; y: number } | null>(null);
   const [selectionBoxEnd, setSelectionBoxEnd] = useState<{ x: number; y: number } | null>(null);
   const [previewSelectedIds, setPreviewSelectedIds] = useState<Set<string>>(new Set());
+  const [fitScale, setFitScale] = useState(1);
 
   // Canvas dimensions (matching presentation format)
   const CANVAS_WIDTH = 1280;
@@ -44,10 +45,11 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
     }
 
     const rect = canvasContainer.getBoundingClientRect();
-    // Account for the transform: translate(calc(-50% + pan.x), calc(-50% + pan.y)) scale(zoom)
-    // The rect already reflects this transform, so we need to account for zoom
-    const canvasX = (screenX - rect.left) / zoom;
-    const canvasY = (screenY - rect.top) / zoom;
+    // Account for both transforms: outer wrapper scale(fitScale) and inner scale(zoom)
+    // The rect already reflects both transforms, so we need to account for the effective scale
+    const effectiveScale = zoom * fitScale;
+    const canvasX = (screenX - rect.left) / effectiveScale;
+    const canvasY = (screenY - rect.top) / effectiveScale;
     return { x: canvasX, y: canvasY };
   };
 
@@ -119,8 +121,9 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
       if (!canvasContainer) return;
       
       const rect = canvasContainer.getBoundingClientRect();
-      const canvasX = (e.clientX - rect.left) / zoom;
-      const canvasY = (e.clientY - rect.top) / zoom;
+      const effectiveScale = zoom * fitScale;
+      const canvasX = (e.clientX - rect.left) / effectiveScale;
+      const canvasY = (e.clientY - rect.top) / effectiveScale;
       setSelectionBoxEnd({ x: canvasX, y: canvasY });
 
       // Calculate which elements would be selected with current box
@@ -263,7 +266,7 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
       window.removeEventListener('mousemove', handleGlobalMouseMove);
       window.removeEventListener('mouseup', handleGlobalMouseUp);
     };
-  }, [isSelecting, selectionBoxStart, selectionBoxEnd, deck, currentSlideIndex, editor, zoom, state.openedGroupId]);
+  }, [isSelecting, selectionBoxStart, selectionBoxEnd, deck, currentSlideIndex, editor, zoom, fitScale, state.openedGroupId]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -286,6 +289,37 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, []);
+
+  // Calculate fit scale on window resize to fit canvas at current zoom level
+  useEffect(() => {
+    const calculateFitScale = () => {
+      if (!canvasRef.current) return;
+      
+      const containerRect = canvasRef.current.getBoundingClientRect();
+      const containerWidth = containerRect.width;
+      const containerHeight = containerRect.height;
+      
+      // Calculate scale needed to fit the canvas (at current zoom) within the container
+      const scaleX = containerWidth / (CANVAS_WIDTH * zoom);
+      const scaleY = containerHeight / (CANVAS_HEIGHT * zoom);
+      const newFitScale = Math.min(scaleX, scaleY, 1); // Don't scale up beyond 1
+      
+      setFitScale(newFitScale);
+    };
+
+    // Calculate initial fit scale
+    calculateFitScale();
+
+    // Recalculate on window resize
+    window.addEventListener('resize', calculateFitScale);
+    
+    // Also recalculate when zoom changes
+    calculateFitScale();
+
+    return () => {
+      window.removeEventListener('resize', calculateFitScale);
+    };
+  }, [zoom]);
 
   return (
     <div
@@ -317,21 +351,35 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
         }
       }}
     >
-      {/* Canvas Container */}
+      {/* Fit Scale Wrapper - Scales the entire canvas to fit window at current zoom */}
       <div
-        data-canvas-container
         style={{
           position: 'absolute',
           top: '50%',
           left: '50%',
-          transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${zoom})`,
-          transformOrigin: 'center center',
           width: `${CANVAS_WIDTH}px`,
           height: `${CANVAS_HEIGHT}px`,
-          background: '#ffffff',
-          boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4)',
+          transform: `translate(-50%, -50%) scale(${fitScale})`,
+          transformOrigin: 'center center',
+          transition: 'transform 0.2s ease-out',
         }}
       >
+        {/* Canvas Container */}
+        <div
+          data-canvas-container
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${zoom})`,
+            transformOrigin: 'center center',
+            transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            width: `${CANVAS_WIDTH}px`,
+            height: `${CANVAS_HEIGHT}px`,
+            background: '#ffffff',
+            boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4)',
+          }}
+        >
         {/* Slide Content Area */}
         <div
           style={{
@@ -570,6 +618,7 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
             </div>
           )}
         </div>
+        </div>
       </div>
 
       {/* Zoom Controls */}
@@ -616,6 +665,42 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
         }}>
           {Math.round(zoom * 100)}%
         </div>
+        <button
+          onClick={() => {
+            if (!canvasRef.current) return;
+            const containerRect = canvasRef.current.getBoundingClientRect();
+            const containerWidth = containerRect.width;
+            const containerHeight = containerRect.height;
+            
+            // Calculate zoom level needed to fit the canvas within the container
+            const scaleX = containerWidth / CANVAS_WIDTH;
+            const scaleY = containerHeight / CANVAS_HEIGHT;
+            const fitZoom = Math.min(scaleX, scaleY, 2); // Cap at 200% max
+            
+            editor.setZoom(fitZoom);
+            editor.setPan({ x: 0, y: 0 }); // Reset pan when fitting
+          }}
+          style={{
+            width: '32px',
+            height: '24px',
+            border: 'none',
+            background: 'transparent',
+            color: 'var(--lume-mist)',
+            cursor: 'pointer',
+            fontSize: '11px',
+            fontWeight: '600',
+            transition: 'color 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--lume-primary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--lume-mist)';
+          }}
+          title="Fit to window"
+        >
+          Fit
+        </button>
         <button
           onClick={() => editor.setZoom(Math.max(0.25, zoom - 0.1))}
           style={{

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { cn } from '@/lib/utils';
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { AlignmentTools } from './AlignmentTools';
 
@@ -42,42 +43,93 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
     files.forEach((file) => {
       if (!file || file.size === 0) return;
       
-      // Create object URL for the image
-      const imageUrl = URL.createObjectURL(file);
-      
-      // Load image to get dimensions
-      const img = new Image();
-      img.onload = () => {
-        // Calculate size maintaining aspect ratio, max 400px width or height
-        const maxSize = 400;
-        let width = img.width;
-        let height = img.height;
-        
-        if (width > maxSize || height > maxSize) {
-          const ratio = Math.min(maxSize / width, maxSize / height);
-          width = width * ratio;
-          height = height * ratio;
+      // Convert file to base64 data URL for persistence
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const originalDataUrl = e.target?.result as string;
+        if (!originalDataUrl) {
+          console.error('Failed to read image file');
+          return;
         }
         
-        // Center the image on canvas
-        const x = (1280 - width) / 2;
-        const y = (720 - height) / 2;
-        
-        const imageElement = {
-          id: `image-${Date.now()}`,
-          type: 'image' as const,
-          src: imageUrl,
-          alt: file.name,
-          bounds: { x, y, width, height },
-          objectFit: 'contain' as const,
+        // Load image to get dimensions and compress
+        const img = new Image();
+        img.onload = () => {
+          // Calculate size maintaining aspect ratio, max 800px width or height for storage
+          // (larger than display size to maintain quality, but small enough to fit in KV)
+          const maxStorageSize = 800;
+          let displayWidth = img.width;
+          let displayHeight = img.height;
+          let storageWidth = img.width;
+          let storageHeight = img.height;
+          
+          // Calculate display size (max 400px)
+          const maxDisplaySize = 400;
+          if (displayWidth > maxDisplaySize || displayHeight > maxDisplaySize) {
+            const ratio = Math.min(maxDisplaySize / displayWidth, maxDisplaySize / displayHeight);
+            displayWidth = displayWidth * ratio;
+            displayHeight = displayHeight * ratio;
+          }
+          
+          // Calculate storage size (max 800px, but use display size if smaller)
+          if (storageWidth > maxStorageSize || storageHeight > maxStorageSize) {
+            const ratio = Math.min(maxStorageSize / storageWidth, maxStorageSize / storageHeight);
+            storageWidth = storageWidth * ratio;
+            storageHeight = storageHeight * ratio;
+          }
+          
+          // Use display size for storage if it's smaller (save space)
+          if (displayWidth < storageWidth) {
+            storageWidth = displayWidth;
+            storageHeight = displayHeight;
+          }
+          
+          // Compress image by drawing to canvas at reduced size
+          const canvas = document.createElement('canvas');
+          canvas.width = storageWidth;
+          canvas.height = storageHeight;
+          const ctx = canvas.getContext('2d');
+          
+          if (!ctx) {
+            console.error('Failed to get canvas context');
+            return;
+          }
+          
+          // Draw image to canvas (this resizes it)
+          ctx.drawImage(img, 0, 0, storageWidth, storageHeight);
+          
+          // Convert to compressed base64 (JPEG with 0.85 quality)
+          // Use JPEG for better compression, PNG only if original was PNG and is small
+          const useJpeg = file.type !== 'image/png' || file.size > 100000; // Use JPEG for large PNGs too
+          const mimeType = useJpeg ? 'image/jpeg' : 'image/png';
+          const quality = useJpeg ? 0.85 : undefined;
+          
+          const compressedDataUrl = canvas.toDataURL(mimeType, quality);
+          
+          // Center the image on canvas
+          const x = (1280 - displayWidth) / 2;
+          const y = (720 - displayHeight) / 2;
+          
+          const imageElement = {
+            id: `image-${Date.now()}`,
+            type: 'image' as const,
+            src: compressedDataUrl, // Store as compressed base64 data URL
+            alt: file.name,
+            bounds: { x, y, width: displayWidth, height: displayHeight },
+            objectFit: 'contain' as const,
+          };
+          
+          editor.addElement(imageElement, currentSlideIndex);
         };
-        
-        editor.addElement(imageElement, currentSlideIndex);
+        img.onerror = (err) => {
+          console.error('Error loading image:', err);
+        };
+        img.src = originalDataUrl;
       };
-      img.onerror = (err) => {
-        console.error('Error loading image:', err);
+      reader.onerror = (err) => {
+        console.error('Error reading file:', err);
       };
-      img.src = imageUrl;
+      reader.readAsDataURL(file);
     });
   }, [editor, currentSlideIndex]);
 
@@ -137,19 +189,9 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
     }
   }, [processImageFiles]);
   return (
-    <div className="editor-toolbar" style={{
-      height: '56px',
-      borderBottom: '1px solid rgba(236, 236, 236, 0.1)',
-      display: 'flex',
-      alignItems: 'center',
-      padding: '0 16px',
-      gap: '8px',
-      background: 'rgba(11, 16, 34, 0.8)',
-      backdropFilter: 'blur(10px)',
-      zIndex: 10,
-    }}>
+    <div className="editor-toolbar editor-panel-muted flex items-center gap-3 px-4 h-14 border-b border-[var(--editor-border-strong)] shadow-[0_18px_40px_-30px_var(--editor-shadow)]">
       {/* Insert Tools */}
-      <div style={{ display: 'flex', gap: '4px', paddingRight: '16px', borderRight: '1px solid rgba(236, 236, 236, 0.1)' }}>
+      <div className="flex items-center gap-2 pr-4 mr-2 border-r border-[var(--editor-border)]">
         <ToolbarButton title="Insert Text" onClick={() => {
           editor.addElement({
             id: `text-${Date.now()}`,
@@ -163,7 +205,7 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
             },
           }, currentSlideIndex);
         }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
             <path d="M4 20h16" />
             <path d="M6 4v16" />
             <path d="M18 4v16" />
@@ -173,7 +215,7 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
           title="Insert Image" 
           onClick={handleInsertImageClick}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
             <circle cx="8.5" cy="8.5" r="1.5" />
             <polyline points="21 15 16 10 5 21" />
@@ -184,17 +226,7 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
           type="file"
           accept="image/*"
           onChange={handleFileInputChange}
-          style={{
-            position: 'absolute',
-            width: '1px',
-            height: '1px',
-            padding: 0,
-            margin: '-1px',
-            overflow: 'hidden',
-            clip: 'rect(0, 0, 0, 0)',
-            whiteSpace: 'nowrap',
-            borderWidth: 0,
-          }}
+          className="absolute w-px h-px p-0 -m-px overflow-hidden clip-[rect(0,0,0,0)] whitespace-nowrap border-0"
           tabIndex={-1}
         />
         <ToolbarButton title="Insert Rectangle" onClick={() => {
@@ -211,7 +243,7 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
             },
           }, currentSlideIndex);
         }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
           </svg>
         </ToolbarButton>
@@ -228,7 +260,7 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
             },
           }, currentSlideIndex);
         }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
             <circle cx="12" cy="12" r="10" />
           </svg>
         </ToolbarButton>
@@ -236,7 +268,7 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
 
       {/* Format Tools */}
       {selectedElementIds.size > 0 && (
-        <div style={{ display: 'flex', gap: '4px', paddingRight: '16px', borderRight: '1px solid rgba(236, 236, 236, 0.1)' }}>
+        <div className="flex items-center gap-2 pr-4 mr-2 border-r border-[var(--editor-border)]">
           <ToolbarButton title="Bold" onClick={() => {
             const deck = state.deck;
             const currentSlide = deck?.slides[currentSlideIndex];
@@ -286,7 +318,7 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
       
       {/* Text Alignment Tools */}
       {selectedElementIds.size > 0 && (
-        <div style={{ display: 'flex', gap: '4px', paddingRight: '16px', borderRight: '1px solid rgba(236, 236, 236, 0.1)' }}>
+        <div className="flex items-center gap-2 pr-4 mr-2 border-r border-[var(--editor-border)]">
           <ToolbarButton title="Align Left" onClick={() => {
           const deck = state.deck;
           const currentSlide = deck?.slides[currentSlideIndex];
@@ -306,7 +338,7 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
             }
           });
         }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
             <line x1="21" y1="10" x2="7" y2="10" />
             <line x1="21" y1="6" x2="3" y2="6" />
             <line x1="21" y1="14" x2="3" y2="14" />
@@ -323,33 +355,27 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
             editor.groupElements(Array.from(selectedElementIds));
           }
         }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
             <rect x="3" y="3" width="7" height="7" />
             <rect x="14" y="3" width="7" height="7" />
             <rect x="14" y="14" width="7" height="7" />
             <rect x="3" y="14" width="7" height="7" />
           </svg>
         </ToolbarButton>
-        <div style={{ position: 'relative' }} ref={alignMenuRef}>
+        <div className="relative" ref={alignMenuRef}>
           <ToolbarButton 
             title="Align" 
             onClick={() => setShowAlignMenu(!showAlignMenu)}
             isActive={showAlignMenu}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
               <line x1="18" y1="20" x2="18" y2="10" />
               <line x1="12" y1="20" x2="12" y2="4" />
               <line x1="6" y1="20" x2="6" y2="14" />
             </svg>
           </ToolbarButton>
           {showAlignMenu && selectedElementIds.size >= 2 && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              marginTop: '8px',
-              zIndex: 1000,
-            }}>
+            <div className="absolute top-full left-0 mt-2 z-[1000]">
               <AlignmentTools />
             </div>
           )}
@@ -358,14 +384,14 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
 
       {/* Layer Ordering Tools */}
       {selectedElementIds.size > 0 && (
-        <div style={{ display: 'flex', gap: '4px', paddingRight: '16px', borderRight: '1px solid rgba(236, 236, 236, 0.1)' }}>
+        <div className="flex items-center gap-2 pr-4 mr-2 border-r border-[var(--editor-border)]">
           <ToolbarButton 
             title="Bring to Front" 
             onClick={() => {
               selectedElementIds.forEach(id => editor.bringToFront(id));
             }}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
               <rect x="4" y="4" width="16" height="16" rx="2" />
               <path d="M8 12h8" />
               <path d="M12 8v8" />
@@ -377,7 +403,7 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
               selectedElementIds.forEach(id => editor.bringForward(id));
             }}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
               <rect x="4" y="4" width="16" height="16" rx="2" />
               <path d="M8 12h8" />
               <path d="M12 8v8" />
@@ -390,7 +416,7 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
               selectedElementIds.forEach(id => editor.sendBackward(id));
             }}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
               <rect x="4" y="4" width="16" height="16" rx="2" />
               <path d="M8 12h8" />
               <path d="M12 8v8" />
@@ -403,7 +429,7 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
               selectedElementIds.forEach(id => editor.sendToBack(id));
             }}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
               <rect x="4" y="4" width="16" height="16" rx="2" />
               <path d="M8 12h8" />
             </svg>
@@ -412,21 +438,21 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
       )}
 
       {/* Save Button */}
-      <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto', paddingRight: '16px', borderRight: '1px solid rgba(236, 236, 236, 0.1)' }}>
+      <div className="flex items-center gap-2 ml-auto pr-4 border-r border-[var(--editor-border)]">
         <ToolbarButton
           title={autosaveEnabled ? "Autosave ON - Click to disable (Cmd/Ctrl+S to save)" : "Autosave OFF - Click to enable (Cmd/Ctrl+S to save)"}
           onClick={() => editor.toggleAutosave()}
           isActive={autosaveEnabled}
         >
           {autosaveEnabled ? (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
               <polyline points="17 21 17 13 7 13 7 21"/>
               <polyline points="7 3 7 8 15 8"/>
               <circle cx="18" cy="8" r="1" fill="currentColor"/>
             </svg>
           ) : (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
               <polyline points="17 21 17 13 7 13 7 21"/>
               <polyline points="7 3 7 8 15 8"/>
@@ -437,13 +463,13 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
       </div>
 
       {/* View Tools */}
-      <div style={{ display: 'flex', gap: '4px' }}>
+      <div className="flex items-center gap-2">
         <ToolbarButton 
           title="Toggle Grid" 
           onClick={() => editor.toggleGrid()}
           isActive={showGrid}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
             <rect x="3" y="3" width="7" height="7" />
             <rect x="14" y="3" width="7" height="7" />
             <rect x="14" y="14" width="7" height="7" />
@@ -451,7 +477,7 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
           </svg>
         </ToolbarButton>
         <ToolbarButton title="Toggle Timeline" onClick={onToggleTimeline}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
           </svg>
         </ToolbarButton>
@@ -460,47 +486,24 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
   );
 }
 
-function ToolbarButton({ 
-  children, 
-  title, 
-  onClick, 
-  isActive = false 
-}: { 
-  children: React.ReactNode; 
-  title: string; 
+function ToolbarButton({
+  children,
+  title,
+  onClick,
+  isActive = false,
+}: {
+  children: React.ReactNode;
+  title: string;
   onClick: () => void;
   isActive?: boolean;
 }) {
   return (
     <button
       type="button"
+      aria-pressed={isActive}
       onClick={onClick}
       title={title}
-      style={{
-        width: '32px',
-        height: '32px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        border: 'none',
-        background: isActive ? 'rgba(22, 194, 199, 0.2)' : 'transparent',
-        color: isActive ? 'var(--lume-primary)' : 'var(--lume-mist)',
-        cursor: 'pointer',
-        borderRadius: '4px',
-        transition: 'background 0.2s, color 0.2s',
-      }}
-      onMouseEnter={(e) => {
-        if (!isActive) {
-          e.currentTarget.style.background = 'rgba(22, 194, 199, 0.1)';
-          e.currentTarget.style.color = 'var(--lume-primary)';
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!isActive) {
-          e.currentTarget.style.background = 'transparent';
-          e.currentTarget.style.color = 'var(--lume-mist)';
-        }
-      }}
+      className={cn('editor-toolbar-button', { 'is-active': isActive })}
     >
       {children}
     </button>

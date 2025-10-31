@@ -3,6 +3,9 @@
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { ColorPicker } from './ColorPicker';
 import { useMemo } from 'react';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 export function DocumentProperties() {
   // Observe editor state (triggers re-render when state changes)
@@ -16,67 +19,39 @@ export function DocumentProperties() {
 
   if (!state.deck) {
     return (
-      <div style={{
-        color: 'rgba(236, 236, 236, 0.6)',
-        fontSize: '12px',
-        fontStyle: 'italic',
-      }}>
+      <div className="text-sm text-[var(--editor-text-muted)] italic">
         No document loaded
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div className="flex flex-col gap-6 text-foreground">
       {/* Document Title */}
-      <div>
-        <label style={{ fontSize: '12px', color: 'rgba(236, 236, 236, 0.8)', marginBottom: '4px', display: 'block' }}>
-          Title
-        </label>
-        <input
-          type="text"
+      <div className="space-y-2">
+        <Label className="editor-section-heading">Title</Label>
+        <Input
           value={meta.title || ''}
           onChange={(e) => editor.updateDeckMeta({ title: e.target.value })}
-          style={{
-            width: '100%',
-            padding: '8px',
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(236, 236, 236, 0.2)',
-            borderRadius: '4px',
-            color: 'var(--lume-mist)',
-            fontSize: '14px',
-          }}
+          placeholder="Untitled presentation"
+          className="editor-input"
         />
       </div>
 
       {/* Description */}
-      <div>
-        <label style={{ fontSize: '12px', color: 'rgba(236, 236, 236, 0.8)', marginBottom: '4px', display: 'block' }}>
-          Description
-        </label>
+      <div className="space-y-2">
+        <Label className="editor-section-heading">Description</Label>
         <textarea
           value={meta.description || ''}
           onChange={(e) => editor.updateDeckMeta({ description: e.target.value })}
-          style={{
-            width: '100%',
-            minHeight: '60px',
-            padding: '8px',
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(236, 236, 236, 0.2)',
-            borderRadius: '4px',
-            color: 'var(--lume-mist)',
-            fontSize: '14px',
-            fontFamily: 'inherit',
-            resize: 'vertical',
-          }}
+          placeholder="Describe the intent or audience"
+          className="editor-textarea min-h-[90px] resize-y"
         />
       </div>
 
       {/* Slide Size */}
-      <div>
-        <label style={{ fontSize: '12px', color: 'rgba(236, 236, 236, 0.8)', marginBottom: '4px', display: 'block' }}>
-          Slide Size
-        </label>
+      <div className="space-y-2">
+        <Label className="editor-section-heading">Slide Size</Label>
         <select
           value={settings.slideSize?.preset || 'widescreen'}
           onChange={(e) => {
@@ -117,36 +92,24 @@ export function DocumentProperties() {
               },
             });
           }}
-          style={{
-            width: '100%',
-            padding: '8px',
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(236, 236, 236, 0.2)',
-            borderRadius: '4px',
-            color: 'var(--lume-mist)',
-            fontSize: '14px',
-          }}
+          className="editor-select"
         >
-          <option value="standard">Standard (4:3) - 1024×768</option>
-          <option value="widescreen">Widescreen (16:9) - 1280×720</option>
-          <option value="ultrawide">Ultrawide (16:9) - 1920×1080</option>
-          <option value="square">Square (1:1) - 1080×1080</option>
+          <option value="standard">Standard (4:3) – 1024×768</option>
+          <option value="widescreen">Widescreen (16:9) – 1280×720</option>
+          <option value="ultrawide">Ultrawide (16:9) – 1920×1080</option>
+          <option value="square">Square (1:1) – 1080×1080</option>
           <option value="custom">Custom</option>
         </select>
       </div>
 
       {/* Custom Slide Size (if custom is selected) */}
       {settings.slideSize?.preset === 'custom' && (
-        <div>
-          <label style={{ fontSize: '12px', color: 'rgba(236, 236, 236, 0.8)', marginBottom: '4px', display: 'block' }}>
-            Custom Dimensions
-          </label>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            <div>
-              <label style={{ fontSize: '10px', color: 'rgba(236, 236, 236, 0.6)', display: 'block', marginBottom: '2px' }}>
-                Width
-              </label>
-              <input
+        <div className="space-y-3">
+          <Label className="editor-section-heading">Custom Dimensions</Label>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-[0.65rem] font-medium text-[var(--editor-text-muted)]">Width</Label>
+              <Input
                 type="number"
                 value={settings.slideSize?.width || 1280}
                 onChange={(e) => editor.updateDeckSettings({
@@ -157,22 +120,12 @@ export function DocumentProperties() {
                     units: 'pixels',
                   },
                 })}
-                style={{
-                  width: '100%',
-                  padding: '4px 8px',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(236, 236, 236, 0.2)',
-                  borderRadius: '4px',
-                  color: 'var(--lume-mist)',
-                  fontSize: '12px',
-                }}
+                className="editor-input h-9"
               />
             </div>
-            <div>
-              <label style={{ fontSize: '10px', color: 'rgba(236, 236, 236, 0.6)', display: 'block', marginBottom: '2px' }}>
-                Height
-              </label>
-              <input
+            <div className="space-y-1">
+              <Label className="text-[0.65rem] font-medium text-[var(--editor-text-muted)]">Height</Label>
+              <Input
                 type="number"
                 value={settings.slideSize?.height || 720}
                 onChange={(e) => editor.updateDeckSettings({
@@ -183,15 +136,7 @@ export function DocumentProperties() {
                     units: 'pixels',
                   },
                 })}
-                style={{
-                  width: '100%',
-                  padding: '4px 8px',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(236, 236, 236, 0.2)',
-                  borderRadius: '4px',
-                  color: 'var(--lume-mist)',
-                  fontSize: '12px',
-                }}
+                className="editor-input h-9"
               />
             </div>
           </div>
@@ -199,24 +144,14 @@ export function DocumentProperties() {
       )}
 
       {/* Orientation */}
-      <div>
-        <label style={{ fontSize: '12px', color: 'rgba(236, 236, 236, 0.8)', marginBottom: '4px', display: 'block' }}>
-          Orientation
-        </label>
+      <div className="space-y-2">
+        <Label className="editor-section-heading">Orientation</Label>
         <select
           value={settings.orientation || 'landscape'}
-          onChange={(e) => updateDeckSettings({
+          onChange={(e) => editor.updateDeckSettings({
             orientation: e.target.value as 'landscape' | 'portrait',
           })}
-          style={{
-            width: '100%',
-            padding: '8px',
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(236, 236, 236, 0.2)',
-            borderRadius: '4px',
-            color: 'var(--lume-mist)',
-            fontSize: '14px',
-          }}
+          className="editor-select"
         >
           <option value="landscape">Landscape</option>
           <option value="portrait">Portrait</option>
@@ -224,10 +159,8 @@ export function DocumentProperties() {
       </div>
 
       {/* Default Background */}
-      <div>
-        <label style={{ fontSize: '12px', color: 'rgba(236, 236, 236, 0.8)', marginBottom: '4px', display: 'block' }}>
-          Default Background
-        </label>
+      <div className="space-y-2">
+        <Label className="editor-section-heading">Default Background</Label>
         <ColorPicker
           value={settings.defaultBackground || '#ffffff'}
           onChange={(value) => editor.updateDeckSettings({
@@ -237,74 +170,64 @@ export function DocumentProperties() {
       </div>
 
       {/* Presentation Settings */}
-      <div style={{ marginTop: '8px', paddingTop: '16px', borderTop: '1px solid rgba(236, 236, 236, 0.1)' }}>
-        <label style={{ fontSize: '12px', color: 'rgba(236, 236, 236, 0.8)', marginBottom: '8px', display: 'block' }}>
-          Presentation
-        </label>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <label style={{ fontSize: '11px', color: 'rgba(236, 236, 236, 0.7)', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+      <div className="pt-5 border-t border-[var(--editor-border)] space-y-3">
+        <Label className="editor-section-heading">Presentation</Label>
+        <div className="space-y-3">
+          <label className="flex items-center gap-3 text-sm text-[var(--editor-text-muted)]">
             <input
               type="checkbox"
               checked={settings.presentation?.loop || false}
-              onChange={(e) => updateDeckSettings({
+              onChange={(e) => editor.updateDeckSettings({
                 presentation: {
                   loop: e.target.checked,
                 },
               })}
-              style={{ cursor: 'pointer' }}
+              className="editor-checkbox"
             />
             Loop presentation
           </label>
-          <label style={{ fontSize: '11px', color: 'rgba(236, 236, 236, 0.7)', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+          <label className="flex items-center gap-3 text-sm text-[var(--editor-text-muted)]">
             <input
               type="checkbox"
               checked={settings.presentation?.autoAdvance || false}
-              onChange={(e) => updateDeckSettings({
+              onChange={(e) => editor.updateDeckSettings({
                 presentation: {
                   autoAdvance: e.target.checked,
                 },
               })}
-              style={{ cursor: 'pointer' }}
+              className="editor-checkbox"
             />
             Auto-advance slides
           </label>
           {settings.presentation?.autoAdvance && (
-            <div style={{ marginLeft: '24px' }}>
-              <label style={{ fontSize: '10px', color: 'rgba(236, 236, 236, 0.6)', display: 'block', marginBottom: '2px' }}>
+            <div className="pl-6 space-y-2">
+              <Label className="text-[0.65rem] font-medium text-[var(--editor-text-muted)]">
                 Delay (seconds)
-              </label>
-              <input
+              </Label>
+              <Input
                 type="number"
-                min="1"
-                max="300"
+                min={1}
+                max={300}
                 value={settings.presentation?.autoAdvanceDelay || 5}
                 onChange={(e) => editor.updateDeckSettings({
                   presentation: {
                     autoAdvanceDelay: parseInt(e.target.value) || 5,
                   },
                 })}
-                style={{
-                  width: '100%',
-                  padding: '4px 8px',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(236, 236, 236, 0.2)',
-                  borderRadius: '4px',
-                  color: 'var(--lume-mist)',
-                  fontSize: '12px',
-                }}
+                className="editor-input h-9"
               />
             </div>
           )}
-          <label style={{ fontSize: '11px', color: 'rgba(236, 236, 236, 0.7)', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+          <label className="flex items-center gap-3 text-sm text-[var(--editor-text-muted)]">
             <input
               type="checkbox"
               checked={settings.presentation?.showSlideNumbers || false}
-              onChange={(e) => updateDeckSettings({
+              onChange={(e) => editor.updateDeckSettings({
                 presentation: {
                   showSlideNumbers: e.target.checked,
                 },
               })}
-              style={{ cursor: 'pointer' }}
+              className="editor-checkbox"
             />
             Show slide numbers
           </label>
@@ -312,27 +235,25 @@ export function DocumentProperties() {
       </div>
 
       {/* Grid Settings */}
-      <div style={{ marginTop: '8px', paddingTop: '16px', borderTop: '1px solid rgba(236, 236, 236, 0.1)' }}>
-        <label style={{ fontSize: '12px', color: 'rgba(236, 236, 236, 0.8)', marginBottom: '8px', display: 'block' }}>
-          Grid & Guides
-        </label>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <label style={{ fontSize: '11px', color: 'rgba(236, 236, 236, 0.7)', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+      <div className="pt-5 border-t border-[var(--editor-border)] space-y-3">
+        <Label className="editor-section-heading">Grid &amp; Guides</Label>
+        <div className="space-y-2">
+          <label className="flex items-center gap-3 text-sm text-[var(--editor-text-muted)]">
             <input
               type="checkbox"
               checked={settings.grid?.enabled || false}
-              onChange={(e) => updateDeckSettings({
+              onChange={(e) => editor.updateDeckSettings({
                 grid: {
                   enabled: e.target.checked,
                 },
               })}
-              style={{ cursor: 'pointer' }}
+              className="editor-checkbox"
             />
             Show grid
           </label>
           {settings.grid?.enabled && (
-            <>
-              <label style={{ fontSize: '11px', color: 'rgba(236, 236, 236, 0.7)', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <div className="space-y-3 pl-6">
+              <label className="flex items-center gap-3 text-sm text-[var(--editor-text-muted)]">
                 <input
                   type="checkbox"
                   checked={settings.grid?.snapToGrid || false}
@@ -341,36 +262,28 @@ export function DocumentProperties() {
                       snapToGrid: e.target.checked,
                     },
                   })}
-                  style={{ cursor: 'pointer' }}
+                  className="editor-checkbox"
                 />
                 Snap to grid
               </label>
-              <div>
-                <label style={{ fontSize: '10px', color: 'rgba(236, 236, 236, 0.6)', display: 'block', marginBottom: '2px' }}>
+              <div className="space-y-2">
+                <Label className="text-[0.65rem] font-medium text-[var(--editor-text-muted)]">
                   Grid Size
-                </label>
-                <input
+                </Label>
+                <Input
                   type="number"
-                  min="5"
-                  max="100"
+                  min={5}
+                  max={100}
                   value={settings.grid?.size || 20}
                   onChange={(e) => editor.updateDeckSettings({
                     grid: {
                       size: parseInt(e.target.value) || 20,
                     },
                   })}
-                  style={{
-                    width: '100%',
-                    padding: '4px 8px',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(236, 236, 236, 0.2)',
-                    borderRadius: '4px',
-                    color: 'var(--lume-mist)',
-                    fontSize: '12px',
-                  }}
+                  className="editor-input h-9"
                 />
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>
