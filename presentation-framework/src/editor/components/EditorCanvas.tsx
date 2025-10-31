@@ -133,24 +133,55 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
           ];
 
           const previewIds = new Set<string>();
+          const openedGroupId = state.openedGroupId;
 
           // Check each element for intersection with selection box
           for (const element of allElements) {
             if (!element.bounds) continue;
 
-            const elX = element.bounds.x || 0;
-            const elY = element.bounds.y || 0;
-            const elWidth = element.bounds.width || 0;
-            const elHeight = element.bounds.height || 0;
+            // If this is an opened group, check its children with absolute bounds
+            if (element.type === 'group' && openedGroupId === element.id) {
+              const group = element as any;
+              const groupX = element.bounds.x || 0;
+              const groupY = element.bounds.y || 0;
+              
+              // Check group children with absolute positions
+              if (group.children) {
+                for (const child of group.children) {
+                  if (!child.bounds) continue;
+                  
+                  const childAbsX = (child.bounds.x || 0) + groupX;
+                  const childAbsY = (child.bounds.y || 0) + groupY;
+                  const childWidth = child.bounds.width || 0;
+                  const childHeight = child.bounds.height || 0;
 
-            // Check if selection box intersects with element bounds
-            if (
-              minX < elX + elWidth &&
-              maxX > elX &&
-              minY < elY + elHeight &&
-              maxY > elY
-            ) {
-              previewIds.add(element.id);
+                  // Check if selection box intersects with child bounds
+                  if (
+                    minX < childAbsX + childWidth &&
+                    maxX > childAbsX &&
+                    minY < childAbsY + childHeight &&
+                    maxY > childAbsY
+                  ) {
+                    previewIds.add(child.id);
+                  }
+                }
+              }
+            } else {
+              // Regular element or closed group - check element bounds
+              const elX = element.bounds.x || 0;
+              const elY = element.bounds.y || 0;
+              const elWidth = element.bounds.width || 0;
+              const elHeight = element.bounds.height || 0;
+
+              // Check if selection box intersects with element bounds
+              if (
+                minX < elX + elWidth &&
+                maxX > elX &&
+                minY < elY + elHeight &&
+                maxY > elY
+              ) {
+                previewIds.add(element.id);
+              }
             }
           }
 
@@ -378,28 +409,70 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
                   ...(currentSlide.elements || []),
                   ...(currentSlide.layers?.flatMap(l => l.elements) || []),
                 ];
-                return allElements
-                  .filter(el => previewSelectedIds.has(el.id) && el.bounds)
-                  .map((element) => {
-                    const bounds = element.bounds!;
-                    return (
-                      <div
-                        key={`preview-${element.id}`}
-                        style={{
-                          position: 'absolute',
-                          left: `${bounds.x || 0}px`,
-                          top: `${bounds.y || 0}px`,
-                          width: `${bounds.width || 100}px`,
-                          height: `${bounds.height || 50}px`,
-                          border: '2px dashed rgba(22, 194, 199, 0.6)',
-                          background: 'rgba(22, 194, 199, 0.05)',
-                          pointerEvents: 'none',
-                          zIndex: 1000,
-                          borderRadius: '2px',
-                        }}
-                      />
-                    );
-                  });
+                const openedGroupId = state.openedGroupId;
+                const previewElements: Array<{ id: string; bounds: { x: number; y: number; width: number; height: number } }> = [];
+
+                // Collect elements to show preview borders for
+                for (const element of allElements) {
+                  if (!element.bounds) continue;
+
+                  // If element is in preview selection
+                  if (previewSelectedIds.has(element.id)) {
+                    // If this is an opened group, we need to render children individually
+                    if (element.type === 'group' && openedGroupId === element.id) {
+                      const group = element as any;
+                      const groupX = element.bounds.x || 0;
+                      const groupY = element.bounds.y || 0;
+                      
+                      // Add children with absolute bounds
+                      if (group.children) {
+                        for (const child of group.children) {
+                          if (previewSelectedIds.has(child.id) && child.bounds) {
+                            previewElements.push({
+                              id: child.id,
+                              bounds: {
+                                x: (child.bounds.x || 0) + groupX,
+                                y: (child.bounds.y || 0) + groupY,
+                                width: child.bounds.width || 100,
+                                height: child.bounds.height || 50,
+                              },
+                            });
+                          }
+                        }
+                      }
+                    } else {
+                      // Regular element or closed group
+                      previewElements.push({
+                        id: element.id,
+                        bounds: {
+                          x: element.bounds.x || 0,
+                          y: element.bounds.y || 0,
+                          width: element.bounds.width || 100,
+                          height: element.bounds.height || 50,
+                        },
+                      });
+                    }
+                  }
+                }
+
+                return previewElements.map((item) => (
+                  <div
+                    key={`preview-${item.id}`}
+                    style={{
+                      position: 'absolute',
+                      left: `${item.bounds.x}px`,
+                      top: `${item.bounds.y}px`,
+                      width: `${item.bounds.width}px`,
+                      height: `${item.bounds.height}px`,
+                      border: '2px solid rgba(22, 194, 199, 0.8)',
+                      background: 'rgba(22, 194, 199, 0.1)',
+                      pointerEvents: 'none',
+                      zIndex: 1002, // Above selection box and elements
+                      borderRadius: '2px',
+                      boxShadow: '0 0 0 1px rgba(22, 194, 199, 0.3)',
+                    }}
+                  />
+                ));
               })()}
             </>
           )}
