@@ -274,6 +274,7 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
           setIsSelecting(false);
           setSelectionBoxStart(null);
           setSelectionBoxEnd(null);
+          setPreviewSelectedIds(new Set());
         }
         if (isPanning) {
           setIsPanning(false);
