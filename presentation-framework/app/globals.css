@@ -261,6 +261,13 @@
   box-shadow: 0 14px 28px -18px var(--editor-shadow);
 }
 
+.editor-toolbar-button.is-disabled,
+.editor-toolbar-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .editor-input,
 .editor-textarea,
 .editor-select {

@@ -316,30 +316,26 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
   }, []);
 
   const compressBackgroundFile = useCallback(async (file: File) => {
-    const readFileAsDataUrl = () =>
-      new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (typeof reader.result === 'string') {
-            resolve(reader.result);
-          } else {
-            reject(new Error('Unable to read image file'));
-          }
-        };
-        reader.onerror = () => reject(new Error('Failed to read image file'));
-        reader.readAsDataURL(file);
-      });
-
-    const loadImage = (dataUrl: string) =>
+    const loadImage = () =>
       new Promise<HTMLImageElement>((resolve, reject) => {
+        // Use object URL instead of data URL for better compatibility
+        const objectUrl = URL.createObjectURL(file);
         const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error('Failed to load image'));
-        img.src = dataUrl;
+        
+        img.onload = () => {
+          URL.revokeObjectURL(objectUrl); // Clean up
+          resolve(img);
+        };
+        
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl); // Clean up on error
+          reject(new Error('Failed to load image'));
+        };
+        
+        img.src = objectUrl;
       });
 
-    const originalDataUrl = await readFileAsDataUrl();
-    const img = await loadImage(originalDataUrl);
+    const img = await loadImage();
 
     const maxWidth = 2560;
     const maxHeight = 1440;
@@ -417,6 +413,9 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
               updatedAt: new Date().toISOString(),
               source: 'upload',
               name: file.name,
+              offsetX: 0,
+              offsetY: 0,
+              scale: 100,
             },
             opacity: 1,
           },
@@ -475,12 +474,21 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
 
     try {
       setBackgroundFeedback({ isGenerating: true, error: null, success: null });
+      
+      // Get slide dimensions from deck settings
+      const slideWidth = deck?.settings?.slideSize?.width ?? 1280;
+      const slideHeight = deck?.settings?.slideSize?.height ?? 720;
+      
       const response = await fetch('/api/ai/background', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ 
+          prompt,
+          width: slideWidth,
+          height: slideHeight,
+        }),
       });
 
       if (!response.ok) {
@@ -503,6 +511,9 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
             type: 'image',
             value: {
               src: imageData,
+              offsetX: 0,
+              offsetY: 0,
+              scale: 100,
               prompt,
               generatedAt: new Date().toISOString(),
               source: 'ai',
@@ -544,23 +555,27 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
     <div className="editor-toolbar editor-panel-muted flex items-center gap-3 px-4 h-14 border-b border-[var(--editor-border-strong)] shadow-[0_18px_40px_-30px_var(--editor-shadow)]">
       {/* Insert Tools */}
       <div className="flex items-center gap-2 pr-4 mr-2 border-r border-[var(--editor-border)]">
-        <ToolbarButton title="Insert Text" onClick={() => {
-          editor.addElement({
-            id: `text-${Date.now()}`,
-            type: 'text',
-            content: 'New Text',
-            bounds: { x: 100, y: 100, width: 200, height: 50 },
-            style: {
-              fontSize: '24px',
-              color: '#000000',
-              fontFamily: 'inherit',
-            },
-          }, currentSlideIndex);
-        }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-            <rect x="1" y="3" width="22" height="19" rx="1.5" ry="1.5" stroke="currentColor" fill="none" />
-            <text x="8.5" y="15.5" textAnchor="middle" fontSize="12" fill="currentColor" fontFamily="system-ui, -apple-system, sans-serif" fontWeight="500">a</text>
-            <text x="15.5" y="15.5" textAnchor="middle" fontSize="12" fill="currentColor" fontFamily="system-ui, -apple-system, sans-serif" fontWeight="500">b</text>
+        <ToolbarButton 
+          title="Insert Text" 
+          onClick={() => {
+            editor.addElement({
+              id: `text-${Date.now()}`,
+              type: 'text',
+              content: 'New Text',
+              bounds: { x: 100, y: 100, width: 200, height: 50 },
+              style: {
+                fontSize: '24px',
+                color: '#000000',
+                fontFamily: 'inherit',
+              },
+            }, currentSlideIndex);
+          }}
+          disabled={!activeSlideId}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+            <path d="M4 20h16" />
+            <path d="M6 4v16" />
+            <path d="M18 4v16" />
           </svg>
         </ToolbarButton>
         <ToolbarButton 
@@ -569,6 +584,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
             setBackgroundStatus({ isGenerating: false, error: null, success: null });
             setShowBackgroundModal(true);
           }}
+          disabled={!activeSlideId}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -592,37 +608,45 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
           className="absolute w-px h-px p-0 -m-px overflow-hidden clip-[rect(0,0,0,0)] whitespace-nowrap border-0"
           tabIndex={-1}
         />
-        <ToolbarButton title="Insert Rectangle" onClick={() => {
-          editor.addElement({
-            id: `shape-${Date.now()}`,
-            type: 'shape',
-            shapeType: 'rect',
-            bounds: { x: 150, y: 150, width: 150, height: 100 },
-            style: lastShapeStyle || {
-              fill: '#16C2C7',
-              stroke: '#0B1022',
-              strokeWidth: 2,
-              borderRadius: 4,
-            },
-          }, currentSlideIndex);
-        }}>
+        <ToolbarButton 
+          title="Insert Rectangle" 
+          onClick={() => {
+            editor.addElement({
+              id: `shape-${Date.now()}`,
+              type: 'shape',
+              shapeType: 'rect',
+              bounds: { x: 150, y: 150, width: 150, height: 100 },
+              style: lastShapeStyle || {
+                fill: '#16C2C7',
+                stroke: '#0B1022',
+                strokeWidth: 2,
+                borderRadius: 4,
+              },
+            }, currentSlideIndex);
+          }}
+          disabled={!activeSlideId}
+        >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
           </svg>
         </ToolbarButton>
-        <ToolbarButton title="Insert Circle" onClick={() => {
-          editor.addElement({
-            id: `shape-${Date.now()}`,
-            type: 'shape',
-            shapeType: 'ellipse',
-            bounds: { x: 200, y: 200, width: 120, height: 120 },
-            style: lastShapeStyle || {
-              fill: '#C84BD2',
-              stroke: '#0B1022',
-              strokeWidth: 2,
-            },
-          }, currentSlideIndex);
-        }}>
+        <ToolbarButton 
+          title="Insert Circle" 
+          onClick={() => {
+            editor.addElement({
+              id: `shape-${Date.now()}`,
+              type: 'shape',
+              shapeType: 'ellipse',
+              bounds: { x: 200, y: 200, width: 120, height: 120 },
+              style: lastShapeStyle || {
+                fill: '#C84BD2',
+                stroke: '#0B1022',
+                strokeWidth: 2,
+              },
+            }, currentSlideIndex);
+          }}
+          disabled={!activeSlideId}
+        >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
             <circle cx="12" cy="12" r="10" />
           </svg>
@@ -713,11 +737,15 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
 
       {/* Layout Tools */}
       <div style={{ display: 'flex', gap: '4px', paddingRight: '16px', borderRight: '1px solid rgba(236, 236, 236, 0.1)' }}>
-        <ToolbarButton title="Group (Cmd/Ctrl+G)" onClick={() => {
-          if (selectedElementIds.size >= 2) {
-            editor.groupElements(Array.from(selectedElementIds));
-          }
-        }}>
+        <ToolbarButton 
+          title="Group (Cmd/Ctrl+G)" 
+          onClick={() => {
+            if (selectedElementIds.size >= 2) {
+              editor.groupElements(Array.from(selectedElementIds));
+            }
+          }}
+          disabled={selectedElementIds.size < 2}
+        >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
             <rect x="3" y="3" width="7" height="7" />
             <rect x="14" y="3" width="7" height="7" />
@@ -730,6 +758,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
             title="Align" 
             onClick={() => setShowAlignMenu(!showAlignMenu)}
             isActive={showAlignMenu}
+            disabled={selectedElementIds.size < 2}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
               <line x1="18" y1="20" x2="18" y2="10" />
@@ -916,9 +945,9 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
           setBackgroundStatus({ isGenerating: false, error: null, success: null });
         }}
         onGenerate={handleGenerateImage}
-        onUpload={() => {
+        onUpload={(mode) => {
           setBackgroundFeedback({ error: null, success: null });
-          triggerBackgroundUpload();
+          triggerBackgroundUpload(mode);
         }}
         status={backgroundStatus}
       />
@@ -931,11 +960,13 @@ function ToolbarButton({
   title,
   onClick,
   isActive = false,
+  disabled = false,
 }: {
   children: React.ReactNode;
   title: string;
   onClick: () => void;
   isActive?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -943,7 +974,8 @@ function ToolbarButton({
       aria-pressed={isActive}
       onClick={onClick}
       title={title}
-      className={cn('editor-toolbar-button', { 'is-active': isActive })}
+      disabled={disabled}
+      className={cn('editor-toolbar-button', { 'is-active': isActive, 'is-disabled': disabled })}
     >
       {children}
     </button>

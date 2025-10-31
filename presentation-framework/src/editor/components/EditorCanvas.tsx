@@ -324,11 +324,12 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
   return (
     <div
       ref={canvasRef}
-      className="editor-canvas bg-gray-400 dark:bg-gray-900"
+      className="editor-canvas"
       style={{
         flex: 1,
         overflow: 'hidden',
         position: 'relative',
+        background: 'var(--lume-midnight)',
         cursor: isPanning ? 'grabbing' : 'default',
         userSelect: 'none',
         WebkitUserSelect: 'none',
@@ -422,13 +423,16 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
                     if (typeof src === 'string' && src.length > 0) {
                       const offsetX = (value as any).offsetX ?? 0;
                       const offsetY = (value as any).offsetY ?? 0;
+                      const scale = (value as any).scale ?? 100;
                       const position = offsetX !== 0 || offsetY !== 0 
                         ? `${offsetX}px ${offsetY}px`
                         : ((value as any).position || 'center');
                       const fit = (value as any).fit || 'cover';
                       const repeat = (value as any).repeat || 'no-repeat';
                       const base = (value as any).baseColor;
-                      const imagePart = `url(${src}) ${position} / ${fit} ${repeat}`;
+                      // Use scale% auto for percentage, or fit (cover/contain) if scale is 100
+                      const size = scale !== 100 ? `${scale}% auto` : fit;
+                      const imagePart = `url(${src}) ${position} / ${size} ${repeat}`;
                       return base ? `${base} ${imagePart}` : imagePart;
                     }
                   }

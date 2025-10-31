@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useEffect, useState, type ReactNode } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
-import type { ElementDefinition } from '@/rsc/types';
+import type { ElementDefinition, GroupElementDefinition } from '@/rsc/types';
 import { cn } from '@/lib/utils';
 
 interface ElementContextMenuProps {
@@ -26,72 +26,36 @@ export function ElementContextMenu({ element, position, onClose }: ElementContex
   const isText = element.type === 'text';
   const isLocked = (element.metadata as any)?.locked === true;
 
-      // Close menu when interacting outside
-      useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-          const target = e.target as Node;
-          if (!menuRef.current) return;
-          
-          const isInsideMenu = menuRef.current.contains(target);
-          
-          if (!isInsideMenu) {
-            // Immediate close when clicking outside
-            onClose();
-          }
-        };
+  // Close menu when interacting outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
 
-        const handleMouseDown = (e: MouseEvent) => {
-          const target = e.target as Node;
-          if (!menuRef.current) return;
-          
-          const isInsideMenu = menuRef.current.contains(target);
-          
-          if (!isInsideMenu) {
-            // Close on mousedown outside (in capture phase to catch early)
-            onClose();
-          }
-        };
+    const handleContextMenuOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
 
-        const handlePointerDown = (e: PointerEvent) => {
-          const target = e.target as Node;
-          if (!menuRef.current) return;
-          
-          const isInsideMenu = menuRef.current.contains(target);
-          
-          if (!isInsideMenu) {
-            // Also catch pointer events for touch/pen interactions
-            onClose();
-          }
-        };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
 
-        const handleContextMenuOutside = (e: MouseEvent) => {
-          if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-            onClose();
-          }
-        };
+    document.addEventListener('mousedown', handleClickOutside, true);
+    document.addEventListener('contextmenu', handleContextMenuOutside, true);
+    document.addEventListener('keydown', handleEscape);
 
-        const handleEscape = (e: KeyboardEvent) => {
-          if (e.key === 'Escape') {
-            onClose();
-          }
-        };
-
-        // Use multiple event types in capture phase to catch all interactions
-        // Capture phase ensures we get events even if they're stopped elsewhere
-        document.addEventListener('mousedown', handleMouseDown, true);
-        document.addEventListener('pointerdown', handlePointerDown, true);
-        document.addEventListener('click', handleClickOutside, true);
-        document.addEventListener('contextmenu', handleContextMenuOutside, true);
-        document.addEventListener('keydown', handleEscape);
-
-        return () => {
-          document.removeEventListener('mousedown', handleMouseDown, true);
-          document.removeEventListener('pointerdown', handlePointerDown, true);
-          document.removeEventListener('click', handleClickOutside, true);
-          document.removeEventListener('contextmenu', handleContextMenuOutside, true);
-          document.removeEventListener('keydown', handleEscape);
-        };
-      }, [onClose]);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside, true);
+      document.removeEventListener('contextmenu', handleContextMenuOutside, true);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [onClose]);
 
   // Position menu next to cursor
   useEffect(() => {
@@ -130,9 +94,8 @@ export function ElementContextMenu({ element, position, onClose }: ElementContex
 
   // Alignment helpers (from AlignmentTools)
   const getSelectedElements = () => {
-    const editorState = editor.getState();
-    const deck = editorState.deck;
-    const currentSlideIndex = editorState.currentSlideIndex;
+    const deck = state.deck;
+    const currentSlideIndex = state.currentSlideIndex;
     if (!deck) return [];
     
     const slide = deck.slides[currentSlideIndex];
@@ -143,12 +106,11 @@ export function ElementContextMenu({ element, position, onClose }: ElementContex
       ...(slide.layers?.flatMap(l => l.elements) || []),
     ];
     
-    return allElements.filter(el => editorState.selectedElementIds.has(el.id));
+    return allElements.filter(el => selectedElementIds.has(el.id));
   };
 
   const getSlideDimensions = () => {
-    const editorState = editor.getState();
-    const slideSize = editorState.deck?.settings?.slideSize;
+    const slideSize = state.deck?.settings?.slideSize;
 
     if (slideSize) {
       return {
@@ -162,48 +124,19 @@ export function ElementContextMenu({ element, position, onClose }: ElementContex
   };
 
   const expandToFill = () => {
-    const editorState = editor.getState();
     const { width, height } = getSlideDimensions();
     const selectedElements = getSelectedElements();
 
     const targets = new Map<string, ElementDefinition>();
 
-    // If multiple items selected, expand applicable ones (excluding locked)
+    // If multiple items selected, expand applicable ones
     selectedElements
-      .filter(el => {
-        const isLocked = (el.metadata as any)?.locked === true;
-        return (el.type === 'image' || el.type === 'shape') && !isLocked;
-      })
+      .filter(el => el.type === 'image' || el.type === 'shape')
       .forEach(el => targets.set(el.id, el));
 
-    // Ensure the context element is included with the latest state (if not locked)
-    if (element.type === 'image' || element.type === 'shape') {
-      const isElementLocked = (element.metadata as any)?.locked === true;
-      if (!isElementLocked) {
-        const contextElement = (() => {
-          const deck = editorState.deck;
-          const currentSlideIndex = editorState.currentSlideIndex;
-          if (!deck) return element;
-          const slide = deck.slides[currentSlideIndex];
-          if (!slide) return element;
-          const allElements = [
-            ...(slide.elements || []),
-            ...(slide.layers?.flatMap(l => l.elements) || []),
-          ];
-          return allElements.find(el => el.id === element.id) ?? element;
-        })();
-
-        // Double-check the context element isn't locked
-        const isContextLocked = (contextElement.metadata as any)?.locked === true;
-        if (!isContextLocked) {
-          targets.set(contextElement.id, contextElement);
-        }
-      }
-    }
-
-    // If no valid targets, return early
-    if (targets.size === 0) {
-      return;
+    // Ensure the context element is included
+    if ((element.type === 'image' || element.type === 'shape') && !targets.has(element.id)) {
+      targets.set(element.id, element);
     }
 
     targets.forEach((target) => {
@@ -211,8 +144,8 @@ export function ElementContextMenu({ element, position, onClose }: ElementContex
         bounds: {
           x: 0,
           y: 0,
-          width: Math.ceil(width),
-          height: Math.ceil(height),
+          width,
+          height,
         },
       };
 
@@ -357,27 +290,21 @@ export function ElementContextMenu({ element, position, onClose }: ElementContex
     disabled = false,
     separator = false 
   }: { 
-    children?: ReactNode; 
+    children: React.ReactNode; 
     onClick?: () => void;
     disabled?: boolean;
     separator?: boolean;
   }) => {
     if (separator) {
-      return <div className="h-px my-1 bg-border/20" />;
+      return <div className="h-px bg-border/20 my-1" />;
     }
 
     return (
       <button
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (onClick && !disabled) {
-            onClick();
-          }
-        }}
+        onClick={onClick}
         disabled={disabled}
         className={cn(
-          "w-full text-left px-3 py-2 text-sm text-foreground hover:bg-blue-500/20 hover:text-foreground",
+          "w-full text-left px-3 py-2 text-sm text-foreground hover:bg-accent hover:text-accent-foreground",
           "flex items-center gap-2 rounded-md cursor-pointer transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
         )}
       >
@@ -393,13 +320,12 @@ export function ElementContextMenu({ element, position, onClose }: ElementContex
   const menu = (
     <div
       ref={menuRef}
-      className="fixed z-[9999] bg-card/80 backdrop-blur-sm border border-border/30 rounded-lg shadow-xl py-1 min-w-[200px]"
+      className="fixed z-[9999] bg-card/95 backdrop-blur-sm border border-border/30 rounded-lg shadow-xl py-1 min-w-[200px]"
       style={{
         left: `${menuPosition.x}px`,
         top: `${menuPosition.y}px`,
       }}
       onClick={(e) => e.stopPropagation()}
-      onMouseDown={(e) => e.stopPropagation()}
     >
       {/* Common Actions */}
       <MenuItem onClick={() => handleAction(() => editor.copy())}>
@@ -570,7 +496,7 @@ export function ElementContextMenu({ element, position, onClose }: ElementContex
       )}
 
       {/* Element-specific options */}
-      {(isImage || isShape) && !isLocked && (
+      {(isImage || isShape) && (
         <>
           <MenuItem separator />
           <div className="px-3 py-1 text-xs font-medium text-muted-foreground">Image/Shape</div>

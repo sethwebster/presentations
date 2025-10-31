@@ -30,6 +30,8 @@ export const dynamic = "force-dynamic";
  */
 type GenerateBackgroundRequest = {
   prompt?: string;
+  width?: number;
+  height?: number;
 };
 
 export async function POST(request: Request) {
@@ -70,9 +72,29 @@ export async function POST(request: Request) {
     );
   }
 
+  // Calculate aspect ratio description from dimensions
+  const width = body.width ?? 1280;
+  const height = body.height ?? 720;
+  const aspectRatio = width / height;
+  
+  // Describe aspect ratio in a natural way
+  let aspectDescription = "";
+  if (aspectRatio > 2.0) {
+    aspectDescription = "ultrawide";
+  } else if (aspectRatio > 1.5) {
+    aspectDescription = "widescreen";
+  } else if (aspectRatio > 1.2) {
+    aspectDescription = "wide format";
+  } else if (aspectRatio > 0.9) {
+    aspectDescription = "square format";
+  } else {
+    aspectDescription = "portrait format";
+  }
+
   // DALL-E 3 has a 4000 character limit. Keep instructions concise but effective.
-  // Focus on the user's subject, not presentation context. Create a beautiful background image.
-  const baseInstructions = "Stunning high-quality 16:9 background image, photorealistic, cinematic lighting, no text, no logos, no watermarks, elegant composition, suitable for slide backgrounds";
+  // Focus on quality and creativity, prioritizing user intent.
+  // Avoid production-oriented terms that cause staging equipment to appear.
+  const baseInstructions = `Stunning high-quality ${aspectDescription} image (${width}x${height} dimensions), photorealistic or artistic masterpiece quality, dramatic lighting, creative composition, highly detailed, visually striking, no text, no logos, no watermarks, no cameras, no filming equipment, no production crew, no stage equipment unless explicitly requested in the prompt`;
   
   // Combine user prompt with instructions, ensuring we stay under 4000 chars
   const maxPromptLength = 3500; // Leave buffer for instructions
@@ -80,9 +102,8 @@ export async function POST(request: Request) {
     ? userPrompt.substring(0, maxPromptLength).trim() + "..."
     : userPrompt;
   
-  // Lead with user's intent, then add quality requirements
-  // Important: Don't add presentation elements, stages, or branding unless user explicitly requests them
-  const composedPrompt = `${truncatedUserPrompt}, ${baseInstructions}. Do not include presentation stages, auditoriums, screens, logos, or speakers unless explicitly requested in the prompt.`;
+  // Prioritize user intent with quality enhancement
+  const composedPrompt = `${truncatedUserPrompt}. ${baseInstructions}`;
 
   // Retry logic for transient server errors
   const maxRetries = 2;
@@ -98,6 +119,20 @@ export async function POST(request: Request) {
           await new Promise(resolve => setTimeout(resolve, delayMs));
         }
 
+        // Map dimensions to DALL-E 3 supported sizes
+        // DALL-E 3 supports: "1024x1024", "1792x1024", or "1024x1792"
+        let dallESize: string;
+        if (aspectRatio < 0.9) {
+          // Portrait
+          dallESize = "1024x1792";
+        } else if (aspectRatio > 1.5) {
+          // Landscape/widescreen
+          dallESize = "1792x1024";
+        } else {
+          // Square or near-square
+          dallESize = "1024x1024";
+        }
+
         const response = await fetch("https://api.openai.com/v1/images/generations", {
           method: "POST",
           headers: {
@@ -107,7 +142,7 @@ export async function POST(request: Request) {
           body: JSON.stringify({
             model: "dall-e-3",
             prompt: composedPrompt,
-            size: "1792x1024",
+            size: dallESize,
             quality: "hd",
             style: "vivid",
             n: 1,
@@ -170,7 +205,8 @@ export async function POST(request: Request) {
           meta: {
             provider: "openai",
             model: "dall-e-3",
-            size: "1792x1024",
+            size: dallESize,
+            requestedSize: `${width}x${height}`,
             quality: "hd",
           },
         });
