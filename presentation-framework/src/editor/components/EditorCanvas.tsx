@@ -92,11 +92,7 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
       });
       return;
     }
-
-    if (isSelecting && selectionBoxStart) {
-      const canvasPos = screenToCanvas(e.clientX, e.clientY);
-      setSelectionBoxEnd(canvasPos);
-    }
+    // Selection box updates are handled by global mouse move listener
   };
   
   const currentSlide = deck?.slides[currentSlideIndex];
@@ -104,55 +100,47 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
   const handleMouseUp = () => {
     if (isPanning) {
       setIsPanning(false);
-      return;
     }
+    // Selection box completion is handled by global mouse up listener
+  };
 
-    if (isSelecting && selectionBoxStart && selectionBoxEnd) {
-      // Calculate selection box bounds
-      const minX = Math.min(selectionBoxStart.x, selectionBoxEnd.x);
-      const minY = Math.min(selectionBoxStart.y, selectionBoxEnd.y);
-      const maxX = Math.max(selectionBoxStart.x, selectionBoxEnd.x);
-      const maxY = Math.max(selectionBoxStart.y, selectionBoxEnd.y);
-      const boxWidth = maxX - minX;
-      const boxHeight = maxY - minY;
+  // Global mouse event handlers for selection box (works even when mouse leaves canvas)
+  useEffect(() => {
+    if (!isSelecting) return;
 
-      // If selection box is too small, treat it as a click and clear selection
-      if (boxWidth < 5 && boxHeight < 5) {
-        editor.clearSelection();
-      } else {
-        // Find all elements that intersect with the selection box
-        const currentSlide = deck?.slides[currentSlideIndex];
-        if (currentSlide) {
-          const allElements = [
-            ...(currentSlide.elements || []),
-            ...(currentSlide.layers?.flatMap(l => l.elements) || []),
-          ];
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      const canvasPos = screenToCanvas(e.clientX, e.clientY);
+      setSelectionBoxEnd(canvasPos);
+    };
 
-          const selectedIds = new Set<string>();
+    const handleGlobalMouseUp = () => {
+      if (isSelecting && selectionBoxStart && selectionBoxEnd) {
+        // Calculate selection box bounds
+        const minX = Math.min(selectionBoxStart.x, selectionBoxEnd.x);
+        const minY = Math.min(selectionBoxStart.y, selectionBoxEnd.y);
+        const maxX = Math.max(selectionBoxStart.x, selectionBoxEnd.x);
+        const maxY = Math.max(selectionBoxStart.y, selectionBoxEnd.y);
+        const boxWidth = maxX - minX;
+        const boxHeight = maxY - minY;
 
-          // Check each element for intersection with selection box
-          for (const element of allElements) {
-            if (!element.bounds) continue;
+        // If selection box is too small, treat it as a click and clear selection
+        if (boxWidth < 5 && boxHeight < 5) {
+          editor.clearSelection();
+        } else {
+          // Find all elements that intersect with the selection box
+          const currentSlide = deck?.slides[currentSlideIndex];
+          if (currentSlide) {
+            const allElements = [
+              ...(currentSlide.elements || []),
+              ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+            ];
 
-            // Skip groups - we'll handle them separately if needed
-            if (element.type === 'group') {
-              // For groups, check if selection box intersects with group bounds
-              const elX = element.bounds.x || 0;
-              const elY = element.bounds.y || 0;
-              const elWidth = element.bounds.width || 0;
-              const elHeight = element.bounds.height || 0;
+            const selectedIds = new Set<string>();
 
-              // Check if selection box intersects with element bounds
-              if (
-                minX < elX + elWidth &&
-                maxX > elX &&
-                minY < elY + elHeight &&
-                maxY > elY
-              ) {
-                selectedIds.add(element.id);
-              }
-            } else {
-              // For regular elements, check intersection
+            // Check each element for intersection with selection box
+            for (const element of allElements) {
+              if (!element.bounds) continue;
+
               const elX = element.bounds.x || 0;
               const elY = element.bounds.y || 0;
               const elWidth = element.bounds.width || 0;
@@ -168,23 +156,31 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
                 selectedIds.add(element.id);
               }
             }
-          }
 
-          // Update selection
-          if (selectedIds.size > 0) {
-            editor.selectElements(Array.from(selectedIds));
-          } else {
-            editor.clearSelection();
+            // Update selection
+            if (selectedIds.size > 0) {
+              editor.selectElements(Array.from(selectedIds));
+            } else {
+              editor.clearSelection();
+            }
           }
         }
-      }
 
-      // Reset selection box
-      setIsSelecting(false);
-      setSelectionBoxStart(null);
-      setSelectionBoxEnd(null);
-    }
-  };
+        // Reset selection box
+        setIsSelecting(false);
+        setSelectionBoxStart(null);
+        setSelectionBoxEnd(null);
+      }
+    };
+
+    window.addEventListener('mousemove', handleGlobalMouseMove);
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [isSelecting, selectionBoxStart, selectionBoxEnd, deck, currentSlideIndex, editor, screenToCanvas]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
