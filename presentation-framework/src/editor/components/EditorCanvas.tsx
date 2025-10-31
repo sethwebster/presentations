@@ -65,6 +65,11 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
     if (target.closest('[data-element-id]')) {
       return;
     }
+    
+    // Close opened group when clicking on canvas background (blur)
+    if (state.openedGroupId) {
+      editor.closeGroup();
+    }
 
     // Pan with middle mouse button or shift + left click
     if (e.button === 1 || (e.button === 0 && e.shiftKey)) {

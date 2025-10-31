@@ -160,7 +160,21 @@ function GroupBoundsOverlay({
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isDragging) return;
-    editor.toggleGroup(element.id);
+    
+    // If group is selected, enter it for editing
+    if (isSelected) {
+      editor.openGroup(element.id);
+      // Select all children when entering the group
+      if (element.children) {
+        editor.clearSelection();
+        element.children.forEach(child => {
+          editor.selectElement(child.id, true);
+        });
+      }
+    } else {
+      // If not selected, just toggle (existing behavior)
+      editor.toggleGroup(element.id);
+    }
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {

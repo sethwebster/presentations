@@ -81,9 +81,14 @@ export function useKeyboardShortcuts() {
         return;
       }
 
-      // Escape - Clear selection
+      // Escape - Close opened group or clear selection
       if (e.key === 'Escape') {
-        editor.clearSelection();
+        if (state.openedGroupId) {
+          editor.closeGroup();
+          editor.clearSelection();
+        } else {
+          editor.clearSelection();
+        }
         return;
       }
 
@@ -163,6 +168,6 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedElementIds, state.deck, state.currentSlideIndex, editor]);
+  }, [selectedElementIds, state.deck, state.currentSlideIndex, state.openedGroupId, editor]);
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
-import type { ElementDefinition } from '@/rsc/types';
+import type { ElementDefinition, GroupElementDefinition } from '@/rsc/types';
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { EditableTextElement } from './EditableTextElement';
 
@@ -172,9 +172,23 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
     e.stopPropagation();
     if (isDragging) return;
     
-    // Handle group double-click: open/close group
+    // Handle group double-click: if group is selected, enter it for editing
     if (element.type === 'group') {
-      editor.toggleGroup(element.id);
+      // Only open if the group is currently selected
+      if (isSelected) {
+        editor.openGroup(element.id);
+        // Select all children when entering the group
+        const group = element as GroupElementDefinition;
+        if (group.children) {
+          editor.clearSelection();
+          group.children.forEach(child => {
+            editor.selectElement(child.id, true);
+          });
+        }
+      } else {
+        // If not selected, just toggle (existing behavior)
+        editor.toggleGroup(element.id);
+      }
       return;
     }
     
@@ -205,26 +219,18 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
         ...(currentSlide.layers?.flatMap(l => l.elements) || []),
       ];
       
-      // If group is opened, also include children with absolute bounds
+      // Collect all elements with their current bounds
+      // CRITICAL: Children of groups have ABSOLUTE bounds already (groups are logical only)
       let elementsWithAbsoluteBounds = [...allElements];
       if (currentState.openedGroupId) {
         const groupElement = allElements.find(el => el.id === currentState.openedGroupId);
         if (groupElement && groupElement.type === 'group') {
           const group = groupElement as any;
-          const groupX = group.bounds?.x || 0;
-          const groupY = group.bounds?.y || 0;
           
-          // Add children with absolute bounds for dragging
+          // Add children directly - their bounds are already absolute
           group.children?.forEach((child: any) => {
             if (currentState.selectedElementIds.has(child.id)) {
-              elementsWithAbsoluteBounds.push({
-                ...child,
-                bounds: child.bounds ? {
-                  ...child.bounds,
-                  x: (child.bounds.x || 0) + groupX,
-                  y: (child.bounds.y || 0) + groupY,
-                } : undefined,
-              });
+              elementsWithAbsoluteBounds.push(child);
             }
           });
         }
@@ -234,6 +240,7 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
       currentState.selectedElementIds.forEach((id) => {
         const el = elementsWithAbsoluteBounds.find(e => e.id === id);
         if (el && el.bounds) {
+          // Children have absolute bounds already - use them directly
           initialBounds.set(id, {
             x: el.bounds.x || 0,
             y: el.bounds.y || 0,
