@@ -462,7 +462,7 @@ export class Editor {
           );
           
           // Recalculate group bounds from children's relative positions
-          // Calculate the bounding box of relative positions, then position group at that location
+          // We calculate the bounding box but preserve visual positions
           let minX = Infinity;
           let minY = Infinity;
           let maxX = -Infinity;
@@ -481,36 +481,105 @@ export class Editor {
             maxY = Math.max(maxY, relY + height);
           }
           
-          // Calculate new group bounds (children are already relative, so this is the relative bounding box)
-          const newGroupBounds = minX !== Infinity ? {
-            x: group.bounds.x + minX, // Keep group at original position, adjust for relative min
-            y: group.bounds.y + minY,
-            width: maxX - minX,
-            height: maxY - minY,
-          } : group.bounds;
+          // Only update if we have valid bounds and group.bounds exists
+          if (minX !== Infinity && group.bounds) {
+            const currentGroupX = group.bounds.x || 0;
+            const currentGroupY = group.bounds.y || 0;
+            
+            // Calculate new group bounds size
+            const newWidth = maxX - minX;
+            const newHeight = maxY - minY;
+            
+            // Normalize children to start at (0,0) relative to group
+            // This requires adjusting group position to preserve visual positions
+            const normalizedChildren = updatedChildren.map(child => {
+              if (!child.bounds) return child;
+              return {
+                ...child,
+                bounds: {
+                  ...child.bounds,
+                  x: (child.bounds.x || 0) - minX,
+                  y: (child.bounds.y || 0) - minY,
+                },
+              };
+            });
+            
+            // Adjust group position to preserve visual positions
+            // Visual position of child = groupX + relX
+            // After normalization: newGroupX + (relX - minX) = groupX + relX
+            // So: newGroupX = groupX + minX
+            const newGroupBounds = {
+              x: currentGroupX + minX,
+              y: currentGroupY + minY,
+              width: newWidth,
+              height: newHeight,
+            };
+            
+            const updatedGroup: GroupElementDefinition = {
+              ...group,
+              children: normalizedChildren,
+              bounds: newGroupBounds,
+            };
+            
+            // Update the group in the slide
+            const updatedDeck: DeckDefinition = {
+              ...deck,
+              slides: deck.slides.map((slide, i): SlideDefinition => {
+                if (i !== currentSlideIndex) return slide;
+                
+                const elements = slide.elements || [];
+                const groupIndex = elements.findIndex(el => el.id === openedGroupId);
+                
+                if (groupIndex !== -1) {
+                  return {
+                    ...slide,
+                    elements: elements.map((el, idx) =>
+                      idx === groupIndex ? updatedGroup : el
+                    ) as ElementDefinition[],
+                  };
+                }
+                
+                // Check layers
+                if (slide.layers) {
+                  const updatedLayers = slide.layers.map(layer => {
+                    const layerGroupIndex = layer.elements.findIndex(el => el.id === openedGroupId);
+                    if (layerGroupIndex !== -1) {
+                      return {
+                        ...layer,
+                        elements: layer.elements.map((el, idx) =>
+                          idx === layerGroupIndex ? updatedGroup : el
+                        ) as ElementDefinition[],
+                      };
+                    }
+                    return layer;
+                  });
+                  
+                  if (updatedLayers.some((layer, idx) => layer !== slide.layers![idx])) {
+                    return { ...slide, layers: updatedLayers };
+                  }
+                }
+                
+                return slide;
+              }),
+            };
+            
+            this.setState({ deck: updatedDeck });
+            
+            this.executeCommand({
+              type: 'updateElement',
+              target: elementId,
+              params: { updates: relativeUpdates },
+              timestamp: Date.now(),
+            });
+            
+            return;
+          }
           
-          // If group origin changed, adjust all children relative positions
-          const deltaX = newGroupBounds.x - group.bounds.x;
-          const deltaY = newGroupBounds.y - group.bounds.y;
-          
-          const finalChildren = deltaX !== 0 || deltaY !== 0
-            ? updatedChildren.map(child => {
-                if (!child.bounds) return child;
-                return {
-                  ...child,
-                  bounds: {
-                    ...child.bounds,
-                    x: (child.bounds.x || 0) - minX, // Adjust relative to new origin
-                    y: (child.bounds.y || 0) - minY,
-                  },
-                };
-              })
-            : updatedChildren;
-          
+          // Fallback: if bounds calculation failed, just update children without recalculating bounds
           const updatedGroup: GroupElementDefinition = {
             ...group,
-            children: finalChildren,
-            bounds: newGroupBounds,
+            children: updatedChildren,
+            bounds: group.bounds,
           };
           
           // Update the group in the slide
