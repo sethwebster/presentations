@@ -30,6 +30,7 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionBoxStart, setSelectionBoxStart] = useState<{ x: number; y: number } | null>(null);
   const [selectionBoxEnd, setSelectionBoxEnd] = useState<{ x: number; y: number } | null>(null);
+  const [previewSelectedIds, setPreviewSelectedIds] = useState<Set<string>>(new Set());
 
   // Canvas dimensions (matching presentation format)
   const CANVAS_WIDTH = 1280;
@@ -116,6 +117,46 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
       const canvasX = (e.clientX - rect.left) / zoom;
       const canvasY = (e.clientY - rect.top) / zoom;
       setSelectionBoxEnd({ x: canvasX, y: canvasY });
+
+      // Calculate which elements would be selected with current box
+      if (selectionBoxStart) {
+        const minX = Math.min(selectionBoxStart.x, canvasX);
+        const minY = Math.min(selectionBoxStart.y, canvasY);
+        const maxX = Math.max(selectionBoxStart.x, canvasX);
+        const maxY = Math.max(selectionBoxStart.y, canvasY);
+
+        const currentSlide = deck?.slides[currentSlideIndex];
+        if (currentSlide) {
+          const allElements = [
+            ...(currentSlide.elements || []),
+            ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+          ];
+
+          const previewIds = new Set<string>();
+
+          // Check each element for intersection with selection box
+          for (const element of allElements) {
+            if (!element.bounds) continue;
+
+            const elX = element.bounds.x || 0;
+            const elY = element.bounds.y || 0;
+            const elWidth = element.bounds.width || 0;
+            const elHeight = element.bounds.height || 0;
+
+            // Check if selection box intersects with element bounds
+            if (
+              minX < elX + elWidth &&
+              maxX > elX &&
+              minY < elY + elHeight &&
+              maxY > elY
+            ) {
+              previewIds.add(element.id);
+            }
+          }
+
+          setPreviewSelectedIds(previewIds);
+        }
+      }
     };
 
     const handleGlobalMouseUp = () => {
@@ -175,6 +216,7 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
         setIsSelecting(false);
         setSelectionBoxStart(null);
         setSelectionBoxEnd(null);
+        setPreviewSelectedIds(new Set());
       }
     };
 
@@ -325,6 +367,40 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
                 pointerEvents: 'none',
               }}
             />
+          )}
+
+          {/* Preview Selection Borders - Show boundaries of elements that would be selected */}
+          {isSelecting && previewSelectedIds.size > 0 && currentSlide && (
+            <>
+              {(() => {
+                const allElements = [
+                  ...(currentSlide.elements || []),
+                  ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+                ];
+                return allElements
+                  .filter(el => previewSelectedIds.has(el.id) && el.bounds)
+                  .map((element) => {
+                    const bounds = element.bounds!;
+                    return (
+                      <div
+                        key={`preview-${element.id}`}
+                        style={{
+                          position: 'absolute',
+                          left: `${bounds.x || 0}px`,
+                          top: `${bounds.y || 0}px`,
+                          width: `${bounds.width || 100}px`,
+                          height: `${bounds.height || 50}px`,
+                          border: '2px dashed rgba(22, 194, 199, 0.6)',
+                          background: 'rgba(22, 194, 199, 0.05)',
+                          pointerEvents: 'none',
+                          zIndex: 1000,
+                          borderRadius: '2px',
+                        }}
+                      />
+                    );
+                  });
+              })()}
+            </>
           )}
 
           {/* Selection Box - Show when dragging to select */}
