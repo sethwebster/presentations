@@ -133,7 +133,7 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
           ];
 
           const previewIds = new Set<string>();
-          const openedGroupId = state.openedGroupId;
+          const openedGroupId = editor.getState().openedGroupId;
 
           // Check each element for intersection with selection box
           for (const element of allElements) {
@@ -258,7 +258,7 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
       window.removeEventListener('mousemove', handleGlobalMouseMove);
       window.removeEventListener('mouseup', handleGlobalMouseUp);
     };
-  }, [isSelecting, selectionBoxStart, selectionBoxEnd, deck, currentSlideIndex, editor, zoom]);
+  }, [isSelecting, selectionBoxStart, selectionBoxEnd, deck, currentSlideIndex, editor, zoom, state.openedGroupId]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
