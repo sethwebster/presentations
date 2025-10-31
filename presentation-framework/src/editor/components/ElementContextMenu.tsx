@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import type { ElementDefinition, GroupElementDefinition } from '@/rsc/types';
 import { cn } from '@/lib/utils';
@@ -15,6 +16,7 @@ export function ElementContextMenu({ element, position, onClose }: ElementContex
   const state = useEditor();
   const editor = useEditorInstance();
   const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number }>(() => ({ x: position.x, y: position.y }));
   const selectedElementIds = state.selectedElementIds;
   const isSingleSelected = selectedElementIds.size === 1 && selectedElementIds.has(element.id);
   const isMultiSelected = selectedElementIds.size > 1;
@@ -24,9 +26,15 @@ export function ElementContextMenu({ element, position, onClose }: ElementContex
   const isText = element.type === 'text';
   const isLocked = (element.metadata as any)?.locked === true;
 
-  // Close menu when clicking outside
+  // Close menu when interacting outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+
+    const handleContextMenuOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         onClose();
       }
@@ -38,37 +46,44 @@ export function ElementContextMenu({ element, position, onClose }: ElementContex
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside, true);
+    document.addEventListener('contextmenu', handleContextMenuOutside, true);
     document.addEventListener('keydown', handleEscape);
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('mousedown', handleClickOutside, true);
+      document.removeEventListener('contextmenu', handleContextMenuOutside, true);
       document.removeEventListener('keydown', handleEscape);
     };
   }, [onClose]);
 
-  // Position menu
+  // Position menu next to cursor
   useEffect(() => {
     if (menuRef.current) {
       const rect = menuRef.current.getBoundingClientRect();
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
 
-      let x = position.x;
-      let y = position.y;
+      // Offset from cursor to avoid covering it
+      const offsetX = 8;
+      const offsetY = 8;
+      
+      let x = position.x + offsetX;
+      let y = position.y + offsetY;
 
       // Adjust if menu would go off screen
       if (x + rect.width > viewportWidth) {
-        x = viewportWidth - rect.width - 10;
+        // Position to the left of cursor instead
+        x = position.x - rect.width - offsetX;
       }
       if (y + rect.height > viewportHeight) {
-        y = viewportHeight - rect.height - 10;
+        // Position above cursor instead
+        y = position.y - rect.height - offsetY;
       }
       if (x < 10) x = 10;
       if (y < 10) y = 10;
 
-      menuRef.current.style.left = `${x}px`;
-      menuRef.current.style.top = `${y}px`;
+      setMenuPosition({ x, y });
     }
   }, [position]);
 
@@ -92,6 +107,55 @@ export function ElementContextMenu({ element, position, onClose }: ElementContex
     ];
     
     return allElements.filter(el => selectedElementIds.has(el.id));
+  };
+
+  const getSlideDimensions = () => {
+    const slideSize = state.deck?.settings?.slideSize;
+
+    if (slideSize) {
+      return {
+        width: slideSize.width || 1280,
+        height: slideSize.height || 720,
+      };
+    }
+
+    // Fallback to widescreen default
+    return { width: 1280, height: 720 };
+  };
+
+  const expandToFill = () => {
+    const { width, height } = getSlideDimensions();
+    const selectedElements = getSelectedElements();
+
+    const targets = new Map<string, ElementDefinition>();
+
+    // If multiple items selected, expand applicable ones
+    selectedElements
+      .filter(el => el.type === 'image' || el.type === 'shape')
+      .forEach(el => targets.set(el.id, el));
+
+    // Ensure the context element is included
+    if ((element.type === 'image' || element.type === 'shape') && !targets.has(element.id)) {
+      targets.set(element.id, element);
+    }
+
+    targets.forEach((target) => {
+      const update: Record<string, any> = {
+        bounds: {
+          x: 0,
+          y: 0,
+          width,
+          height,
+        },
+      };
+
+      if (target.type === 'image') {
+        update.objectFit = 'cover';
+        update.objectPosition = 'center';
+      }
+
+      editor.updateElement(target.id, update);
+    });
   };
 
   const alignLeft = () => {
@@ -180,6 +244,46 @@ export function ElementContextMenu({ element, position, onClose }: ElementContex
     });
   };
 
+  const distributeHorizontally = () => {
+    const selectedElements = getSelectedElements();
+    if (selectedElements.length < 3) return;
+    
+    const sorted = [...selectedElements].sort((a, b) => (a.bounds?.x || 0) - (b.bounds?.x || 0));
+    const firstX = sorted[0].bounds?.x || 0;
+    const lastElement = sorted[sorted.length - 1];
+    const lastX = (lastElement.bounds?.x || 0) + (lastElement.bounds?.width || 100);
+    const totalWidth = lastX - firstX;
+    const spacing = totalWidth / (sorted.length - 1);
+
+    sorted.forEach((el, index) => {
+      if (index === 0 || index === sorted.length - 1) return;
+      const bounds = el.bounds || { x: 0, y: 0, width: 100, height: 50 };
+      editor.updateElement(el.id, {
+        bounds: { ...bounds, x: firstX + spacing * index },
+      });
+    });
+  };
+
+  const distributeVertically = () => {
+    const selectedElements = getSelectedElements();
+    if (selectedElements.length < 3) return;
+    
+    const sorted = [...selectedElements].sort((a, b) => (a.bounds?.y || 0) - (b.bounds?.y || 0));
+    const firstY = sorted[0].bounds?.y || 0;
+    const lastElement = sorted[sorted.length - 1];
+    const lastY = (lastElement.bounds?.y || 0) + (lastElement.bounds?.height || 50);
+    const totalHeight = lastY - firstY;
+    const spacing = totalHeight / (sorted.length - 1);
+
+    sorted.forEach((el, index) => {
+      if (index === 0 || index === sorted.length - 1) return;
+      const bounds = el.bounds || { x: 0, y: 0, width: 100, height: 50 };
+      editor.updateElement(el.id, {
+        bounds: { ...bounds, y: firstY + spacing * index },
+      });
+    });
+  };
+
   const MenuItem = ({ 
     children, 
     onClick, 
@@ -200,8 +304,8 @@ export function ElementContextMenu({ element, position, onClose }: ElementContex
         onClick={onClick}
         disabled={disabled}
         className={cn(
-          "w-full text-left px-3 py-2 text-sm text-foreground hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed",
-          "flex items-center gap-2"
+          "w-full text-left px-3 py-2 text-sm text-foreground hover:bg-accent hover:text-accent-foreground",
+          "flex items-center gap-2 rounded-md cursor-pointer transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
         )}
       >
         {children}
@@ -209,13 +313,17 @@ export function ElementContextMenu({ element, position, onClose }: ElementContex
     );
   };
 
-  return (
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const menu = (
     <div
       ref={menuRef}
-      className="fixed z-[9999] bg-card border border-border/20 rounded-lg shadow-lg py-1 min-w-[200px]"
+      className="fixed z-[9999] bg-card/95 backdrop-blur-sm border border-border/30 rounded-lg shadow-xl py-1 min-w-[200px]"
       style={{
-        left: `${position.x}px`,
-        top: `${position.y}px`,
+        left: `${menuPosition.x}px`,
+        top: `${menuPosition.y}px`,
       }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -301,6 +409,24 @@ export function ElementContextMenu({ element, position, onClose }: ElementContex
             </svg>
             Align Bottom
           </MenuItem>
+          {selectedElementIds.size >= 3 && (
+            <>
+              <MenuItem separator />
+              <div className="px-3 py-1 text-xs font-medium text-muted-foreground">Distribute</div>
+              <MenuItem onClick={() => handleAction(distributeHorizontally)}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                Distribute Horizontally
+              </MenuItem>
+              <MenuItem onClick={() => handleAction(distributeVertically)}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                </svg>
+                Distribute Vertically
+              </MenuItem>
+            </>
+          )}
         </>
       )}
 
@@ -374,24 +500,7 @@ export function ElementContextMenu({ element, position, onClose }: ElementContex
         <>
           <MenuItem separator />
           <div className="px-3 py-1 text-xs font-medium text-muted-foreground">Image/Shape</div>
-          <MenuItem onClick={() => handleAction(() => {
-            const bounds = element.bounds || { x: 0, y: 0, width: 100, height: 50 };
-            const CANVAS_WIDTH = 1280;
-            const CANVAS_HEIGHT = 720;
-            editor.updateElement(element.id, {
-              bounds: {
-                x: 0,
-                y: 0,
-                width: CANVAS_WIDTH,
-                height: CANVAS_HEIGHT,
-              },
-            });
-            if (isImage) {
-              editor.updateElement(element.id, {
-                objectFit: 'cover',
-              });
-            }
-          })}>
+          <MenuItem onClick={() => handleAction(expandToFill)}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
             </svg>
@@ -501,5 +610,7 @@ export function ElementContextMenu({ element, position, onClose }: ElementContex
       </MenuItem>
     </div>
   );
+
+  return createPortal(menu, document.body);
 }
 

@@ -1,16 +1,18 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+
+type ImageMode = "background" | "element";
 
 interface ImageBackgroundModalProps {
   open: boolean;
   onClose: () => void;
-  onGenerate: (prompt: string) => Promise<void>;
-  onUpload: () => void;
-  onInsertImageElement: () => void;
+  onGenerate: (prompt: string, mode: ImageMode) => Promise<void>;
+  onUpload: (mode: ImageMode) => void;
   status?: {
     isGenerating: boolean;
     error?: string | null;
@@ -26,10 +28,11 @@ export function ImageBackgroundModal({
   onClose,
   onGenerate,
   onUpload,
-  onInsertImageElement,
   status,
 }: ImageBackgroundModalProps) {
   const [prompt, setPrompt] = useState("");
+  const [mode, setMode] = useState<ImageMode>("background");
+  const [activeTab, setActiveTab] = useState<"generate" | "upload">("generate");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -40,6 +43,8 @@ export function ImageBackgroundModal({
   useEffect(() => {
     if (!open) {
       setPrompt("");
+      setMode("background");
+      setActiveTab("generate");
       return;
     }
 
@@ -57,8 +62,8 @@ export function ImageBackgroundModal({
     if (!prompt.trim()) {
       return;
     }
-    await onGenerate(prompt.trim());
-  }, [onGenerate, prompt]);
+    await onGenerate(prompt.trim(), mode);
+  }, [onGenerate, prompt, mode]);
 
   if (!open || !mounted) {
     return null;
@@ -76,18 +81,13 @@ export function ImageBackgroundModal({
         className="w-full max-w-xl rounded-2xl border border-black/10 bg-white/95 p-6 text-[var(--editor-text-strong)] shadow-[0_30px_90px_-30px_rgba(0,0,0,0.55)]"
       >
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--editor-text-strong)]">
-              Craft a Slide Background
-            </h2>
-            <p className="mt-1 text-sm text-[var(--editor-text-muted)]">
-              Describe the scene you want. We’ll generate a presentation-grade, projection-ready image.
-            </p>
-          </div>
+          <h2 className="text-lg font-semibold text-[var(--editor-text-strong)]">
+            Generate Image
+          </h2>
           <button
             onClick={onClose}
             className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--editor-text-muted)] transition hover:bg-white/5 hover:text-[var(--editor-text-strong)]"
-            aria-label="Close background generator"
+            aria-label="Close image generator"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -96,69 +96,123 @@ export function ImageBackgroundModal({
           </button>
         </div>
 
-        <label className="mt-6 block text-sm font-medium text-[var(--editor-text-muted)]">
-          Prompt
-        </label>
-        <textarea
-          value={prompt}
-          onChange={(event) => setPrompt(event.target.value)}
-          placeholder="E.g. A dramatic dusk skyline over a futuristic city, soft rim lighting, cinematic atmosphere"
-          className={cn(
-            "mt-2 w-full rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-3 text-sm text-[var(--editor-text)]",
-            "focus:border-[var(--editor-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--editor-accent)]/40"
-          )}
-          rows={4}
-        />
-
-        <div className="mt-4 flex flex-col gap-2 text-xs text-[var(--editor-text-muted)]">
-          <div>
-            • Favor cinematic lighting, depth, and texture. Avoid text, logos, or recognizable faces.
-          </div>
-          <div>
-            • Leave visual breathing room for slide titles and content.
-          </div>
-          <div>
-            • Mention color palettes or moods you want to emphasize.
+        {/* Tabs */}
+        <div className="mt-6 border-b border-[var(--editor-border)]">
+          <div className="flex gap-4">
+            <button
+              type="button"
+              onClick={() => setActiveTab("generate")}
+              className={cn(
+                "pb-3 px-1 text-sm font-medium border-b-2 transition-colors",
+                activeTab === "generate"
+                  ? "border-[var(--editor-accent)] text-[var(--editor-text-strong)]"
+                  : "border-transparent text-[var(--editor-text-muted)] hover:text-[var(--editor-text-strong)]"
+              )}
+            >
+              Generate
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("upload")}
+              className={cn(
+                "pb-3 px-1 text-sm font-medium border-b-2 transition-colors",
+                activeTab === "upload"
+                  ? "border-[var(--editor-accent)] text-[var(--editor-text-strong)]"
+                  : "border-transparent text-[var(--editor-text-muted)] hover:text-[var(--editor-text-strong)]"
+              )}
+            >
+              Upload
+            </button>
           </div>
         </div>
 
-        {status?.error && (
-          <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-            {status.error}
-          </div>
+        {/* Generate Tab */}
+        {activeTab === "generate" && (
+          <>
+            <label className="mt-6 block text-sm font-medium text-[var(--editor-text-muted)]">
+              Prompt
+            </label>
+            <textarea
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder="Describe the image you want to generate..."
+              className={cn(
+                "mt-2 w-full rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-3 text-sm text-[var(--editor-text)]",
+                "focus:border-[var(--editor-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--editor-accent)]/40"
+              )}
+              rows={4}
+            />
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-[var(--editor-text-muted)] mb-2">
+                Type
+              </label>
+              <SegmentedControl
+                items={[
+                  { value: "background", label: "Background" },
+                  { value: "element", label: "Image Element" },
+                ]}
+                value={mode}
+                onValueChange={(value) => setMode(value as ImageMode)}
+              />
+            </div>
+
+            {status?.error && (
+              <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                {status.error}
+              </div>
+            )}
+
+            {status?.success && (
+              <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+                {status.success}
+              </div>
+            )}
+
+            <div className="mt-6">
+              <Button
+                type="button"
+                onClick={handleGenerateClick}
+                disabled={isGenerating || !prompt.trim()}
+                className="w-full"
+              >
+                {isGenerating ? "Generating…" : "Generate"}
+              </Button>
+            </div>
+          </>
         )}
 
-        {status?.success && (
-          <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
-            {status.success}
-          </div>
+        {/* Upload Tab */}
+        {activeTab === "upload" && (
+          <>
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-[var(--editor-text-muted)] mb-2">
+                Type
+              </label>
+              <SegmentedControl
+                items={[
+                  { value: "background", label: "Background" },
+                  { value: "element", label: "Image Element" },
+                ]}
+                value={mode}
+                onValueChange={(value) => setMode(value as ImageMode)}
+              />
+            </div>
+            <div className="mt-6">
+              <Button
+                type="button"
+                onClick={() => onUpload(mode)}
+                variant="secondary"
+                className="w-full"
+              >
+                Choose Image File
+              </Button>
+              <p className="mt-3 text-sm text-[var(--editor-text-muted)]">
+                Select an image file from your computer to use as a {mode === "background" ? "background" : "image element"}.
+              </p>
+            </div>
+          </>
         )}
-
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <Button
-            type="button"
-            onClick={handleGenerateClick}
-            disabled={isGenerating || !prompt.trim()}
-            className="min-w-[160px]"
-          >
-            {isGenerating ? "Generating…" : "Generate Background"}
-          </Button>
-          <Button
-            type="button"
-            onClick={onUpload}
-            variant="secondary"
-            className="min-w-[160px]"
-          >
-            Upload Image
-          </Button>
-          <button
-            type="button"
-            onClick={onInsertImageElement}
-            className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)] transition hover:text-[var(--editor-text)]"
-          >
-            Or insert as slide element
-          </button>
-        </div>
       </div>
     </div>,
     document.body
