@@ -173,7 +173,7 @@ function GroupBoundsOverlay({
       onSelect();
     }
 
-    // Store initial positions of all group children
+    // Store initial positions of all group children (including nested groups)
     const currentState = editor.getState();
     const currentDeck = currentState.deck;
     const currentSlide = currentDeck?.slides[currentState.currentSlideIndex];
@@ -181,17 +181,30 @@ function GroupBoundsOverlay({
     if (currentSlide && element.children) {
       const initialBounds = new Map<string, { x: number; y: number; width: number; height: number }>();
       
-      // Store bounds for all group children (they have absolute positions)
-      element.children.forEach((child) => {
-        if (child.bounds) {
-          initialBounds.set(child.id, {
-            x: child.bounds.x || 0,
-            y: child.bounds.y || 0,
-            width: child.bounds.width || 100,
-            height: child.bounds.height || 100,
-          });
-        }
-      });
+      // Helper to recursively collect bounds from all children (including nested groups)
+      const collectBounds = (children: ElementDefinition[]) => {
+        children.forEach((child) => {
+          if (child.bounds) {
+            initialBounds.set(child.id, {
+              x: child.bounds.x || 0,
+              y: child.bounds.y || 0,
+              width: child.bounds.width || 100,
+              height: child.bounds.height || 100,
+            });
+          }
+          
+          // If child is a nested group, recursively collect its children's bounds
+          if (child.type === 'group') {
+            const nestedGroup = child as GroupElementDefinition;
+            if (nestedGroup.children) {
+              collectBounds(nestedGroup.children);
+            }
+          }
+        });
+      };
+      
+      // Collect bounds from all children (including nested groups)
+      collectBounds(element.children);
       
       setSelectedElementsInitialBounds(initialBounds);
     }
@@ -258,24 +271,38 @@ function GroupBoundsOverlay({
       const primaryDeltaX = primaryNewX - primaryInitialBounds.x;
       const primaryDeltaY = primaryNewY - primaryInitialBounds.y;
       
-      // Update all group children with the same delta
-      element.children.forEach((child) => {
-        const initialBounds = selectedElementsInitialBounds.get(child.id);
-        if (!initialBounds) return;
-        
-        const newX = Math.max(0, Math.min(CANVAS_WIDTH - initialBounds.width, initialBounds.x + primaryDeltaX));
-        const newY = Math.max(0, Math.min(CANVAS_HEIGHT - initialBounds.height, initialBounds.y + primaryDeltaY));
-        
-        editor.updateElement(child.id, {
-          bounds: {
-            ...child.bounds,
-            x: newX,
-            y: newY,
-            width: initialBounds.width,
-            height: initialBounds.height,
-          },
+      // Helper to recursively update all children (including nested groups)
+      const updateGroupChildren = (children: ElementDefinition[], deltaX: number, deltaY: number) => {
+        children.forEach((child) => {
+          const initialBounds = selectedElementsInitialBounds.get(child.id);
+          if (!initialBounds) return;
+          
+          const newX = Math.max(0, Math.min(CANVAS_WIDTH - initialBounds.width, initialBounds.x + deltaX));
+          const newY = Math.max(0, Math.min(CANVAS_HEIGHT - initialBounds.height, initialBounds.y + deltaY));
+          
+          // Update the child
+          editor.updateElement(child.id, {
+            bounds: {
+              ...child.bounds,
+              x: newX,
+              y: newY,
+              width: initialBounds.width,
+              height: initialBounds.height,
+            },
+          });
+          
+          // If child is a nested group, recursively update its children
+          if (child.type === 'group') {
+            const nestedGroup = child as GroupElementDefinition;
+            if (nestedGroup.children) {
+              updateGroupChildren(nestedGroup.children, deltaX, deltaY);
+            }
+          }
         });
-      });
+      };
+      
+      // Update all group children (including nested groups) with the same delta
+      updateGroupChildren(element.children, primaryDeltaX, primaryDeltaY);
       
       // Group bounds will be recalculated automatically when children are updated
     };

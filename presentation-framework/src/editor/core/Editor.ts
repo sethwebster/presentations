@@ -727,6 +727,22 @@ export class Editor {
 
     if (!currentElement) return;
 
+    // If updating a group element's children, recalculate bounds
+    let finalUpdates = { ...updates };
+    if (currentElement.type === 'group' && updates.children) {
+      const group = currentElement as GroupElementDefinition;
+      const updatedGroup = { ...group, ...updates } as GroupElementDefinition;
+      
+      // Recalculate group bounds from updated children
+      const newGroupBounds = this.calculateGroupBounds(updatedGroup.children || []);
+      if (newGroupBounds) {
+        finalUpdates = {
+          ...updates,
+          bounds: newGroupBounds,
+        };
+      }
+    }
+
     // Update element in deck
     const updatedDeck: DeckDefinition = {
       ...deck,
@@ -738,7 +754,7 @@ export class Editor {
           return {
             ...slide,
             elements: elements.map((el, i) => 
-              i === elementIndex ? { ...el, ...updates } as ElementDefinition : el
+              i === elementIndex ? { ...el, ...finalUpdates } as ElementDefinition : el
             ),
           };
         }
@@ -751,7 +767,7 @@ export class Editor {
               return {
                 ...layer,
                 elements: layer.elements.map((el, i) =>
-                  i === layerElementIndex ? { ...el, ...updates } as ElementDefinition : el
+                  i === layerElementIndex ? { ...el, ...finalUpdates } as ElementDefinition : el
                 ),
               };
             }
@@ -782,7 +798,7 @@ export class Editor {
       type: 'updateElement',
       target: elementId,
       params: { 
-        updates,
+        updates: finalUpdates,
         previousElement: previousElement ? JSON.parse(JSON.stringify(previousElement)) : undefined,
       },
       timestamp: Date.now(),
@@ -1297,9 +1313,18 @@ export class Editor {
     // Find elements to group - preserve their original order
     // CRITICAL: Read bounds and convert to absolute if element is child of opened group
     const elementsToGroup: Array<{ element: ElementDefinition; originalBounds: { x: number; y: number; width: number; height: number } }> = [];
+    let existingGroup: GroupElementDefinition | null = null;
+    
     for (const id of elementIds) {
       const result = findElementWithAbsoluteBounds(id);
       if (!result) continue;
+      
+      // Check if this element is already a group
+      if (result.element.type === 'group' && !existingGroup) {
+        existingGroup = result.element as GroupElementDefinition;
+        // If we found an existing group, we'll add other elements to it instead of creating a new group
+        continue;
+      }
       
       elementsToGroup.push({ 
         element: result.element, 
@@ -1307,6 +1332,102 @@ export class Editor {
       });
     }
     
+    // If we found an existing group, add elements to it instead of creating a new group
+    if (existingGroup) {
+      // First, get the existing group's current bounds (need absolute positions)
+      const existingGroupResult = findElementWithAbsoluteBounds(existingGroup.id);
+      if (!existingGroupResult) return; // Shouldn't happen, but safety check
+      
+      // Collect all elements to add (including children from other groups if any)
+      const elementsToAdd: ElementDefinition[] = [];
+      
+      for (const { element, originalBounds } of elementsToGroup) {
+        // If element is a group, add its children individually (they already have absolute bounds)
+        if (element.type === 'group') {
+          const groupToMerge = element as GroupElementDefinition;
+          if (groupToMerge.children) {
+            // Children of the group being merged already have absolute bounds
+            elementsToAdd.push(...groupToMerge.children);
+          }
+        } else {
+          // Regular element - add it with absolute bounds
+          elementsToAdd.push({
+            ...element,
+            bounds: {
+              x: originalBounds.x,
+              y: originalBounds.y,
+              width: originalBounds.width,
+              height: originalBounds.height,
+            },
+          });
+        }
+      }
+      
+      // Add existing group's children to the list (they already have absolute bounds)
+      if (existingGroup.children) {
+        elementsToAdd.push(...existingGroup.children);
+      }
+      
+      // Calculate new group bounds
+      const newGroupBounds = this.calculateGroupBounds(elementsToAdd);
+      if (!newGroupBounds) return;
+      
+      // Update the existing group
+      const updatedGroup: GroupElementDefinition = {
+        ...existingGroup,
+        children: elementsToAdd,
+        bounds: newGroupBounds,
+      };
+      
+      // Remove elements that were added to the group from the slide
+      let updatedSlide: SlideDefinition = { ...slide };
+      
+      // Remove elements being added (except the existing group itself)
+      const idsToRemove = elementIds.filter(id => id !== existingGroup!.id);
+      updatedSlide = {
+        ...updatedSlide,
+        elements: (updatedSlide.elements || []).filter(el => !idsToRemove.includes(el.id)),
+        layers: updatedSlide.layers?.map(layer => ({
+          ...layer,
+          elements: layer.elements.filter(el => !idsToRemove.includes(el.id)),
+        })),
+      };
+      
+      // Update the existing group in the slide
+      updatedSlide = {
+        ...updatedSlide,
+        elements: (updatedSlide.elements || []).map(el => 
+          el.id === existingGroup!.id ? updatedGroup : el
+        ) as ElementDefinition[],
+        layers: updatedSlide.layers?.map(layer => ({
+          ...layer,
+          elements: layer.elements.map(el => 
+            el.id === existingGroup!.id ? updatedGroup : el
+          ) as ElementDefinition[],
+        })),
+      };
+      
+      const updatedDeck: DeckDefinition = {
+        ...deck,
+        slides: deck.slides.map((s, i) => (i === currentSlideIndex ? updatedSlide : s)),
+      };
+      
+      this.setState({ 
+        deck: updatedDeck,
+        selectedElementIds: new Set([existingGroup.id]),
+      });
+      
+      this.executeCommand({
+        type: 'groupElements',
+        target: elementIds,
+        params: { groupId: existingGroup.id },
+        timestamp: Date.now(),
+      });
+      
+      return;
+    }
+    
+    // No existing group found - create a new group
     if (elementsToGroup.length < 2) return;
 
     // Calculate group bounds from ORIGINAL absolute positions

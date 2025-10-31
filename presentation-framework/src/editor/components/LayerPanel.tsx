@@ -71,10 +71,35 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
   }
 
   // Collect all elements in rendering order, then reverse to show topmost first
+  // BUT: Group children should appear UNDER their parent group in the list
   const allElements: Array<{ element: any; layerId?: string; layerOrder?: number; renderIndex?: number; isGroupChild?: boolean; parentGroupId?: string }> = [];
   
   let renderIndex = 0;
   
+  // Helper to recursively add group children to the list
+  const addGroupChildren = (group: GroupElementDefinition, parentGroupId: string, isExpanded: boolean, layerId?: string, layerOrder?: number) => {
+    if (!isExpanded || !group.children) return;
+    
+    group.children.forEach((child) => {
+      const isChildGroup = child.type === 'group';
+      const isChildExpanded = isChildGroup && expandedGroups.has(child.id);
+      
+      allElements.push({ 
+        element: child, 
+        renderIndex: renderIndex++, 
+        isGroupChild: true, 
+        parentGroupId,
+        layerId,
+        layerOrder,
+      });
+      
+      // Recursively add nested group children
+      if (isChildGroup && isChildExpanded) {
+        addGroupChildren(child as GroupElementDefinition, child.id, true, layerId, layerOrder);
+      }
+    });
+  };
+
   // Add elements directly on slide (rendered first, so on bottom)
   (currentSlide.elements || []).forEach((el) => {
     if (el.type === 'group') {
@@ -82,11 +107,9 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
       const isExpanded = expandedGroups.has(el.id);
       allElements.push({ element: el, renderIndex: renderIndex++, isGroupChild: false });
       
-      // If group is expanded, add its children
-      if (isExpanded && group.children) {
-        group.children.forEach((child) => {
-          allElements.push({ element: child, renderIndex: renderIndex++, isGroupChild: true, parentGroupId: el.id });
-        });
+      // If group is expanded, add its children (including nested groups)
+      if (isExpanded) {
+        addGroupChildren(group, el.id, true);
       }
     } else {
       allElements.push({ element: el, renderIndex: renderIndex++ });
@@ -109,11 +132,9 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
           const isExpanded = expandedGroups.has(el.id);
           allElements.push({ element: el, layerId: layer.id, layerOrder: layer.order, renderIndex: renderIndex++, isGroupChild: false });
           
-          // If group is expanded, add its children
-          if (isExpanded && group.children) {
-            group.children.forEach((child) => {
-              allElements.push({ element: child, layerId: layer.id, layerOrder: layer.order, renderIndex: renderIndex++, isGroupChild: true, parentGroupId: el.id });
-            });
+          // If group is expanded, add its children (including nested groups)
+          if (isExpanded) {
+            addGroupChildren(group, el.id, true, layer.id, layer.order);
           }
         } else {
           allElements.push({ element: el, layerId: layer.id, layerOrder: layer.order, renderIndex: renderIndex++ });
@@ -122,7 +143,55 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
     });
 
   // Reverse the order so topmost elements (rendered last) appear at the top of the list
-  allElements.reverse();
+  // BUT: When reversing, we need to keep group children UNDER their parent (including nested groups)
+  // Strategy: Build reversed list, treating group+children as a unit, recursively handling nested groups
+  const reversed: typeof allElements = [];
+  let i = allElements.length - 1;
+  
+  // Helper to collect all children of a group (including nested groups) in forward order
+  const collectGroupChildren = (groupId: string, startIndex: number): typeof allElements => {
+    const children: typeof allElements = [];
+    for (let j = startIndex; j < allElements.length; j++) {
+      const childItem = allElements[j];
+      if (childItem.isGroupChild && childItem.parentGroupId === groupId) {
+        children.push(childItem);
+        // If this child is itself a group and expanded, its children are already in the array
+        // (they'll be handled by the recursion logic)
+      } else if (!childItem.isGroupChild) {
+        break; // Stop when we hit a non-child of this group
+      }
+    }
+    return children;
+  };
+  
+  while (i >= 0) {
+    const item = allElements[i];
+    
+    // If this is a group child, skip it (we'll handle it with its parent)
+    if (item.isGroupChild) {
+      i--;
+      continue;
+    }
+    
+    // If this is a group with expanded children, add group first, then children in order
+    if (item.element.type === 'group' && expandedGroups.has(item.element.id)) {
+      // Add the group
+      reversed.push(item);
+      
+      // Find and add its direct children in forward order
+      const children = collectGroupChildren(item.element.id, i + 1);
+      reversed.push(...children);
+    } else {
+      // Regular element, just add it
+      reversed.push(item);
+    }
+    
+    i--;
+  }
+  
+  // Replace allElements with the correctly ordered list (topmost first, group children under parent)
+  allElements.length = 0;
+  allElements.push(...reversed);
 
   const toggleGroup = (groupId: string) => {
     const newExpanded = new Set(expandedGroups);
@@ -144,15 +213,57 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
     setExpandedLayers(newExpanded);
   };
 
-  const startEditingLayerName = (layerId: string, currentName: string) => {
-    setEditingLayerId(layerId);
+  const startEditingLayerName = (elementOrLayerId: string, currentName: string) => {
+    setEditingLayerId(elementOrLayerId);
     setEditingLayerName(currentName || '');
   };
 
   const saveLayerName = () => {
-    if (editingLayerId && currentSlide) {
-      editor.updateLayerName(currentSlideIndex, editingLayerId, editingLayerName);
+    if (!editingLayerId || !currentSlide) {
+      setEditingLayerId(null);
+      setEditingLayerName('');
+      return;
     }
+
+    // Check if it's a layer or an element
+    const isLayer = currentSlide.layers?.some(layer => layer.id === editingLayerId);
+    
+    if (isLayer) {
+      // Update layer name
+      editor.updateLayerName(currentSlideIndex, editingLayerId, editingLayerName);
+    } else {
+      // It's an element (including groups) - need to find it and update its name
+      const allElements = [
+        ...(currentSlide.elements || []),
+        ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+      ];
+      
+      // Check if it's a direct element
+      const element = allElements.find(el => el.id === editingLayerId);
+      
+      if (element) {
+        // Update element name directly
+        editor.updateElement(editingLayerId, { name: editingLayerName || undefined });
+      } else {
+        // Check if it's a child of a group
+        for (const el of allElements) {
+          if (el.type === 'group') {
+            const group = el as GroupElementDefinition;
+            const child = group.children?.find(child => child.id === editingLayerId);
+            if (child) {
+              // Update child name - need to update the group's children array
+              editor.updateElement(el.id, {
+                children: group.children?.map(c => 
+                  c.id === editingLayerId ? { ...c, name: editingLayerName || undefined } : c
+                ),
+              });
+              break;
+            }
+          }
+        }
+      }
+    }
+    
     setEditingLayerId(null);
     setEditingLayerName('');
   };
@@ -344,8 +455,11 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
               const isGroup = element.type === 'group';
               const isGroupExpanded = isGroup && expandedGroups.has(element.id);
               
+              // Use element.name if set, otherwise generate a default name
               let elementName: string;
-              if (element.type === 'text') {
+              if ((element as any).name) {
+                elementName = (element as any).name;
+              } else if (element.type === 'text') {
                 elementName = (element.content || 'Text').substring(0, 20);
               } else if (element.type === 'shape') {
                 elementName = `${element.shapeType || 'Shape'}`;
@@ -476,15 +590,50 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                     flexShrink: 0,
                   }} />
                   
-                  {/* Element name */}
-                  <span style={{
-                    flex: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}>
-                    {elementName}
-                  </span>
+                  {/* Element name - editable on double click */}
+                  {editingLayerId === element.id ? (
+                    <input
+                      ref={layerNameInputRef}
+                      value={editingLayerName}
+                      onChange={(e) => setEditingLayerName(e.target.value)}
+                      onBlur={saveLayerName}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          saveLayerName();
+                        } else if (e.key === 'Escape') {
+                          cancelEditingLayerName();
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        flex: 1,
+                        background: 'rgba(236, 236, 236, 0.1)',
+                        border: '1px solid var(--lume-primary)',
+                        borderRadius: '2px',
+                        padding: '2px 4px',
+                        fontSize: '12px',
+                        color: 'var(--lume-mist)',
+                        fontFamily: 'inherit',
+                      }}
+                    />
+                  ) : (
+                    <span
+                      style={{
+                        flex: 1,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        // Use the actual element.name if it exists, otherwise use the display name
+                        const actualName = (element as any).name || elementName;
+                        startEditingLayerName(element.id, actualName);
+                      }}
+                    >
+                      {elementName}
+                    </span>
+                  )}
                   
                   {/* Lock/Unlock button */}
                   {!isLocked && (

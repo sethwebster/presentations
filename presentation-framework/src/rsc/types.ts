@@ -349,6 +349,7 @@ export type ElementDefinition =
 export interface BaseElementDefinition {
   id: string;
   type: string;
+  name?: string; // Optional name for the element (for layer panel display)
   bounds?: Bounds;
   style?: Record<string, unknown>;
   animation?: AnimationDefinition;
