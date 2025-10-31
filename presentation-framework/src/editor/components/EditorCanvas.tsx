@@ -413,10 +413,12 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
                 top: `${Math.min(selectionBoxStart.y, selectionBoxEnd.y)}px`,
                 width: `${Math.abs(selectionBoxEnd.x - selectionBoxStart.x)}px`,
                 height: `${Math.abs(selectionBoxEnd.y - selectionBoxStart.y)}px`,
-                border: '1px dashed var(--lume-primary)',
-                background: 'rgba(22, 194, 199, 0.1)',
+                border: '2px solid var(--lume-primary)',
+                background: 'rgba(22, 194, 199, 0.15)',
                 pointerEvents: 'none',
                 zIndex: 1001,
+                boxShadow: '0 0 0 1px rgba(22, 194, 199, 0.3), inset 0 0 0 1px rgba(22, 194, 199, 0.2)',
+                borderRadius: '2px',
               }}
             />
           )}
