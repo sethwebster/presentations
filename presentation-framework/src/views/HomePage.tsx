@@ -84,6 +84,44 @@ export function HomePage() {
 
         {/* Presentation List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Add New Presentation Card */}
+          <Card
+            className="group cursor-pointer overflow-hidden transition-all duration-300 hover:scale-[1.02] border-dashed"
+            style={{
+              background: 'rgba(255, 255, 255, 0.02)',
+              borderColor: 'rgba(236, 236, 236, 0.2)',
+              borderWidth: '2px',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(22, 194, 199, 0.05)';
+              e.currentTarget.style.borderColor = 'var(--lume-primary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
+              e.currentTarget.style.borderColor = 'rgba(236, 236, 236, 0.2)';
+            }}
+            onClick={() => {
+              // Generate a new deck ID
+              const newDeckId = `deck-${Date.now()}`;
+              router.push(`/editor/${newDeckId}`);
+            }}
+          >
+            <CardContent className="p-0">
+              <div className="w-full aspect-video flex flex-col items-center justify-center"
+                   style={{ background: 'rgba(255, 255, 255, 0.03)' }}>
+                <div className="text-5xl mb-4 opacity-40" style={{ color: 'var(--lume-primary)' }}>
+                  +
+                </div>
+                <div className="text-lg font-medium" style={{ color: 'var(--lume-mist)' }}>
+                  New Presentation
+                </div>
+                <div className="text-sm mt-1 opacity-60" style={{ color: 'var(--lume-mist)' }}>
+                  Create in editor
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {Object.keys(presentations).map((name) => {
             const isHovered = hoveredCard === name;
             const presentationData = loadedPresentations[name];
@@ -173,6 +211,25 @@ export function HomePage() {
                             LIVE
                           </span>
                         )}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/editor/default-${name}`);
+                        }}
+                        className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all hover:scale-105 cursor-pointer"
+                        style={{
+                          background: 'rgba(200, 75, 210, 0.2)',
+                          border: '1px solid rgba(200, 75, 210, 0.4)',
+                          color: 'var(--lume-accent)',
+                        }}
+                        title="Edit in editor"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                        <span className="text-sm">Edit</span>
                       </button>
                       <button
                         onClick={(e) => {

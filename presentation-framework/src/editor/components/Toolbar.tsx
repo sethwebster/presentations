@@ -1,13 +1,15 @@
 "use client";
 
+import React, { useState, useRef, useEffect } from 'react';
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
+import { AlignmentTools } from './AlignmentTools';
 
 interface ToolbarProps {
   deckId: string;
   onToggleTimeline: () => void;
 }
 
-export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
+export function Toolbar({ onToggleTimeline }: ToolbarProps) {
   const state = useEditor();
   const editor = useEditorInstance();
   
@@ -16,6 +18,23 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
   const selectedElementIds = state.selectedElementIds;
   const autosaveEnabled = state.autosaveEnabled;
   const lastShapeStyle = state.lastShapeStyle;
+  
+  const [showAlignMenu, setShowAlignMenu] = useState(false);
+  const alignMenuRef = useRef<HTMLDivElement>(null);
+  
+  // Close align menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (alignMenuRef.current && !alignMenuRef.current.contains(event.target as Node)) {
+        setShowAlignMenu(false);
+      }
+    };
+    
+    if (showAlignMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showAlignMenu]);
   return (
     <div className="editor-toolbar" style={{
       height: '56px',
@@ -60,7 +79,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
           editor.addElement({
             id: `shape-${Date.now()}`,
             type: 'shape',
-            shapeType: 'rectangle',
+            shapeType: 'rect',
             bounds: { x: 150, y: 150, width: 150, height: 100 },
             style: lastShapeStyle || {
               fill: '#16C2C7',
@@ -78,7 +97,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
           editor.addElement({
             id: `shape-${Date.now()}`,
             type: 'shape',
-            shapeType: 'circle',
+            shapeType: 'ellipse',
             bounds: { x: 200, y: 200, width: 120, height: 120 },
             style: lastShapeStyle || {
               fill: '#C84BD2',
@@ -189,13 +208,30 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
             <rect x="3" y="14" width="7" height="7" />
           </svg>
         </ToolbarButton>
-        <ToolbarButton title="Align" onClick={() => {}}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
-            <line x1="18" y1="20" x2="18" y2="10" />
-            <line x1="12" y1="20" x2="12" y2="4" />
-            <line x1="6" y1="20" x2="6" y2="14" />
-          </svg>
-        </ToolbarButton>
+        <div style={{ position: 'relative' }} ref={alignMenuRef}>
+          <ToolbarButton 
+            title="Align" 
+            onClick={() => setShowAlignMenu(!showAlignMenu)}
+            isActive={showAlignMenu}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+              <line x1="18" y1="20" x2="18" y2="10" />
+              <line x1="12" y1="20" x2="12" y2="4" />
+              <line x1="6" y1="20" x2="6" y2="14" />
+            </svg>
+          </ToolbarButton>
+          {showAlignMenu && selectedElementIds.size >= 2 && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              marginTop: '8px',
+              zIndex: 1000,
+            }}>
+              <AlignmentTools />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Layer Ordering Tools */}

@@ -87,57 +87,62 @@ interface ElementRendererProps {
 
 function GroupElementRenderer({ element, slideId }: { element: GroupElementDefinition; slideId: string }) {
   const state = useEditor();
+  const editor = useEditorInstance();
   const isOpened = state.openedGroupId === element.id;
+  const isSelected = state.selectedElementIds.has(element.id);
   
-  // When group is opened, render children individually with absolute positions (outside group container)
-  if (isOpened && element.children && element.bounds) {
-    const groupX = element.bounds.x || 0;
-    const groupY = element.bounds.y || 0;
-    const isSelected = state.selectedElementIds.has(element.id);
-    
-    return (
-      <>
-        {/* Render group bounds as a visual guide when opened */}
-        <div
-          style={{
-            position: 'absolute',
-            left: `${element.bounds.x || 0}px`,
-            top: `${element.bounds.y || 0}px`,
-            width: `${element.bounds.width || 100}px`,
-            height: `${element.bounds.height || 100}px`,
-            border: isSelected ? '2px solid var(--lume-primary)' : '1px dashed rgba(22, 194, 199, 0.3)',
-            borderRadius: '4px',
-            pointerEvents: 'none',
-            background: isSelected ? 'rgba(22, 194, 199, 0.05)' : 'transparent',
-            zIndex: 0, // Behind children
-          }}
-        />
-        {element.children.map((child) => {
-          // Restore absolute positions for children
-          const childWithAbsoluteBounds = {
-            ...child,
-            bounds: child.bounds ? {
-              ...child.bounds,
-              x: (child.bounds.x || 0) + groupX,
-              y: (child.bounds.y || 0) + groupY,
-            } : undefined,
-          };
-          return (
-            <ElementRenderer key={child.id} element={childWithAbsoluteBounds} slideId={slideId} />
-          );
-        })}
-      </>
-    );
-  }
+  // CRITICAL: Groups are logical only - children are always rendered at absolute positions
+  // No DOM wrapper - children are positioned relative to the slide, not the group
   
-  // When group is closed, render group container with children inside (relative positioning)
-  return <GroupElementContainer element={element} slideId={slideId} />;
+  if (!element.children || !element.bounds) return null;
+  
+  // Render children at their absolute positions (they're already stored as absolute)
+  const childrenElements = element.children.map((child) => (
+    <ElementRenderer key={child.id} element={child} slideId={slideId} />
+  ));
+  
+  // Render visual group bounds overlay (for selection feedback only)
+  const groupBoundsOverlay = (
+    <GroupBoundsOverlay
+      element={element}
+      isSelected={isSelected}
+      isOpened={isOpened}
+      onSelect={() => editor.selectElement(element.id, false)}
+      onSelectChildren={() => {
+        // When clicking group bounds, select all children
+        if (element.children) {
+          element.children.forEach(child => {
+            editor.selectElement(child.id, true);
+          });
+        }
+      }}
+    />
+  );
+  
+  return (
+    <>
+      {childrenElements}
+      {groupBoundsOverlay}
+    </>
+  );
 }
 
-function GroupElementContainer({ element, slideId }: { element: GroupElementDefinition; slideId: string }) {
-  const state = useEditor();
+// Visual overlay for group bounds - handles selection and dragging without DOM wrapper
+function GroupBoundsOverlay({ 
+  element, 
+  isSelected, 
+  isOpened,
+  onSelect,
+  onSelectChildren 
+}: { 
+  element: GroupElementDefinition; 
+  isSelected: boolean; 
+  isOpened: boolean;
+  onSelect: () => void;
+  onSelectChildren: () => void;
+}) {
   const editor = useEditorInstance();
-  const isSelected = state.selectedElementIds.has(element.id);
+  const state = useEditor();
   const zoom = state.zoom;
   const pan = state.pan;
   
@@ -148,7 +153,8 @@ function GroupElementContainer({ element, slideId }: { element: GroupElementDefi
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    editor.selectElement(element.id, e.shiftKey);
+    // Select the group (which will select all children via selection logic)
+    onSelect();
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -162,31 +168,31 @@ function GroupElementContainer({ element, slideId }: { element: GroupElementDefi
     e.preventDefault();
     e.stopPropagation();
     
+    // Select group and all children
     if (!isSelected) {
-      editor.selectElement(element.id, e.shiftKey);
+      onSelect();
     }
 
-    // Store initial positions of all selected elements
+    // Store initial positions of all group children
     const currentState = editor.getState();
     const currentDeck = currentState.deck;
     const currentSlide = currentDeck?.slides[currentState.currentSlideIndex];
-    if (currentSlide && currentState.selectedElementIds.size > 0) {
-      const allElements = [
-        ...(currentSlide.elements || []),
-        ...(currentSlide.layers?.flatMap(l => l.elements) || []),
-      ];
+    
+    if (currentSlide && element.children) {
       const initialBounds = new Map<string, { x: number; y: number; width: number; height: number }>();
-      currentState.selectedElementIds.forEach((id) => {
-        const el = allElements.find(e => e.id === id);
-        if (el && el.bounds) {
-          initialBounds.set(id, {
-            x: el.bounds.x || 0,
-            y: el.bounds.y || 0,
-            width: el.bounds.width || 100,
-            height: el.bounds.height || 100,
+      
+      // Store bounds for all group children (they have absolute positions)
+      element.children.forEach((child) => {
+        if (child.bounds) {
+          initialBounds.set(child.id, {
+            x: child.bounds.x || 0,
+            y: child.bounds.y || 0,
+            width: child.bounds.width || 100,
+            height: child.bounds.height || 100,
           });
         }
       });
+      
       setSelectedElementsInitialBounds(initialBounds);
     }
 
@@ -207,33 +213,36 @@ function GroupElementContainer({ element, slideId }: { element: GroupElementDefi
       e.preventDefault();
       const canvasPos = screenToCanvas(e.clientX, e.clientY, zoom, pan);
       
+      if (!element.children || element.children.length === 0) return;
+      
+      // Use first child as primary for delta calculation
+      const firstChild = element.children[0];
+      const primaryInitialBounds = selectedElementsInitialBounds.get(firstChild.id);
+      if (!primaryInitialBounds) return;
+      
+      const initialMouseOffsetX = dragStart.x - primaryInitialBounds.x;
+      const initialMouseOffsetY = dragStart.y - primaryInitialBounds.y;
+      
+      let primaryNewX = Math.max(0, Math.min(CANVAS_WIDTH - primaryInitialBounds.width, canvasPos.x - initialMouseOffsetX));
+      let primaryNewY = Math.max(0, Math.min(CANVAS_HEIGHT - primaryInitialBounds.height, canvasPos.y - initialMouseOffsetY));
+      
+      // Check for snap points
       const currentState = editor.getState();
       const currentDeck = currentState.deck;
       const currentSlide = currentDeck?.slides[currentState.currentSlideIndex];
-      
-      if (currentSlide && currentState.selectedElementIds.size > 0) {
+      if (currentSlide) {
         const allElements = [
           ...(currentSlide.elements || []),
           ...(currentSlide.layers?.flatMap(l => l.elements) || []),
-        ];
+        ].filter(el => !element.children?.some(child => child.id === el.id));
         
-        const primaryInitialBounds = selectedElementsInitialBounds.get(element.id);
-        if (!primaryInitialBounds) return;
-        
-        const initialMouseOffsetX = dragStart.x - primaryInitialBounds.x;
-        const initialMouseOffsetY = dragStart.y - primaryInitialBounds.y;
-        
-        let primaryNewX = Math.max(0, Math.min(CANVAS_WIDTH - primaryInitialBounds.width, canvasPos.x - initialMouseOffsetX));
-        let primaryNewY = Math.max(0, Math.min(CANVAS_HEIGHT - primaryInitialBounds.height, canvasPos.y - initialMouseOffsetY));
-        
-        // Check for snap points
         const tempBounds = {
           x: primaryNewX,
           y: primaryNewY,
           width: primaryInitialBounds.width,
           height: primaryInitialBounds.height,
         };
-        const snapPoints = findSnapPoints(tempBounds, allElements.filter(el => el.id !== element.id));
+        const snapPoints = findSnapPoints(tempBounds, allElements);
         
         if (snapPoints.snapX !== null && Math.abs(snapPoints.snapX - primaryNewX) < SNAP_THRESHOLD) {
           primaryNewX = snapPoints.snapX;
@@ -241,44 +250,38 @@ function GroupElementContainer({ element, slideId }: { element: GroupElementDefi
         if (snapPoints.snapY !== null && Math.abs(snapPoints.snapY - primaryNewY) < SNAP_THRESHOLD) {
           primaryNewY = snapPoints.snapY;
         }
+      }
+      
+      primaryNewX = Math.max(0, Math.min(CANVAS_WIDTH - primaryInitialBounds.width, primaryNewX));
+      primaryNewY = Math.max(0, Math.min(CANVAS_HEIGHT - primaryInitialBounds.height, primaryNewY));
+      
+      const primaryDeltaX = primaryNewX - primaryInitialBounds.x;
+      const primaryDeltaY = primaryNewY - primaryInitialBounds.y;
+      
+      // Update all group children with the same delta
+      element.children.forEach((child) => {
+        const initialBounds = selectedElementsInitialBounds.get(child.id);
+        if (!initialBounds) return;
         
-        primaryNewX = Math.max(0, Math.min(CANVAS_WIDTH - primaryInitialBounds.width, primaryNewX));
-        primaryNewY = Math.max(0, Math.min(CANVAS_HEIGHT - primaryInitialBounds.height, primaryNewY));
+        const newX = Math.max(0, Math.min(CANVAS_WIDTH - initialBounds.width, initialBounds.x + primaryDeltaX));
+        const newY = Math.max(0, Math.min(CANVAS_HEIGHT - initialBounds.height, initialBounds.y + primaryDeltaY));
         
-        const primaryDeltaX = primaryNewX - primaryInitialBounds.x;
-        const primaryDeltaY = primaryNewY - primaryInitialBounds.y;
-        
-        // Update all selected elements
-        currentState.selectedElementIds.forEach((id) => {
-          const el = allElements.find(e => e.id === id);
-          if (!el) return;
-          
-          const initialBounds = selectedElementsInitialBounds.get(id);
-          if (!initialBounds) return;
-          
-          const newX = Math.max(0, Math.min(CANVAS_WIDTH - initialBounds.width, initialBounds.x + primaryDeltaX));
-          const newY = Math.max(0, Math.min(CANVAS_HEIGHT - initialBounds.height, initialBounds.y + primaryDeltaY));
-          
-          const newBounds = {
-            ...el.bounds,
+        editor.updateElement(child.id, {
+          bounds: {
+            ...child.bounds,
             x: newX,
             y: newY,
             width: initialBounds.width,
             height: initialBounds.height,
-          };
-
-          if (id === element.id) {
-            editor.setDraggingElement(element.id, newBounds);
-          }
-
-          editor.updateElement(id, { bounds: newBounds });
+          },
         });
-      }
+      });
+      
+      // Group bounds will be recalculated automatically when children are updated
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
-      editor.setDraggingElement(null, null);
       document.body.style.userSelect = '';
       document.body.style.webkitUserSelect = '';
       document.body.style.cursor = '';
@@ -300,15 +303,15 @@ function GroupElementContainer({ element, slideId }: { element: GroupElementDefi
       document.body.style.webkitUserSelect = '';
       document.body.style.cursor = '';
     };
-  }, [isDragging, dragStart, bounds, element.id, zoom, pan, selectedElementsInitialBounds, editor]);
+  }, [isDragging, dragStart, element, zoom, pan, selectedElementsInitialBounds, editor]);
 
-  // Render the group container with children inside
-  // Children are rendered with relative positioning (their bounds are already relative to group)
-  // When group is closed, children should not intercept mouse events - they should pass through to group container
+  // Only show overlay when group is selected or when not opened
+  if (isOpened && !isSelected) return null;
+
   return (
     <div
       data-element-id={element.id}
-      data-element-type="group"
+      data-element-type="group-overlay"
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onMouseDown={handleMouseDown}
@@ -323,46 +326,10 @@ function GroupElementContainer({ element, slideId }: { element: GroupElementDefi
         cursor: isDragging ? 'grabbing' : 'grab',
         background: isSelected ? 'rgba(22, 194, 199, 0.05)' : 'transparent',
         userSelect: 'none',
+        pointerEvents: 'auto',
+        zIndex: isSelected ? 1000 : 999, // Above children when selected
       }}
-    >
-      {/* Render children with relative positioning inside the group */}
-      {/* Children are rendered but cannot intercept mouse events - group container handles all interactions */}
-      {element.children?.map((child) => {
-        // Render children with pointerEvents: 'none' so they can't be event targets
-        return (
-          <div
-            key={child.id}
-            style={{
-              position: 'absolute',
-              left: `${child.bounds?.x || 0}px`,
-              top: `${child.bounds?.y || 0}px`,
-              width: `${child.bounds?.width || 100}px`,
-              height: `${child.bounds?.height || 50}px`,
-              pointerEvents: 'none', // Critical: Children cannot receive pointer events
-            }}
-          >
-            <ElementRenderer element={child} slideId={slideId} />
-          </div>
-        );
-      })}
-      
-      {/* Transparent overlay that covers entire group to capture all events */}
-      {/* This ensures events are always handled by group container, not children */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          pointerEvents: 'auto',
-          zIndex: 1, // Above children (but group border is still visible)
-          background: 'transparent',
-        }}
-        // Events on this overlay will bubble to parent group container
-        // No handlers needed - just let events bubble naturally
-      />
-    </div>
+    />
   );
 }
 

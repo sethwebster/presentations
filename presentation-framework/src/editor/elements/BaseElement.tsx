@@ -480,7 +480,7 @@ function TextElementContent({ element }: { element: ElementDefinition }) {
 function ShapeElementContent({ element }: { element: ElementDefinition }) {
   if (element.type !== 'shape') return null;
   const shapeElement = element as any;
-  const shapeType = shapeElement.shapeType || 'rectangle';
+  const shapeType = shapeElement.shapeType || 'rect';
   const fill = shapeElement.style?.fill || 'transparent';
 
   // Convert gradient object to CSS gradient string

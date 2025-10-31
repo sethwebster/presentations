@@ -472,27 +472,12 @@ export class Editor {
         
         if (childIndex !== undefined && childIndex !== -1) {
           // Update child in group's children array
-          // Convert absolute bounds (from dragging) back to relative bounds
-          let relativeUpdates = { ...updates };
-          
-          if (updates.bounds && group.bounds) {
-            // Convert absolute bounds to relative bounds
-            relativeUpdates = {
-              ...relativeUpdates,
-              bounds: {
-                ...updates.bounds,
-                x: (updates.bounds.x || 0) - (group.bounds.x || 0),
-                y: (updates.bounds.y || 0) - (group.bounds.y || 0),
-              },
-            };
-          }
-          
+          // CRITICAL: Children have absolute positions - no conversion needed
           const updatedChildren: ElementDefinition[] = group.children.map((child, i) =>
-            i === childIndex ? { ...child, ...relativeUpdates } as ElementDefinition : child
+            i === childIndex ? { ...child, ...updates } as ElementDefinition : child
           );
           
-          // Recalculate group bounds from children's relative positions
-          // We calculate the bounding box but preserve visual positions
+          // Recalculate group bounds from children's absolute positions
           let minX = Infinity;
           let minY = Infinity;
           let maxX = -Infinity;
@@ -500,55 +485,36 @@ export class Editor {
           
           for (const child of updatedChildren) {
             if (!child.bounds) continue;
-            const relX = child.bounds.x || 0;
-            const relY = child.bounds.y || 0;
+            const absX = child.bounds.x || 0;
+            const absY = child.bounds.y || 0;
             const width = child.bounds.width || 0;
             const height = child.bounds.height || 0;
             
-            minX = Math.min(minX, relX);
-            minY = Math.min(minY, relY);
-            maxX = Math.max(maxX, relX + width);
-            maxY = Math.max(maxY, relY + height);
+            minX = Math.min(minX, absX);
+            minY = Math.min(minY, absY);
+            maxX = Math.max(maxX, absX + width);
+            maxY = Math.max(maxY, absY + height);
           }
           
-          // Only update if we have valid bounds and group.bounds exists
-          if (minX !== Infinity && group.bounds) {
-            const currentGroupX = group.bounds.x || 0;
-            const currentGroupY = group.bounds.y || 0;
-            
-            // Calculate new group bounds size
+          // Only update if we have valid bounds
+          if (minX !== Infinity) {
+            // Calculate new group bounds from absolute positions
             const newWidth = maxX - minX;
             const newHeight = maxY - minY;
             
-            // Normalize children to start at (0,0) relative to group
-            // This requires adjusting group position to preserve visual positions
-            const normalizedChildren = updatedChildren.map(child => {
-              if (!child.bounds) return child;
-              return {
-                ...child,
-                bounds: {
-                  ...child.bounds,
-                  x: (child.bounds.x || 0) - minX,
-                  y: (child.bounds.y || 0) - minY,
-                },
-              };
-            });
-            
-            // Adjust group position to preserve visual positions
-            // Visual position of child = groupX + relX
-            // After normalization: newGroupX + (relX - minX) = groupX + relX
-            // So: newGroupX = groupX + minX
+            // CRITICAL: Keep children at absolute positions - don't normalize
+            // Group bounds are only for visual feedback, not positioning
             const newGroupBounds = {
-              x: currentGroupX + minX,
-              y: currentGroupY + minY,
+              x: minX,
+              y: minY,
               width: newWidth,
               height: newHeight,
             };
             
             const updatedGroup: GroupElementDefinition = {
               ...group,
-              children: normalizedChildren,
-              bounds: newGroupBounds,
+              children: updatedChildren, // Children have absolute positions
+              bounds: newGroupBounds, // Visual bounds only
             };
             
             // Update the group in the slide
@@ -598,7 +564,7 @@ export class Editor {
             this.executeCommand({
               type: 'updateElement',
               target: elementId,
-              params: { updates: relativeUpdates },
+              params: { updates },
               timestamp: Date.now(),
             });
             
@@ -659,7 +625,82 @@ export class Editor {
           this.executeCommand({
             type: 'updateElement',
             target: elementId,
-            params: { updates: relativeUpdates },
+            params: { updates },
+            timestamp: Date.now(),
+          });
+          
+          return;
+        }
+      }
+    }
+
+    // Check if element is a child of any group (even if not opened) and update group bounds
+    const containingGroup = this.findGroupContainingElement(elementId, currentSlide);
+    if (containingGroup && containingGroup.id !== openedGroupId) {
+      // Update the child in the group and recalculate group bounds
+      const group = containingGroup as GroupElementDefinition;
+      const childIndex = group.children?.findIndex(child => child.id === elementId);
+      
+      if (childIndex !== undefined && childIndex !== -1 && group.children) {
+        const updatedChildren: ElementDefinition[] = group.children.map((child, i) =>
+          i === childIndex ? { ...child, ...updates } as ElementDefinition : child
+        );
+        
+        // Recalculate group bounds from absolute positions
+        const newGroupBounds = this.calculateGroupBounds(updatedChildren);
+        if (newGroupBounds) {
+          const updatedGroup: GroupElementDefinition = {
+            ...group,
+            children: updatedChildren,
+            bounds: newGroupBounds,
+          };
+          
+          // Update the group in the slide
+          const updatedDeck: DeckDefinition = {
+            ...deck,
+            slides: deck.slides.map((slide): SlideDefinition => {
+              const elements = slide.elements || [];
+              const groupIndex = elements.findIndex(el => el.id === containingGroup.id);
+              
+              if (groupIndex !== -1) {
+                return {
+                  ...slide,
+                  elements: elements.map((el, idx) =>
+                    idx === groupIndex ? updatedGroup : el
+                  ) as ElementDefinition[],
+                };
+              }
+              
+              // Check layers
+              if (slide.layers) {
+                const updatedLayers = slide.layers.map(layer => {
+                  const layerGroupIndex = layer.elements.findIndex(el => el.id === containingGroup.id);
+                  if (layerGroupIndex !== -1) {
+                    return {
+                      ...layer,
+                      elements: layer.elements.map((el, idx) =>
+                        idx === layerGroupIndex ? updatedGroup : el
+                      ) as ElementDefinition[],
+                    };
+                  }
+                  return layer;
+                });
+                
+                if (updatedLayers.some((layer, idx) => layer !== slide.layers![idx])) {
+                  return { ...slide, layers: updatedLayers };
+                }
+              }
+              
+              return slide;
+            }),
+          };
+          
+          this.setState({ deck: updatedDeck });
+          
+          this.executeCommand({
+            type: 'updateElement',
+            target: elementId,
+            params: { updates },
             timestamp: Date.now(),
           });
           
@@ -1185,92 +1226,186 @@ export class Editor {
   }
 
   groupElements(elementIds: string[]): void {
-    const { deck, currentSlideIndex } = this.state;
+    // CRITICAL: Get fresh state snapshot to ensure we're reading current bounds
+    const currentState = this.getState();
+    const { deck, currentSlideIndex, openedGroupId } = currentState;
     if (!deck || elementIds.length < 2) return;
 
     const slide = deck.slides[currentSlideIndex];
     if (!slide) return;
 
+    // CRITICAL: Read elements from current deck state to get the most up-to-date bounds
     const allElements = [
       ...(slide.elements || []),
       ...(slide.layers?.flatMap(l => l.elements) || []),
     ];
 
+    // Helper to find an element by ID, checking both top-level elements and children of opened groups
+    const findElementWithAbsoluteBounds = (id: string): { element: ElementDefinition; absoluteBounds: { x: number; y: number; width: number; height: number } } | null => {
+      // First check top-level elements
+      let el = allElements.find(e => e.id === id);
+      let isChildOfOpenedGroup = false;
+      
+      // If not found and there's an opened group, check its children
+      if (!el && openedGroupId) {
+        const parentGroup = allElements.find(pg => pg.id === openedGroupId && pg.type === 'group');
+        if (parentGroup && parentGroup.type === 'group') {
+          const group = parentGroup as GroupElementDefinition;
+          el = group.children?.find(child => child.id === id);
+          isChildOfOpenedGroup = !!el;
+        }
+      }
+      
+      if (!el || !el.bounds) return null;
+      
+      // Calculate absolute bounds
+      let absoluteBounds: { x: number; y: number; width: number; height: number };
+      
+      if (isChildOfOpenedGroup && openedGroupId) {
+        // Element is a child of opened group - convert relative to absolute
+        const parentGroup = allElements.find(pg => pg.id === openedGroupId && pg.type === 'group') as GroupElementDefinition | undefined;
+        if (parentGroup && parentGroup.bounds) {
+          absoluteBounds = {
+            x: (el.bounds.x || 0) + (parentGroup.bounds.x || 0),
+            y: (el.bounds.y || 0) + (parentGroup.bounds.y || 0),
+            width: el.bounds.width || 100,
+            height: el.bounds.height || 100,
+          };
+        } else {
+          // Fallback - shouldn't happen
+          absoluteBounds = {
+            x: el.bounds.x || 0,
+            y: el.bounds.y || 0,
+            width: el.bounds.width || 100,
+            height: el.bounds.height || 100,
+          };
+        }
+      } else {
+        // Element is not a child of an opened group, bounds are already absolute
+        // Read bounds directly from the element's bounds property - ensure we get exact values
+        absoluteBounds = {
+          x: el.bounds.x ?? 0,
+          y: el.bounds.y ?? 0,
+          width: el.bounds.width ?? 100,
+          height: el.bounds.height ?? 100,
+        };
+      }
+      
+      return { element: el, absoluteBounds };
+    };
+
     // Find elements to group - preserve their original order
-    // CRITICAL: Read bounds directly from the actual elements in the slide/layers, not from a copy
+    // CRITICAL: Read bounds and convert to absolute if element is child of opened group
     const elementsToGroup: Array<{ element: ElementDefinition; originalBounds: { x: number; y: number; width: number; height: number } }> = [];
     for (const id of elementIds) {
-      const el = allElements.find(e => e.id === id);
-      if (!el || !el.bounds) continue;
+      const result = findElementWithAbsoluteBounds(id);
+      if (!result) continue;
       
-      // Store the EXACT absolute bounds from the current state
-      const originalBounds = {
-        x: el.bounds.x || 0,
-        y: el.bounds.y || 0,
-        width: el.bounds.width || 100,
-        height: el.bounds.height || 100,
-      };
-      
-      elementsToGroup.push({ element: el, originalBounds });
+      elementsToGroup.push({ 
+        element: result.element, 
+        originalBounds: result.absoluteBounds 
+      });
     }
     
     if (elementsToGroup.length < 2) return;
 
     // Calculate group bounds from ORIGINAL absolute positions
     // Use originalBounds directly to ensure we're calculating from the exact current positions
-    const groupBounds = this.calculateGroupBounds(elementsToGroup.map(({ originalBounds }) => ({
+    const tempElements = elementsToGroup.map(({ originalBounds }) => ({
       id: 'temp',
       type: 'shape',
-      shapeType: 'rectangle',
+      shapeType: 'rect',
       bounds: originalBounds,
-    } as ElementDefinition)));
+    } as ElementDefinition));
+    
+    const groupBounds = this.calculateGroupBounds(tempElements);
     if (!groupBounds) return;
 
-    // Adjust children bounds to be relative to group origin
-    // Group will be positioned at groupBounds, children will be relative to that
+    // CRITICAL: Keep children at their ABSOLUTE positions - groups are logical only
+    // Children should NOT be converted to relative positions
+    // All elements remain positioned absolutely relative to the slide
     const adjustedChildren = elementsToGroup.map(({ element, originalBounds }) => {
-      // Convert absolute bounds to relative bounds
-      const relativeX = originalBounds.x - groupBounds.x;
-      const relativeY = originalBounds.y - groupBounds.y;
-      
-      // Verify math is correct
-      const absoluteX = groupBounds.x + relativeX;
-      const absoluteY = groupBounds.y + relativeY;
-      
-      if (Math.abs(absoluteX - originalBounds.x) > 0.001 || Math.abs(absoluteY - originalBounds.y) > 0.001) {
-        console.error('Grouping math error:', {
-          elementId: element.id,
-          original: { x: originalBounds.x, y: originalBounds.y },
-          groupBounds: { x: groupBounds.x, y: groupBounds.y },
-          relative: { x: relativeX, y: relativeY },
-          calculated: { x: absoluteX, y: absoluteY },
-        });
-      }
-      
+      // Keep absolute bounds - groups don't affect positioning
       return {
         ...element,
         bounds: {
-          x: relativeX,
-          y: relativeY,
+          x: originalBounds.x,
+          y: originalBounds.y,
           width: originalBounds.width,
           height: originalBounds.height,
         },
       } as ElementDefinition;
     });
 
-    // Create group element with bounds at the calculated position
+    // Create group element - bounds are only for visual feedback/selection, not positioning
+    // Children maintain their absolute positions
     const groupElement: GroupElementDefinition = {
       id: `group-${Date.now()}`,
       type: 'group',
-      bounds: groupBounds,
-      children: adjustedChildren,
+      bounds: groupBounds, // Used for selection bounds visualization only
+      children: adjustedChildren, // Children have absolute bounds
     };
 
     // Remove grouped elements from slide (preserve elements not being grouped)
-    const updatedSlide: SlideDefinition = {
-      ...slide,
-      elements: (slide.elements || []).filter(el => !elementIds.includes(el.id)),
-      layers: slide.layers?.map(layer => ({
+    // If elements are children of an opened group, remove them from the parent group instead
+    let updatedSlide: SlideDefinition = { ...slide };
+    
+    // Check if any elements being grouped are children of an opened group
+    if (openedGroupId) {
+      const parentGroup = allElements.find(el => el.id === openedGroupId && el.type === 'group');
+      if (parentGroup && parentGroup.type === 'group') {
+        const group = parentGroup as GroupElementDefinition;
+        const childrenBeingGrouped = group.children?.filter(child => elementIds.includes(child.id));
+        
+        if (childrenBeingGrouped && childrenBeingGrouped.length > 0) {
+          // Remove children from parent group
+          const updatedParentGroup: GroupElementDefinition = {
+            ...group,
+            children: group.children?.filter(child => !elementIds.includes(child.id)) || [],
+          };
+          
+          // Recalculate parent group bounds if it still has children
+          if (updatedParentGroup.children && updatedParentGroup.children.length > 0) {
+            const parentGroupBounds = this.calculateGroupBounds(updatedParentGroup.children);
+            if (parentGroupBounds) {
+              // CRITICAL: Children have absolute positions - don't normalize
+              // Group bounds are calculated from absolute positions
+              updatedParentGroup.bounds = parentGroupBounds;
+            }
+          } else {
+            // Parent group has no children left - remove it entirely
+            updatedSlide = {
+              ...updatedSlide,
+              elements: (updatedSlide.elements || []).filter(el => el.id !== openedGroupId),
+              layers: updatedSlide.layers?.map(layer => ({
+                ...layer,
+                elements: layer.elements.filter(el => el.id !== openedGroupId),
+              })),
+            };
+          }
+          
+          // Update the parent group in the slide
+          updatedSlide = {
+            ...updatedSlide,
+            elements: (updatedSlide.elements || []).map(el => 
+              el.id === openedGroupId ? updatedParentGroup : el
+            ) as ElementDefinition[],
+            layers: updatedSlide.layers?.map(layer => ({
+              ...layer,
+              elements: layer.elements.map(el => 
+                el.id === openedGroupId ? updatedParentGroup : el
+              ) as ElementDefinition[],
+            })),
+          };
+        }
+      }
+    }
+    
+    // Remove grouped elements from slide elements and layers (if not already removed from parent group)
+    updatedSlide = {
+      ...updatedSlide,
+      elements: (updatedSlide.elements || []).filter(el => !elementIds.includes(el.id)),
+      layers: updatedSlide.layers?.map(layer => ({
         ...layer,
         elements: layer.elements.filter(el => !elementIds.includes(el.id)),
       })),
