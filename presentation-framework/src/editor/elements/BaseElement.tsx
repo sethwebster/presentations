@@ -306,8 +306,8 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
         const initialMouseOffsetY = dragStart.y - primaryInitialBounds.y;
         
         // Calculate where the primary element should be (follows cursor)
-        let primaryNewX = Math.max(0, Math.min(CANVAS_WIDTH - primaryInitialBounds.width, canvasPos.x - initialMouseOffsetX));
-        let primaryNewY = Math.max(0, Math.min(CANVAS_HEIGHT - primaryInitialBounds.height, canvasPos.y - initialMouseOffsetY));
+        let primaryNewX = canvasPos.x - initialMouseOffsetX;
+        let primaryNewY = canvasPos.y - initialMouseOffsetY;
         
         // Build list of elements for snap points (excluding the dragged element and other selected elements)
         const elementsForSnap = allElements.filter(el => {
@@ -341,10 +341,6 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
           primaryNewY = snapPoints.snapY;
         }
         
-        // Ensure bounds are still valid after snapping
-        primaryNewX = Math.max(0, Math.min(CANVAS_WIDTH - primaryInitialBounds.width, primaryNewX));
-        primaryNewY = Math.max(0, Math.min(CANVAS_HEIGHT - primaryInitialBounds.height, primaryNewY));
-        
         // Calculate the delta of the primary element
         const primaryDeltaX = primaryNewX - primaryInitialBounds.x;
         const primaryDeltaY = primaryNewY - primaryInitialBounds.y;
@@ -355,9 +351,9 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
           const initialBounds = selectedElementsInitialBounds.get(id);
           if (!initialBounds) return;
           
-          // Calculate new absolute position
-          const newX = Math.max(0, Math.min(CANVAS_WIDTH - initialBounds.width, initialBounds.x + primaryDeltaX));
-          const newY = Math.max(0, Math.min(CANVAS_HEIGHT - initialBounds.height, initialBounds.y + primaryDeltaY));
+          // Calculate new absolute position (no bounds constraints)
+          const newX = initialBounds.x + primaryDeltaX;
+          const newY = initialBounds.y + primaryDeltaY;
           
           const newBounds = {
             x: newX,
@@ -537,7 +533,7 @@ function ImageElementContent({ element }: { element: ElementDefinition }) {
       style={{
         width: '100%',
         height: '100%',
-        objectFit: 'cover',
+        objectFit: imageElement.objectFit || 'cover',
       }}
       onError={(e) => {
         // Show placeholder on error
@@ -578,18 +574,34 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
   const editor = useEditorInstance();
   const bounds = element.bounds || { x: 0, y: 0, width: 100, height: 50 };
   const zoom = state.zoom;
+  const pan = state.pan;
   const [isResizing, setIsResizing] = useState(false);
-  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const [resizeStart, setResizeStart] = useState({ 
+    mouseX: 0, 
+    mouseY: 0, 
+    initialBounds: { x: 0, y: 0, width: 0, height: 0 } 
+  });
 
   const handleResizeStart = (e: React.MouseEvent, handle: string) => {
     e.preventDefault();
     e.stopPropagation();
     setIsResizing(handle);
-    setResizeStart({
-      x: e.clientX,
-      y: e.clientY,
+    
+    // Store initial mouse position in canvas coordinates
+    const initialMouseCanvas = screenToCanvas(e.clientX, e.clientY, zoom, pan);
+    
+    // Store initial bounds
+    const initialBounds = {
+      x: bounds.x || 0,
+      y: bounds.y || 0,
       width: bounds.width || 100,
       height: bounds.height || 50,
+    };
+    
+    setResizeStart({
+      mouseX: initialMouseCanvas.x,
+      mouseY: initialMouseCanvas.y,
+      initialBounds,
     });
   };
 
@@ -606,33 +618,44 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
 
     const handleMouseMove = (e: MouseEvent) => {
       e.preventDefault();
-      // Convert screen pixel deltas to canvas coordinates by dividing by zoom
-      const deltaX = (e.clientX - resizeStart.x) / zoom;
-      const deltaY = (e.clientY - resizeStart.y) / zoom;
+      
+      // Convert current mouse position to canvas coordinates
+      const currentMouseCanvas = screenToCanvas(e.clientX, e.clientY, zoom, pan);
+      
+      // Calculate delta in canvas coordinates
+      const deltaX = currentMouseCanvas.x - resizeStart.mouseX;
+      const deltaY = currentMouseCanvas.y - resizeStart.mouseY;
 
-      let newWidth = resizeStart.width;
-      let newHeight = resizeStart.height;
-      let newX = bounds.x || 0;
-      let newY = bounds.y || 0;
+      // Start with initial bounds
+      let newWidth = resizeStart.initialBounds.width;
+      let newHeight = resizeStart.initialBounds.height;
+      let newX = resizeStart.initialBounds.x;
+      let newY = resizeStart.initialBounds.y;
 
+      // Apply resize based on handle
       if (isResizing.includes('e')) {
-        newWidth = Math.max(20, resizeStart.width + deltaX);
+        // East handle: width increases/decreases with mouse X movement
+        newWidth = Math.max(20, resizeStart.initialBounds.width + deltaX);
       }
       if (isResizing.includes('w')) {
-        newWidth = Math.max(20, resizeStart.width - deltaX);
-        newX = (bounds.x || 0) + deltaX;
+        // West handle: width decreases/increases, position moves right/left
+        newWidth = Math.max(20, resizeStart.initialBounds.width - deltaX);
+        newX = resizeStart.initialBounds.x + deltaX;
       }
       if (isResizing.includes('s')) {
-        newHeight = Math.max(20, resizeStart.height + deltaY);
+        // South handle: height increases/decreases with mouse Y movement
+        newHeight = Math.max(20, resizeStart.initialBounds.height + deltaY);
       }
       if (isResizing.includes('n')) {
-        newHeight = Math.max(20, resizeStart.height - deltaY);
-        newY = (bounds.y || 0) + deltaY;
+        // North handle: height decreases/increases, position moves down/up
+        newHeight = Math.max(20, resizeStart.initialBounds.height - deltaY);
+        newY = resizeStart.initialBounds.y + deltaY;
       }
+
+      // No bounds constraints - allow elements to go outside canvas
 
       editor.updateElement(element.id, {
         bounds: {
-          ...bounds,
           x: newX,
           y: newY,
           width: newWidth,
@@ -660,7 +683,7 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
       document.body.style.userSelect = '';
       document.body.style.webkitUserSelect = '';
     };
-  }, [isResizing, resizeStart, bounds, element.id, zoom, editor]);
+  }, [isResizing, resizeStart, element.id, zoom, pan, editor]);
 
   const handleStyle: React.CSSProperties = {
     position: 'absolute',

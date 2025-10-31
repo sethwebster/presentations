@@ -33,7 +33,8 @@
     "react": "^19.3.0-canary-d7215b49-20251013",
     "react-dom": "^19.3.0-canary-d7215b49-20251013",
     "recharts": "^3.3.0",
-    "tailwind-merge": "^3.3.1"
+    "tailwind-merge": "^3.3.1",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@edge-runtime/types": "^4.0.0",

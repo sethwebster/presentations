@@ -341,6 +341,7 @@ export type ElementDefinition =
   | CodeBlockElementDefinition
   | TableElementDefinition
   | MediaElementDefinition
+  | ImageElementDefinition
   | GroupElementDefinition
   | ShapeElementDefinition
   | ChartElementDefinition
@@ -412,6 +413,13 @@ export interface MediaElementDefinition extends BaseElementDefinition {
   src: string;
   mediaType: 'image' | 'video' | 'audio';
   playback?: Record<string, unknown>;
+}
+
+export interface ImageElementDefinition extends BaseElementDefinition {
+  type: 'image';
+  src: string;
+  alt?: string;
+  objectFit?: 'contain' | 'cover' | 'fill' | 'none' | 'scale-down';
 }
 
 export interface ShapeElementDefinition extends BaseElementDefinition {

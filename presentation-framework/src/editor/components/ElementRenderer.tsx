@@ -250,8 +250,8 @@ function GroupBoundsOverlay({
       const initialMouseOffsetX = dragStart.x - primaryInitialBounds.x;
       const initialMouseOffsetY = dragStart.y - primaryInitialBounds.y;
       
-      let primaryNewX = Math.max(0, Math.min(CANVAS_WIDTH - primaryInitialBounds.width, canvasPos.x - initialMouseOffsetX));
-      let primaryNewY = Math.max(0, Math.min(CANVAS_HEIGHT - primaryInitialBounds.height, canvasPos.y - initialMouseOffsetY));
+      let primaryNewX = canvasPos.x - initialMouseOffsetX;
+      let primaryNewY = canvasPos.y - initialMouseOffsetY;
       
       // Check for snap points
       const currentState = editor.getState();
@@ -279,9 +279,7 @@ function GroupBoundsOverlay({
         }
       }
       
-      primaryNewX = Math.max(0, Math.min(CANVAS_WIDTH - primaryInitialBounds.width, primaryNewX));
-      primaryNewY = Math.max(0, Math.min(CANVAS_HEIGHT - primaryInitialBounds.height, primaryNewY));
-      
+      // No bounds constraints - allow elements to go outside canvas
       const primaryDeltaX = primaryNewX - primaryInitialBounds.x;
       const primaryDeltaY = primaryNewY - primaryInitialBounds.y;
       
@@ -291,8 +289,9 @@ function GroupBoundsOverlay({
           const initialBounds = selectedElementsInitialBounds.get(child.id);
           if (!initialBounds) return;
           
-          const newX = Math.max(0, Math.min(CANVAS_WIDTH - initialBounds.width, initialBounds.x + deltaX));
-          const newY = Math.max(0, Math.min(CANVAS_HEIGHT - initialBounds.height, initialBounds.y + deltaY));
+          // No bounds constraints - allow elements to go outside canvas
+          const newX = initialBounds.x + deltaX;
+          const newY = initialBounds.y + deltaY;
           
           // Update the child
           editor.updateElement(child.id, {

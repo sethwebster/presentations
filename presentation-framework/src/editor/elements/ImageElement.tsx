@@ -1,10 +1,10 @@
 "use client";
 
 import { BaseElement } from './BaseElement';
-import type { MediaElementDefinition } from '@/rsc/types';
+import type { ImageElementDefinition } from '@/rsc/types';
 
 interface ImageElementProps {
-  element: MediaElementDefinition;
+  element: ImageElementDefinition;
   slideId: string;
 }
 

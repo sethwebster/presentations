@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { AlignmentTools } from './AlignmentTools';
 
@@ -21,6 +21,7 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
   
   const [showAlignMenu, setShowAlignMenu] = useState(false);
   const alignMenuRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Close align menu when clicking outside
   useEffect(() => {
@@ -35,6 +36,106 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [showAlignMenu]);
+
+  // Process image files
+  const processImageFiles = useCallback((files: File[]) => {
+    files.forEach((file) => {
+      if (!file || file.size === 0) return;
+      
+      // Create object URL for the image
+      const imageUrl = URL.createObjectURL(file);
+      
+      // Load image to get dimensions
+      const img = new Image();
+      img.onload = () => {
+        // Calculate size maintaining aspect ratio, max 400px width or height
+        const maxSize = 400;
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > maxSize || height > maxSize) {
+          const ratio = Math.min(maxSize / width, maxSize / height);
+          width = width * ratio;
+          height = height * ratio;
+        }
+        
+        // Center the image on canvas
+        const x = (1280 - width) / 2;
+        const y = (720 - height) / 2;
+        
+        const imageElement = {
+          id: `image-${Date.now()}`,
+          type: 'image' as const,
+          src: imageUrl,
+          alt: file.name,
+          bounds: { x, y, width, height },
+          objectFit: 'contain' as const,
+        };
+        
+        editor.addElement(imageElement, currentSlideIndex);
+      };
+      img.onerror = (err) => {
+        console.error('Error loading image:', err);
+      };
+      img.src = imageUrl;
+    });
+  }, [editor, currentSlideIndex]);
+
+  // Handle file input change
+  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files).filter(f => f && f.size > 0);
+      if (files.length) {
+        processImageFiles(files);
+      }
+      // Reset input so same file can be selected again
+      e.target.value = '';
+    }
+  }, [processImageFiles]);
+
+  // Open file picker - MUST be synchronous in click handler
+  const handleInsertImageClick = useCallback(() => {
+    // Try modern File System Access API first
+    if ('showOpenFilePicker' in window) {
+      const opts: any = {
+        multiple: false,
+        types: [{
+          description: 'Images',
+          accept: { 
+            'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.avif', '.heic', '.heif'] 
+          },
+        }],
+        excludeAcceptAllOption: false,
+      };
+      
+      // This async call is okay - the picker itself can be awaited
+      // but we must call it directly from the click handler
+      (window as any).showOpenFilePicker(opts)
+        .then((handles: any[]) => Promise.all(handles.map((h: any) => h.getFile())))
+        .then((files: File[]) => {
+          if (files.length) processImageFiles(files);
+        })
+        .catch((err: any) => {
+          // User cancelled or not supported - fall through to input.click()
+          if (err?.name !== 'AbortError') {
+            // If not cancelled, fall back to input
+            const el = fileInputRef.current;
+            if (el) {
+              el.value = '';
+              el.click();
+            }
+          }
+        });
+      return;
+    }
+
+    // Fallback: hidden input (must be synchronous!)
+    const el = fileInputRef.current;
+    if (el) {
+      el.value = ''; // Reset so selecting same file triggers onChange
+      el.click(); // MUST be synchronous - no await/promise before this
+    }
+  }, [processImageFiles]);
   return (
     <div className="editor-toolbar" style={{
       height: '56px',
@@ -68,13 +169,34 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
             <path d="M18 4v16" />
           </svg>
         </ToolbarButton>
-        <ToolbarButton title="Insert Image" onClick={() => {}}>
+        <ToolbarButton 
+          title="Insert Image" 
+          onClick={handleInsertImageClick}
+        >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
             <circle cx="8.5" cy="8.5" r="1.5" />
             <polyline points="21 15 16 10 5 21" />
           </svg>
         </ToolbarButton>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileInputChange}
+          style={{
+            position: 'absolute',
+            width: '1px',
+            height: '1px',
+            padding: 0,
+            margin: '-1px',
+            overflow: 'hidden',
+            clip: 'rect(0, 0, 0, 0)',
+            whiteSpace: 'nowrap',
+            borderWidth: 0,
+          }}
+          tabIndex={-1}
+        />
         <ToolbarButton title="Insert Rectangle" onClick={() => {
           editor.addElement({
             id: `shape-${Date.now()}`,
@@ -351,6 +473,7 @@ function ToolbarButton({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       title={title}
       style={{

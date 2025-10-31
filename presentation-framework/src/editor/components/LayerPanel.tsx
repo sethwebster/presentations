@@ -464,7 +464,8 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
               } else if (element.type === 'shape') {
                 elementName = `${element.shapeType || 'Shape'}`;
               } else if (element.type === 'image') {
-                elementName = 'Image';
+                const imageEl = element as any;
+                elementName = imageEl.alt || imageEl.name || 'Image';
               } else if (element.type === 'group') {
                 const group = element as GroupElementDefinition;
                 elementName = `Group (${group.children?.length || 0})`;
