@@ -265,6 +265,36 @@ export class Editor {
     });
   }
 
+  updateLayerName(slideIndex: number, layerId: string, name: string): void {
+    const { deck } = this.state;
+    if (!deck) return;
+
+    const slide = deck.slides[slideIndex];
+    if (!slide || !slide.layers) return;
+
+    const updatedLayers = slide.layers.map(layer =>
+      layer.id === layerId ? { ...layer, name: name || undefined } : layer
+    );
+
+    const updatedSlide: SlideDefinition = {
+      ...slide,
+      layers: updatedLayers,
+    };
+
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      slides: deck.slides.map((s, i) => (i === slideIndex ? updatedSlide : s)),
+    };
+
+    this.setState({ deck: updatedDeck });
+    this.executeCommand({
+      type: 'updateLayerName',
+      target: layerId,
+      params: { name },
+      timestamp: Date.now(),
+    });
+  }
+
   // Slide operations
   setCurrentSlide(index: number): void {
     const { deck } = this.state;
