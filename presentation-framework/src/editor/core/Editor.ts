@@ -1196,84 +1196,68 @@ export class Editor {
       ...(slide.layers?.flatMap(l => l.elements) || []),
     ];
 
-    // Find elements to group - preserve their original order AND capture their absolute bounds BEFORE any modifications
-    const elementsToGroup = elementIds
-      .map(id => {
-        const el = allElements.find(e => e.id === id);
-        if (!el || !el.bounds) return null;
-        // Create a deep copy to ensure we're working with the current absolute bounds
-        return {
-          ...el,
-          bounds: {
-            x: el.bounds.x || 0,
-            y: el.bounds.y || 0,
-            width: el.bounds.width || 100,
-            height: el.bounds.height || 100,
-          },
-        };
-      })
-      .filter((el): el is ElementDefinition => el !== null);
+    // Find elements to group - preserve their original order
+    // CRITICAL: Read bounds directly from the actual elements in the slide/layers, not from a copy
+    const elementsToGroup: Array<{ element: ElementDefinition; originalBounds: { x: number; y: number; width: number; height: number } }> = [];
+    for (const id of elementIds) {
+      const el = allElements.find(e => e.id === id);
+      if (!el || !el.bounds) continue;
+      
+      // Store the EXACT absolute bounds from the current state
+      const originalBounds = {
+        x: el.bounds.x || 0,
+        y: el.bounds.y || 0,
+        width: el.bounds.width || 100,
+        height: el.bounds.height || 100,
+      };
+      
+      elementsToGroup.push({ element: el, originalBounds });
+    }
     
     if (elementsToGroup.length < 2) return;
 
-    // Calculate group bounds from children's absolute positions
-    // This finds the bounding box that contains all elements
-    const groupBounds = this.calculateGroupBounds(elementsToGroup);
+    // Calculate group bounds from ORIGINAL absolute positions
+    const groupBounds = this.calculateGroupBounds(elementsToGroup.map(({ element }) => ({
+      ...element,
+      bounds: {
+        x: element.bounds?.x || 0,
+        y: element.bounds?.y || 0,
+        width: element.bounds?.width || 100,
+        height: element.bounds?.height || 100,
+      },
+    })));
     if (!groupBounds) return;
 
-    // Store original absolute positions for verification
-    const originalAbsolutePositions = new Map<string, { x: number; y: number }>();
-    elementsToGroup.forEach(child => {
-      if (child.bounds) {
-        originalAbsolutePositions.set(child.id, {
-          x: child.bounds.x || 0,
-          y: child.bounds.y || 0,
-        });
-      }
-    });
-
-    // Adjust children bounds to be relative to group origin (top-left of bounding box)
-    // This preserves their visual positions: group at groupBounds + children at relative positions = same visual result
-    const adjustedChildren = elementsToGroup.map(child => {
-      if (!child.bounds) return child;
+    // Adjust children bounds to be relative to group origin
+    // Group will be positioned at groupBounds, children will be relative to that
+    const adjustedChildren = elementsToGroup.map(({ element, originalBounds }) => {
+      // Convert absolute bounds to relative bounds
+      const relativeX = originalBounds.x - groupBounds.x;
+      const relativeY = originalBounds.y - groupBounds.y;
       
-      const originalX = child.bounds.x || 0;
-      const originalY = child.bounds.y || 0;
+      // Verify math is correct
+      const absoluteX = groupBounds.x + relativeX;
+      const absoluteY = groupBounds.y + relativeY;
       
-      // Convert to relative coordinates
-      const relativeX = originalX - groupBounds.x;
-      const relativeY = originalY - groupBounds.y;
-      
-      // Verify: groupBounds.x + relativeX should equal originalX
-      // This ensures positions are preserved exactly
-      const verifyX = groupBounds.x + relativeX;
-      const verifyY = groupBounds.y + relativeY;
-      
-      if (Math.abs(verifyX - originalX) > 0.001 || Math.abs(verifyY - originalY) > 0.001) {
-        console.error('Grouping position mismatch:', {
-          childId: child.id,
-          originalX,
-          originalY,
-          groupBoundsX: groupBounds.x,
-          groupBoundsY: groupBounds.y,
-          relativeX,
-          relativeY,
-          verifyX,
-          verifyY,
+      if (Math.abs(absoluteX - originalBounds.x) > 0.001 || Math.abs(absoluteY - originalBounds.y) > 0.001) {
+        console.error('Grouping math error:', {
+          elementId: element.id,
+          original: { x: originalBounds.x, y: originalBounds.y },
+          groupBounds: { x: groupBounds.x, y: groupBounds.y },
+          relative: { x: relativeX, y: relativeY },
+          calculated: { x: absoluteX, y: absoluteY },
         });
       }
       
       return {
-        ...child,
+        ...element,
         bounds: {
-          ...child.bounds,
           x: relativeX,
           y: relativeY,
-          // Preserve width and height exactly
-          width: child.bounds.width,
-          height: child.bounds.height,
+          width: originalBounds.width,
+          height: originalBounds.height,
         },
-      };
+      } as ElementDefinition;
     });
 
     // Create group element with bounds at the calculated position
