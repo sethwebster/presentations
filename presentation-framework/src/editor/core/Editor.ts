@@ -1196,10 +1196,23 @@ export class Editor {
       ...(slide.layers?.flatMap(l => l.elements) || []),
     ];
 
-    // Find elements to group - preserve their original order
+    // Find elements to group - preserve their original order AND capture their absolute bounds BEFORE any modifications
     const elementsToGroup = elementIds
-      .map(id => allElements.find(el => el.id === id))
-      .filter((el): el is ElementDefinition => el !== undefined);
+      .map(id => {
+        const el = allElements.find(e => e.id === id);
+        if (!el || !el.bounds) return null;
+        // Create a deep copy to ensure we're working with the current absolute bounds
+        return {
+          ...el,
+          bounds: {
+            x: el.bounds.x || 0,
+            y: el.bounds.y || 0,
+            width: el.bounds.width || 100,
+            height: el.bounds.height || 100,
+          },
+        };
+      })
+      .filter((el): el is ElementDefinition => el !== null);
     
     if (elementsToGroup.length < 2) return;
 
@@ -1208,18 +1221,55 @@ export class Editor {
     const groupBounds = this.calculateGroupBounds(elementsToGroup);
     if (!groupBounds) return;
 
+    // Store original absolute positions for verification
+    const originalAbsolutePositions = new Map<string, { x: number; y: number }>();
+    elementsToGroup.forEach(child => {
+      if (child.bounds) {
+        originalAbsolutePositions.set(child.id, {
+          x: child.bounds.x || 0,
+          y: child.bounds.y || 0,
+        });
+      }
+    });
+
     // Adjust children bounds to be relative to group origin (top-left of bounding box)
     // This preserves their visual positions: group at groupBounds + children at relative positions = same visual result
     const adjustedChildren = elementsToGroup.map(child => {
       if (!child.bounds) return child;
       
+      const originalX = child.bounds.x || 0;
+      const originalY = child.bounds.y || 0;
+      
+      // Convert to relative coordinates
+      const relativeX = originalX - groupBounds.x;
+      const relativeY = originalY - groupBounds.y;
+      
+      // Verify: groupBounds.x + relativeX should equal originalX
+      // This ensures positions are preserved exactly
+      const verifyX = groupBounds.x + relativeX;
+      const verifyY = groupBounds.y + relativeY;
+      
+      if (Math.abs(verifyX - originalX) > 0.001 || Math.abs(verifyY - originalY) > 0.001) {
+        console.error('Grouping position mismatch:', {
+          childId: child.id,
+          originalX,
+          originalY,
+          groupBoundsX: groupBounds.x,
+          groupBoundsY: groupBounds.y,
+          relativeX,
+          relativeY,
+          verifyX,
+          verifyY,
+        });
+      }
+      
       return {
         ...child,
         bounds: {
           ...child.bounds,
-          x: (child.bounds.x || 0) - groupBounds.x,
-          y: (child.bounds.y || 0) - groupBounds.y,
-          // Preserve width and height
+          x: relativeX,
+          y: relativeY,
+          // Preserve width and height exactly
           width: child.bounds.width,
           height: child.bounds.height,
         },
