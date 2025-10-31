@@ -241,25 +241,37 @@ export function DocumentProperties() {
           <label className="flex items-center gap-3 text-sm text-[var(--editor-text-muted)]">
             <input
               type="checkbox"
-              checked={settings.grid?.enabled || false}
-              onChange={(e) => editor.updateDeckSettings({
-                grid: {
-                  enabled: e.target.checked,
-                },
-              })}
+              checked={state.showGrid}
+              onChange={(e) => {
+                const enabled = e.target.checked;
+                // Update editor UI state immediately
+                editor.setShowGrid(enabled);
+                // Update deck settings with all required properties
+                editor.updateDeckSettings({
+                  grid: {
+                    enabled,
+                    size: settings.grid?.size || 20,
+                    snapToGrid: settings.grid?.snapToGrid || false,
+                    ...settings.grid,
+                  },
+                });
+              }}
               className="editor-checkbox"
             />
             Show grid
           </label>
           {settings.grid?.enabled && (
-            <div className="space-y-3 pl-6">
+            <div className="pl-6 space-y-3">
               <label className="flex items-center gap-3 text-sm text-[var(--editor-text-muted)]">
                 <input
                   type="checkbox"
                   checked={settings.grid?.snapToGrid || false}
                   onChange={(e) => editor.updateDeckSettings({
                     grid: {
+                      enabled: settings.grid?.enabled || false,
+                      size: settings.grid?.size || 20,
                       snapToGrid: e.target.checked,
+                      ...settings.grid,
                     },
                   })}
                   className="editor-checkbox"
@@ -277,7 +289,10 @@ export function DocumentProperties() {
                   value={settings.grid?.size || 20}
                   onChange={(e) => editor.updateDeckSettings({
                     grid: {
+                      enabled: settings.grid?.enabled || false,
                       size: parseInt(e.target.value) || 20,
+                      snapToGrid: settings.grid?.snapToGrid || false,
+                      ...settings.grid,
                     },
                   })}
                   className="editor-input h-9"

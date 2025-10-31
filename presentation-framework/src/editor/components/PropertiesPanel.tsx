@@ -5,6 +5,7 @@ import type { ElementDefinition } from '@/rsc/types';
 import { AlignmentTools } from './AlignmentTools';
 import { ColorPicker } from './ColorPicker';
 import { DocumentProperties } from './DocumentProperties';
+import { SlideProperties } from './SlideProperties';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -13,6 +14,7 @@ export function PropertiesPanel() {
   const editor = useEditorInstance();
   
   const selectedElementIds = state.selectedElementIds;
+  const selectedSlideId = state.selectedSlideId;
   const deck = state.deck;
   const currentSlideIndex = state.currentSlideIndex;
 
@@ -42,9 +44,7 @@ export function PropertiesPanel() {
         )}
       </div>
       <div className="flex-1 p-5 overflow-y-auto editor-panel-body">
-        {!selectedElement ? (
-          <DocumentProperties />
-        ) : (
+        {selectedElement ? (
           <div className="flex flex-col gap-4">
             {/* Position & Size */}
             <div>
@@ -306,6 +306,10 @@ export function PropertiesPanel() {
               </div>
             )}
           </div>
+        ) : selectedSlideId ? (
+          <SlideProperties />
+        ) : (
+          <DocumentProperties />
         )}
       </div>
     </div>

@@ -17,6 +17,7 @@ export interface EditorState {
   deckId: string | null;
   currentSlideIndex: number;
   selectedElementIds: Set<string>;
+  selectedSlideId: string | null; // ID of the slide selected for property editing
   clipboard: ElementDefinition[];
   undoStack: EditorCommand[];
   redoStack: EditorCommand[];
@@ -33,6 +34,7 @@ export interface EditorState {
   openedGroupId: string | null; // ID of the group currently opened for editing
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type EditorStateListener = (state: EditorState) => void;
 
 const MAX_UNDO_STACK_SIZE = 50;
@@ -49,6 +51,7 @@ export class Editor {
       deckId: null,
       currentSlideIndex: 0,
       selectedElementIds: new Set(),
+      selectedSlideId: null,
       clipboard: [],
       undoStack: [],
       redoStack: [],
@@ -299,7 +302,26 @@ export class Editor {
   setCurrentSlide(index: number): void {
     const { deck } = this.state;
     if (!deck || index < 0 || index >= deck.slides.length) return;
-    this.setState({ currentSlideIndex: index, selectedElementIds: new Set() });
+    const slide = deck.slides[index];
+    this.setState({ 
+      currentSlideIndex: index, 
+      selectedElementIds: new Set(),
+      selectedSlideId: slide?.id || null,
+    });
+  }
+
+  setSelectedSlide(slideId: string | null): void {
+    this.setState({ 
+      selectedSlideId: slideId,
+      selectedElementIds: new Set(), // Clear element selection when selecting a slide
+    });
+  }
+
+  clearSelection(): void {
+    this.setState({
+      selectedElementIds: new Set(),
+      selectedSlideId: null,
+    });
   }
 
   addSlide(slide?: Partial<SlideDefinition>): void {
@@ -397,11 +419,17 @@ export class Editor {
     const newSelection = addToSelection 
       ? new Set([...this.state.selectedElementIds, elementId])
       : new Set([elementId]);
-    this.setState({ selectedElementIds: newSelection });
+    this.setState({ 
+      selectedElementIds: newSelection,
+      selectedSlideId: null, // Clear slide selection when selecting an element
+    });
   }
 
   selectElements(elementIds: string[]): void {
-    this.setState({ selectedElementIds: new Set(elementIds) });
+    this.setState({ 
+      selectedElementIds: new Set(elementIds),
+      selectedSlideId: null, // Clear slide selection when selecting elements
+    });
   }
 
   deselectElement(elementId: string): void {
@@ -409,10 +437,6 @@ export class Editor {
     const newSelection = new Set(selectedElementIds);
     newSelection.delete(elementId);
     this.setState({ selectedElementIds: newSelection });
-  }
-
-  clearSelection(): void {
-    this.setState({ selectedElementIds: new Set() });
   }
 
   // Element operations
@@ -729,7 +753,7 @@ export class Editor {
 
     // If updating a group element's children, recalculate bounds
     let finalUpdates = { ...updates };
-    if (currentElement.type === 'group' && updates.children) {
+    if (currentElement.type === 'group' && 'children' in updates && updates.children) {
       const group = currentElement as GroupElementDefinition;
       const updatedGroup = { ...group, ...updates } as GroupElementDefinition;
       
@@ -814,24 +838,78 @@ export class Editor {
 
     let deletedElement: ElementDefinition | undefined;
 
-    const updatedSlide: SlideDefinition = {
-      ...slide,
-      elements: (slide.elements || []).filter(el => {
-        if (el.id === elementId) {
-          deletedElement = el;
+    // Helper to remove element from group children recursively
+    const removeFromGroup = (group: GroupElementDefinition): GroupElementDefinition | null => {
+      if (!group.children) return null;
+      
+      const updatedChildren = group.children.filter(child => {
+        if (child.id === elementId) {
+          deletedElement = child;
           return false;
         }
-        return true;
-      }),
-      layers: slide.layers?.map(layer => ({
-        ...layer,
-        elements: layer.elements.filter(el => {
-          if (el.id === elementId) {
-            deletedElement = el;
+        // If child is a group, recursively check its children
+        if (child.type === 'group') {
+          const updatedChildGroup = removeFromGroup(child as GroupElementDefinition);
+          if (updatedChildGroup === null) {
+            // Child group was deleted entirely
             return false;
           }
-          return true;
-        }),
+          return updatedChildGroup;
+        }
+        return true;
+      });
+
+      // If no children left, return null to indicate group should be deleted
+      if (updatedChildren.length === 0) {
+        return null;
+      }
+
+      // Recalculate group bounds
+      const newBounds = this.calculateGroupBounds(updatedChildren);
+      
+      return {
+        ...group,
+        children: updatedChildren,
+        bounds: newBounds || group.bounds,
+      };
+    };
+
+    const updatedSlide: SlideDefinition = {
+      ...slide,
+      elements: (slide.elements || []).map(el => {
+        if (el.id === elementId) {
+          deletedElement = el;
+          return null; // Mark for removal
+        }
+        // If element is a group, check its children
+        if (el.type === 'group') {
+          const updatedGroup = removeFromGroup(el as GroupElementDefinition);
+          if (updatedGroup === null) {
+            // Group should be deleted (no children left)
+            return null;
+          }
+          return updatedGroup;
+        }
+        return el;
+      }).filter((el): el is ElementDefinition => el !== null),
+      layers: slide.layers?.map(layer => ({
+        ...layer,
+        elements: layer.elements.map(el => {
+          if (el.id === elementId) {
+            deletedElement = el;
+            return null; // Mark for removal
+          }
+          // If element is a group, check its children
+          if (el.type === 'group') {
+            const updatedGroup = removeFromGroup(el as GroupElementDefinition);
+            if (updatedGroup === null) {
+              // Group should be deleted (no children left)
+              return null;
+            }
+            return updatedGroup;
+          }
+          return el;
+        }).filter((el): el is ElementDefinition => el !== null),
       })),
     };
 
@@ -1642,6 +1720,10 @@ export class Editor {
     this.setState({ showGrid: !this.state.showGrid });
   }
 
+  setShowGrid(show: boolean): void {
+    this.setState({ showGrid: show });
+  }
+
   toggleGuides(): void {
     this.setState({ showGuides: !this.state.showGuides });
   }
@@ -1679,6 +1761,30 @@ export class Editor {
     });
   }
 
+  updateSlide(slideId: string, updates: Partial<SlideDefinition>): void {
+    const { deck } = this.state;
+    if (!deck) return;
+
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      slides: deck.slides.map((slide) => {
+        if (slide.id === slideId) {
+          // Deep merge to handle nested properties like background, style, etc.
+          return this.deepMerge(slide, updates);
+        }
+        return slide;
+      }),
+    };
+
+    this.setState({ deck: updatedDeck });
+
+    this.executeCommand({
+      type: 'updateSlide',
+      params: { slideId, updates },
+      timestamp: Date.now(),
+    });
+  }
+
   // Utility
   reset(): void {
     this.state = {
@@ -1686,6 +1792,7 @@ export class Editor {
       deckId: null,
       currentSlideIndex: 0,
       selectedElementIds: new Set(),
+      selectedSlideId: null,
       clipboard: [],
       undoStack: [],
       redoStack: [],

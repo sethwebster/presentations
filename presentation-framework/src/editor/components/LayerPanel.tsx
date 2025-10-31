@@ -16,6 +16,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
   
   const deck = state.deck;
   const currentSlideIndex = state.currentSlideIndex;
+  const selectedSlideId = state.selectedSlideId;
   const selectedElementIds = state.selectedElementIds;
   const [activeTab, setActiveTab] = useState<'slides' | 'layers'>('slides');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -300,7 +301,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
 
   // Slide Preview Component - renders at scale for efficient preview
   const SlidePreview = ({ slide, index }: { slide: SlideDefinition; index: number }) => {
-    const isSelected = currentSlideIndex === index;
+    const isSelected = selectedSlideId === slide.id;
     const previewScale = 0.15;
     const previewWidth = 1280 * previewScale;
     const previewHeight = 720 * previewScale;
@@ -339,7 +340,11 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
 
     return (
       <div
-        onClick={() => editor.setCurrentSlide(index)}
+        onClick={(e) => {
+          e.stopPropagation(); // Prevent click from bubbling to parent container
+          editor.setCurrentSlide(index);
+          editor.setSelectedSlide(slide.id);
+        }}
         className="relative cursor-pointer transition-all mx-auto"
         style={{
           width: `${previewWidth + 8}px`,
@@ -441,19 +446,69 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
       <div className="editor-panel-body flex-1 overflow-y-auto">
         {activeTab === 'slides' ? (
           /* Slides Tab */
-          <div className="p-4">
-            {!deck || deck.slides.length === 0 ? (
-              <div className="text-xs italic text-[var(--editor-text-muted)]">
-                No slides yet
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {deck.slides.map((slide, index) => (
-                  <SlidePreview key={slide.id} slide={slide} index={index} />
-                ))}
-              </div>
-            )}
-          </div>
+          <>
+            {/* Add Slide Button */}
+            <div className="p-4 border-b border-[var(--editor-border-strong)]">
+              <button
+                onClick={() => {
+                  editor.addSlide();
+                  // Select the newly added slide
+                  const newSlideIndex = deck ? deck.slides.length : 0;
+                  setTimeout(() => {
+                    const newDeck = editor.getState().deck;
+                    if (newDeck && newDeck.slides[newSlideIndex]) {
+                      editor.setCurrentSlide(newSlideIndex);
+                      editor.setSelectedSlide(newDeck.slides[newSlideIndex].id);
+                    }
+                  }, 0);
+                }}
+                className="w-full px-4 py-2 text-sm font-medium text-foreground bg-lume-primary/10 hover:bg-lume-primary/20 border border-lume-primary/30 rounded-md transition-colors flex items-center justify-center gap-2"
+              >
+                <svg 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                  className="w-4 h-4"
+                >
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                New Slide
+              </button>
+            </div>
+            
+            <div 
+              className="p-4 h-full flex-1 overflow-y-auto"
+              onClick={(e) => {
+                // Clear selection when clicking empty area (not on a slide preview)
+                const target = e.target as HTMLElement;
+                // Check if click is on a slide preview - if not, clear selection
+                // Slide previews have the class "relative cursor-pointer"
+                const clickedSlidePreview = target.closest('.relative.cursor-pointer');
+                
+                // If we didn't click on a slide preview, clear the selection
+                // This handles: padding area, empty space between/below slides, "No slides yet" message
+                if (!clickedSlidePreview) {
+                  editor.clearSelection();
+                }
+              }}
+            >
+              {!deck || deck.slides.length === 0 ? (
+                <div className="text-xs italic text-[var(--editor-text-muted)]">
+                  No slides yet
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {deck.slides.map((slide, index) => (
+                    <SlidePreview key={slide.id} slide={slide} index={index} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
         ) : (
           /* Layers Tab */
           <>
@@ -467,7 +522,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
               <div className="p-4">
                 {/* Render layers */}
                 {(currentSlide.layers || []).length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginBottom: '8px' }}>
+          <div className="flex flex-col gap-0.5 mb-2">
             {(currentSlide.layers || [])
               .sort((a, b) => a.order - b.order)
               .map((layer) => {
@@ -475,23 +530,10 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                 const isEditing = editingLayerId === layer.id;
                 
                 return (
-                  <div key={layer.id} style={{ marginBottom: '4px' }}>
+                  <div key={layer.id} className="mb-1">
                     {/* Layer header */}
                     <div
-                      style={{
-                        padding: '6px 8px',
-                        background: 'var(--editor-surface-muted)',
-                        borderRadius: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        cursor: 'pointer',
-                        fontSize: '11px',
-                        fontWeight: '600',
-                        color: 'var(--editor-text)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                      }}
+                      className="px-2 py-1.5 bg-muted/50 rounded flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-foreground uppercase tracking-wider"
                       onClick={() => toggleLayer(layer.id)}
                     >
                       {/* Expand/collapse icon */}
@@ -500,12 +542,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="2"
-                        style={{
-                          width: '12px',
-                          height: '12px',
-                          transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                          transition: 'transform 0.2s',
-                        }}
+                        className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? 'rotate-90' : 'rotate-0'}`}
                       >
                         <polyline points="9 18 15 12 9 6" />
                       </svg>
@@ -525,22 +562,11 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                             }
                           }}
                           onClick={(e) => e.stopPropagation()}
-                          style={{
-                            flex: 1,
-                            background: 'var(--editor-surface)',
-                            border: `1px solid var(--editor-border)` ,
-                            borderRadius: '4px',
-                            padding: '2px 4px',
-                            fontSize: '11px',
-                            color: 'var(--editor-text)',
-                            fontFamily: 'inherit',
-                            fontWeight: 600,
-                            textTransform: 'uppercase',
-                          }}
+                          className="flex-1 bg-background border border-border rounded px-1 py-0.5 text-[11px] text-foreground font-semibold uppercase"
                         />
                       ) : (
                         <span
-                          style={{ flex: 1 }}
+                          className="flex-1"
                           onDoubleClick={(e) => {
                             e.stopPropagation();
                             startEditingLayerName(layer.id, layer.name || '');
@@ -557,16 +583,11 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
         )}
 
         {allElements.length === 0 ? (
-          <div style={{
-            color: 'var(--editor-text-muted)',
-            fontSize: '12px',
-            padding: '8px',
-            fontStyle: 'italic',
-          }}>
+          <div className="text-xs p-2 italic text-muted-foreground">
             No layers yet
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <div className="flex flex-col gap-0.5">
             {allElements.map(({ element, layerId, isGroupChild, parentGroupId }, index) => {
               const isSelected = selectedElementIds.has(element.id);
               const isLocked = (element.metadata as any)?.locked === true;
