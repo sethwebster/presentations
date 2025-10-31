@@ -324,12 +324,11 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
   return (
     <div
       ref={canvasRef}
-      className="editor-canvas"
+      className="editor-canvas bg-gray-400 dark:bg-gray-900"
       style={{
         flex: 1,
         overflow: 'hidden',
         position: 'relative',
-        background: 'var(--lume-midnight)',
         cursor: isPanning ? 'grabbing' : 'default',
         userSelect: 'none',
         WebkitUserSelect: 'none',
@@ -412,6 +411,29 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
                 }
                 if (currentSlide.background.type === 'gradient') {
                   return gradientToCSS(currentSlide.background.value);
+                }
+                if (currentSlide.background.type === 'image') {
+                  const value = currentSlide.background.value;
+                  if (typeof value === 'string') {
+                    return `url(${value}) center / cover no-repeat`;
+                  }
+                  if (value && typeof value === 'object') {
+                    const src = (value as any).src || (value as any).url;
+                    if (typeof src === 'string' && src.length > 0) {
+                      const offsetX = (value as any).offsetX ?? 0;
+                      const offsetY = (value as any).offsetY ?? 0;
+                      const position = offsetX !== 0 || offsetY !== 0 
+                        ? `${offsetX}px ${offsetY}px`
+                        : ((value as any).position || 'center');
+                      const fit = (value as any).fit || 'cover';
+                      const repeat = (value as any).repeat || 'no-repeat';
+                      const base = (value as any).baseColor;
+                      const imagePart = `url(${src}) ${position} / ${fit} ${repeat}`;
+                      return base ? `${base} ${imagePart}` : imagePart;
+                    }
+                  }
+                  // Fallback color if src missing
+                  return '#090b16';
                 }
               }
               // Then check slide style background

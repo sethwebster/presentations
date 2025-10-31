@@ -167,6 +167,7 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
   const isSelected = selectedElementIds.has(element.id);
 
   const bounds = element.bounds || { x: 0, y: 0, width: 100, height: 50 };
+  const isLocked = (element.metadata as any)?.locked === true;
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -231,6 +232,19 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
     if (e.button !== 0) return; // Only left mouse button
     if (isEditingText) return; // Don't drag while editing text
     
+    // Check if element is locked - show padlock cursor and prevent drag
+    if (isLocked) {
+      e.preventDefault();
+      e.stopPropagation();
+      // Set cursor to locked padlock
+      document.body.style.cursor = 'not-allowed';
+      // Reset cursor after a short delay
+      setTimeout(() => {
+        document.body.style.cursor = '';
+      }, 300);
+      return;
+    }
+    
     e.preventDefault(); // Prevent text selection
     e.stopPropagation();
     
@@ -248,6 +262,19 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
         ...(currentSlide.layers?.flatMap(l => l.elements) || []),
       ];
       
+      // Check if any selected elements are locked - if so, show padlock cursor and prevent drag
+      const selectedElements = allElements.filter(el => currentState.selectedElementIds.has(el.id));
+      const hasLockedElements = selectedElements.some(el => (el.metadata as any)?.locked === true);
+      if (hasLockedElements) {
+        // Set cursor to locked padlock (not-allowed)
+        document.body.style.cursor = 'not-allowed';
+        // Reset cursor after a short delay
+        setTimeout(() => {
+          document.body.style.cursor = '';
+        }, 300);
+        return; // Don't allow dragging if any selected element is locked
+      }
+      
       // Collect all elements with their current bounds
       // CRITICAL: Children of groups have ABSOLUTE bounds already (groups are logical only)
       let elementsWithAbsoluteBounds = [...allElements];
@@ -259,6 +286,15 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
           // Add children directly - their bounds are already absolute
           group.children?.forEach((child: any) => {
             if (currentState.selectedElementIds.has(child.id)) {
+              // Check if child is locked
+              if ((child.metadata as any)?.locked === true) {
+                // Set cursor to locked padlock (not-allowed)
+                document.body.style.cursor = 'not-allowed';
+                setTimeout(() => {
+                  document.body.style.cursor = '';
+                }, 300);
+                return; // Skip locked children
+              }
               elementsWithAbsoluteBounds.push(child);
             }
           });
@@ -499,6 +535,10 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
   // Extract style properties, excluding opacity (we handle it separately)
   const { opacity, ...otherStyles } = (element.style || {}) as any;
 
+  // Check if element fills the entire canvas (expanded to fill)
+  const fillsCanvas = bounds.x === 0 && bounds.y === 0 && 
+    bounds.width >= 1279 && bounds.height >= 719; // Allow for small rounding differences
+  
   return (
     <div
       ref={elementRef}
@@ -508,8 +548,8 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
       onContextMenu={handleContextMenu}
       className={`
         absolute outline-none select-none
-        ${isSelected ? 'border-2 border-lume-primary' : 'border-2 border-transparent'}
-        ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}
+        ${isSelected ? 'border-2 border-lume-primary' : fillsCanvas ? 'border-0' : 'border-2 border-transparent'}
+        ${isDragging ? 'cursor-grabbing' : isLocked ? 'cursor-not-allowed' : 'cursor-grab'}
       `}
       style={{
         left: `${bounds.x}px`,
@@ -517,6 +557,7 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
         width: `${bounds.width}px`,
         height: `${bounds.height}px`,
         opacity: opacityValue,
+        boxSizing: 'border-box',
         ...otherStyles,
       }}
       onMouseDown={handleMouseDown}
@@ -658,6 +699,7 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
   const state = useEditor();
   const editor = useEditorInstance();
   const bounds = element.bounds || { x: 0, y: 0, width: 100, height: 50 };
+  const isLocked = (element.metadata as any)?.locked === true;
   const zoom = state.zoom;
   const pan = state.pan;
   const [isResizing, setIsResizing] = useState<string | false>(false);
@@ -673,6 +715,12 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
   });
 
   const handleResizeStart = (e: React.MouseEvent, handle: string) => {
+    // Don't allow resizing if locked
+    if (isLocked) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
     setIsResizing(handle);
@@ -1124,6 +1172,11 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
       document.body.style.webkitUserSelect = '';
     };
   }, [isResizing, resizeStart, element.id, element.type, isAltPressedDuringResize, zoom, pan, editor]);
+
+  // Don't show handles if locked (must be after hooks)
+  if (isLocked) {
+    return null;
+  }
 
   const handleBaseClasses = "absolute w-2 h-2 bg-lume-primary border border-white rounded-sm";
 

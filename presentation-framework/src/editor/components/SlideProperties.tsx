@@ -1,9 +1,11 @@
 "use client";
 
+import { useState, useEffect } from 'react';
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { ColorPicker } from './ColorPicker';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 
 export function SlideProperties() {
   const state = useEditor();
@@ -43,6 +45,23 @@ export function SlideProperties() {
     return '#ffffff';
   };
 
+  // Determine current background type
+  const getBackgroundType = (): 'color' | 'gradient' | 'image' => {
+    if (slide.background) {
+      if (typeof slide.background === 'string') return 'color';
+      if (slide.background.type === 'image') return 'image';
+      if (slide.background.type === 'gradient') return 'gradient';
+    }
+    return 'color';
+  };
+
+  const [backgroundType, setBackgroundType] = useState<'color' | 'gradient' | 'image'>(getBackgroundType());
+
+  // Sync backgroundType when slide changes
+  useEffect(() => {
+    setBackgroundType(getBackgroundType());
+  }, [selectedSlideId, slide.background]);
+
   // Get current background value for ColorPicker
   const getBackgroundValue = (): string => {
     if (slide.background) {
@@ -59,6 +78,24 @@ export function SlideProperties() {
     return '#ffffff';
   };
 
+  // Get image background data
+  const getImageBackground = () => {
+    if (slide.background && typeof slide.background === 'object' && slide.background.type === 'image') {
+      const value = slide.background.value;
+      if (typeof value === 'object' && value !== null) {
+        return {
+          src: (value as any).src || '',
+          offsetX: (value as any).offsetX || 0,
+          offsetY: (value as any).offsetY || 0,
+        };
+      }
+      if (typeof value === 'string') {
+        return { src: value, offsetX: 0, offsetY: 0 };
+      }
+    }
+    return { src: '', offsetX: 0, offsetY: 0 };
+  };
+
   return (
     <div className="flex flex-col gap-6 text-foreground">
       {/* Slide Title */}
@@ -73,32 +110,173 @@ export function SlideProperties() {
       </div>
 
       {/* Background */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         <Label className="editor-section-heading">Background</Label>
-        <ColorPicker
-          value={getBackgroundValue()}
-          onChange={(value) => {
-            // Convert ColorPicker value to slide background format
-            // ColorPicker returns: string for colors, or { type: 'linear'|'radial', angle: number, stops: Array } for gradients
-            let backgroundValue: string | { type: 'color' | 'gradient' | 'image' | 'video'; value: string | object; opacity?: number };
+        
+        <SegmentedControl
+          items={[
+            { value: 'color', label: 'Color' },
+            { value: 'gradient', label: 'Gradient' },
+            { value: 'image', label: 'Image' },
+          ]}
+          value={backgroundType}
+          onValueChange={(value) => {
+            const newType = value as 'color' | 'gradient' | 'image';
+            setBackgroundType(newType);
             
-            if (typeof value === 'string') {
-              backgroundValue = value;
-            } else if (value && typeof value === 'object') {
-              // Gradient object from ColorPicker
-              backgroundValue = {
-                type: 'gradient',
-                value: value,
-              };
-            } else {
-              backgroundValue = '#ffffff';
+            // When switching types, set a default value
+            if (newType === 'color') {
+              editor.updateSlide(selectedSlideId, {
+                background: '#ffffff',
+              });
+            } else if (newType === 'gradient') {
+              editor.updateSlide(selectedSlideId, {
+                background: {
+                  type: 'gradient',
+                  value: {
+                    type: 'linear',
+                    angle: 0,
+                    stops: [
+                      { color: '#16C2C7', position: 0 },
+                      { color: '#C84BD2', position: 100 },
+                    ],
+                  },
+                },
+              });
+            } else if (newType === 'image') {
+              editor.updateSlide(selectedSlideId, {
+                background: {
+                  type: 'image',
+                  value: {
+                    src: '',
+                    offsetX: 0,
+                    offsetY: 0,
+                  },
+                  opacity: 1,
+                },
+              });
             }
-            
-            editor.updateSlide(selectedSlideId, {
-              background: backgroundValue,
-            });
           }}
+          variant="editor"
         />
+
+        {backgroundType === 'image' && (() => {
+          const imageData = getImageBackground();
+          return (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label className="text-sm text-[var(--editor-text-muted)]">Image URL</Label>
+                <Input
+                  value={imageData.src}
+                  onChange={(e) => {
+                    const currentValue = slide.background && typeof slide.background === 'object' && slide.background.type === 'image'
+                      ? (slide.background.value as any) || {}
+                      : {};
+                    editor.updateSlide(selectedSlideId, {
+                      background: {
+                        type: 'image',
+                        value: {
+                          ...currentValue,
+                          src: e.target.value,
+                          offsetX: currentValue.offsetX || 0,
+                          offsetY: currentValue.offsetY || 0,
+                        },
+                        opacity: slide.background && typeof slide.background === 'object' ? (slide.background.opacity ?? 1) : 1,
+                      },
+                    });
+                  }}
+                  placeholder="data:image/... or https://..."
+                  className="editor-input"
+                />
+              </div>
+              
+              {imageData.src && (
+                <>
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[var(--editor-text-muted)]">Horizontal Offset</Label>
+                    <Input
+                      type="number"
+                      value={imageData.offsetX}
+                      onChange={(e) => {
+                        const currentValue = slide.background && typeof slide.background === 'object' && slide.background.type === 'image'
+                          ? (slide.background.value as any) || {}
+                          : {};
+                        editor.updateSlide(selectedSlideId, {
+                          background: {
+                            type: 'image',
+                            value: {
+                              ...currentValue,
+                              src: currentValue.src || '',
+                              offsetX: parseInt(e.target.value) || 0,
+                              offsetY: currentValue.offsetY || 0,
+                            },
+                            opacity: slide.background && typeof slide.background === 'object' ? (slide.background.opacity ?? 1) : 1,
+                          },
+                        });
+                      }}
+                      className="editor-input"
+                      step="1"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[var(--editor-text-muted)]">Vertical Offset</Label>
+                    <Input
+                      type="number"
+                      value={imageData.offsetY}
+                      onChange={(e) => {
+                        const currentValue = slide.background && typeof slide.background === 'object' && slide.background.type === 'image'
+                          ? (slide.background.value as any) || {}
+                          : {};
+                        editor.updateSlide(selectedSlideId, {
+                          background: {
+                            type: 'image',
+                            value: {
+                              ...currentValue,
+                              src: currentValue.src || '',
+                              offsetX: currentValue.offsetX || 0,
+                              offsetY: parseInt(e.target.value) || 0,
+                            },
+                            opacity: slide.background && typeof slide.background === 'object' ? (slide.background.opacity ?? 1) : 1,
+                          },
+                        });
+                      }}
+                      className="editor-input"
+                      step="1"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })()}
+
+        {(backgroundType === 'color' || backgroundType === 'gradient') && (
+          <ColorPicker
+            value={getBackgroundValue()}
+            onChange={(value) => {
+              // Convert ColorPicker value to slide background format
+              // ColorPicker returns: string for colors, or { type: 'linear'|'radial', angle: number, stops: Array } for gradients
+              let backgroundValue: string | { type: 'color' | 'gradient' | 'image' | 'video'; value: string | object; opacity?: number };
+              
+              if (typeof value === 'string') {
+                backgroundValue = value;
+              } else if (value && typeof value === 'object') {
+                // Gradient object from ColorPicker
+                backgroundValue = {
+                  type: 'gradient',
+                  value: value,
+                };
+              } else {
+                backgroundValue = '#ffffff';
+              }
+              
+              editor.updateSlide(selectedSlideId, {
+                background: backgroundValue,
+              });
+            }}
+          />
+        )}
       </div>
 
       {/* Slide Number */}
