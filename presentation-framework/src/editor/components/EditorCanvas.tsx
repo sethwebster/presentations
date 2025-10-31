@@ -109,8 +109,13 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
     if (!isSelecting) return;
 
     const handleGlobalMouseMove = (e: MouseEvent) => {
-      const canvasPos = screenToCanvas(e.clientX, e.clientY);
-      setSelectionBoxEnd(canvasPos);
+      const canvasContainer = document.querySelector('[data-canvas-container]') as HTMLElement;
+      if (!canvasContainer) return;
+      
+      const rect = canvasContainer.getBoundingClientRect();
+      const canvasX = (e.clientX - rect.left) / zoom;
+      const canvasY = (e.clientY - rect.top) / zoom;
+      setSelectionBoxEnd({ x: canvasX, y: canvasY });
     };
 
     const handleGlobalMouseUp = () => {
@@ -180,7 +185,7 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
       window.removeEventListener('mousemove', handleGlobalMouseMove);
       window.removeEventListener('mouseup', handleGlobalMouseUp);
     };
-  }, [isSelecting, selectionBoxStart, selectionBoxEnd, deck, currentSlideIndex, editor, screenToCanvas]);
+  }, [isSelecting, selectionBoxStart, selectionBoxEnd, deck, currentSlideIndex, editor, zoom]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
