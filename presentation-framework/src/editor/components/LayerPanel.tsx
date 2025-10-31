@@ -1,7 +1,8 @@
 "use client";
 
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import type { GroupElementDefinition } from '@/rsc/types';
 
 interface LayerPanelProps {
   deckId: string;
@@ -14,7 +15,11 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
   const deck = state.deck;
   const currentSlideIndex = state.currentSlideIndex;
   const selectedElementIds = state.selectedElementIds;
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandedLayers, setExpandedLayers] = useState<Set<string>>(new Set());
+  const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
+  const [editingLayerName, setEditingLayerName] = useState<string>('');
+  const layerNameInputRef = useRef<HTMLInputElement>(null);
   const [draggedElementId, setDraggedElementId] = useState<string | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
@@ -59,13 +64,26 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
   }
 
   // Collect all elements in rendering order, then reverse to show topmost first
-  const allElements: Array<{ element: any; layerId?: string; layerOrder?: number; renderIndex?: number }> = [];
+  const allElements: Array<{ element: any; layerId?: string; layerOrder?: number; renderIndex?: number; isGroupChild?: boolean; parentGroupId?: string }> = [];
   
   let renderIndex = 0;
   
   // Add elements directly on slide (rendered first, so on bottom)
   (currentSlide.elements || []).forEach((el) => {
-    allElements.push({ element: el, renderIndex: renderIndex++ });
+    if (el.type === 'group') {
+      const group = el as GroupElementDefinition;
+      const isExpanded = expandedGroups.has(el.id);
+      allElements.push({ element: el, renderIndex: renderIndex++, isGroupChild: false });
+      
+      // If group is expanded, add its children
+      if (isExpanded && group.children) {
+        group.children.forEach((child) => {
+          allElements.push({ element: child, renderIndex: renderIndex++, isGroupChild: true, parentGroupId: el.id });
+        });
+      }
+    } else {
+      allElements.push({ element: el, renderIndex: renderIndex++ });
+    }
   });
 
   // Add elements from layers (rendered after slide.elements, sorted by order ascending)
@@ -73,13 +91,41 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
   (currentSlide.layers || [])
     .sort((a, b) => a.order - b.order)
     .forEach((layer) => {
+      const isLayerExpanded = expandedLayers.has(layer.id);
+      
+      // If layer is not expanded, skip its elements
+      if (!isLayerExpanded) return;
+      
       layer.elements.forEach((el) => {
-        allElements.push({ element: el, layerId: layer.id, layerOrder: layer.order, renderIndex: renderIndex++ });
+        if (el.type === 'group') {
+          const group = el as GroupElementDefinition;
+          const isExpanded = expandedGroups.has(el.id);
+          allElements.push({ element: el, layerId: layer.id, layerOrder: layer.order, renderIndex: renderIndex++, isGroupChild: false });
+          
+          // If group is expanded, add its children
+          if (isExpanded && group.children) {
+            group.children.forEach((child) => {
+              allElements.push({ element: child, layerId: layer.id, layerOrder: layer.order, renderIndex: renderIndex++, isGroupChild: true, parentGroupId: el.id });
+            });
+          }
+        } else {
+          allElements.push({ element: el, layerId: layer.id, layerOrder: layer.order, renderIndex: renderIndex++ });
+        }
       });
     });
 
   // Reverse the order so topmost elements (rendered last) appear at the top of the list
   allElements.reverse();
+
+  const toggleGroup = (groupId: string) => {
+    const newExpanded = new Set(expandedGroups);
+    if (newExpanded.has(groupId)) {
+      newExpanded.delete(groupId);
+    } else {
+      newExpanded.add(groupId);
+    }
+    setExpandedGroups(newExpanded);
+  };
 
   const toggleLayer = (layerId: string) => {
     const newExpanded = new Set(expandedLayers);
@@ -90,6 +136,31 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
     }
     setExpandedLayers(newExpanded);
   };
+
+  const startEditingLayerName = (layerId: string, currentName: string) => {
+    setEditingLayerId(layerId);
+    setEditingLayerName(currentName || '');
+  };
+
+  const saveLayerName = () => {
+    if (editingLayerId && currentSlide) {
+      editor.updateLayerName(currentSlideIndex, editingLayerId, editingLayerName);
+    }
+    setEditingLayerId(null);
+    setEditingLayerName('');
+  };
+
+  const cancelEditingLayerName = () => {
+    setEditingLayerId(null);
+    setEditingLayerName('');
+  };
+
+  useEffect(() => {
+    if (editingLayerId && layerNameInputRef.current) {
+      layerNameInputRef.current.focus();
+      layerNameInputRef.current.select();
+    }
+  }, [editingLayerId]);
 
   const handleDragStart = (e: React.DragEvent, elementId: string, index: number) => {
     const element = allElements[index]?.element;
@@ -162,6 +233,97 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
         padding: '8px',
         overflowY: 'auto',
       }}>
+        {/* Render layers */}
+        {(currentSlide.layers || []).length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginBottom: '8px' }}>
+            {(currentSlide.layers || [])
+              .sort((a, b) => a.order - b.order)
+              .map((layer) => {
+                const isExpanded = expandedLayers.has(layer.id);
+                const isEditing = editingLayerId === layer.id;
+                
+                return (
+                  <div key={layer.id} style={{ marginBottom: '4px' }}>
+                    {/* Layer header */}
+                    <div
+                      style={{
+                        padding: '6px 8px',
+                        background: 'rgba(236, 236, 236, 0.05)',
+                        borderRadius: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        cursor: 'pointer',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        color: 'rgba(236, 236, 236, 0.8)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                      }}
+                      onClick={() => toggleLayer(layer.id)}
+                    >
+                      {/* Expand/collapse icon */}
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        style={{
+                          width: '12px',
+                          height: '12px',
+                          transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.2s',
+                        }}
+                      >
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                      
+                      {/* Layer name */}
+                      {isEditing ? (
+                        <input
+                          ref={layerNameInputRef}
+                          value={editingLayerName}
+                          onChange={(e) => setEditingLayerName(e.target.value)}
+                          onBlur={saveLayerName}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              saveLayerName();
+                            } else if (e.key === 'Escape') {
+                              cancelEditingLayerName();
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            flex: 1,
+                            background: 'rgba(236, 236, 236, 0.1)',
+                            border: '1px solid var(--lume-primary)',
+                            borderRadius: '2px',
+                            padding: '2px 4px',
+                            fontSize: '11px',
+                            color: 'var(--lume-mist)',
+                            fontFamily: 'inherit',
+                            fontWeight: '600',
+                            textTransform: 'uppercase',
+                          }}
+                        />
+                      ) : (
+                        <span
+                          style={{ flex: 1 }}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            startEditingLayerName(layer.id, layer.name || '');
+                          }}
+                        >
+                          {layer.name || `Layer ${layer.order + 1}`}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+
         {allElements.length === 0 ? (
           <div style={{
             color: 'rgba(236, 236, 236, 0.6)',
@@ -173,24 +335,33 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {allElements.map(({ element, layerId }, index) => {
+            {allElements.map(({ element, layerId, isGroupChild, parentGroupId }, index) => {
               const isSelected = selectedElementIds.has(element.id);
               const isLocked = (element.metadata as any)?.locked === true;
               const isDragging = draggedElementId === element.id;
               const isDragOver = dragOverIndex === index;
               const elementType = element.type || 'unknown';
-              const elementName = element.type === 'text' 
-                ? (element.content || 'Text').substring(0, 20)
-                : element.type === 'shape'
-                ? `${element.shapeType || 'Shape'}`
-                : element.type === 'image'
-                ? 'Image'
-                : elementType;
+              const isGroup = element.type === 'group';
+              const isGroupExpanded = isGroup && expandedGroups.has(element.id);
+              
+              let elementName: string;
+              if (element.type === 'text') {
+                elementName = (element.content || 'Text').substring(0, 20);
+              } else if (element.type === 'shape') {
+                elementName = `${element.shapeType || 'Shape'}`;
+              } else if (element.type === 'image') {
+                elementName = 'Image';
+              } else if (element.type === 'group') {
+                const group = element as GroupElementDefinition;
+                elementName = `Group (${group.children?.length || 0})`;
+              } else {
+                elementName = elementType;
+              }
 
               return (
                 <div
                   key={element.id}
-                  draggable={!isLocked}
+                  draggable={!isLocked && !isGroupChild}
                   onDragStart={(e) => handleDragStart(e, element.id, index)}
                   onDragOver={(e) => handleDragOver(e, index)}
                   onDragLeave={handleDragLeave}
@@ -199,6 +370,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                   onClick={() => !isLocked && editor.selectElement(element.id, false)}
                   style={{
                     padding: '8px 12px',
+                    paddingLeft: isGroupChild ? '24px' : '12px',
                     background: isSelected 
                       ? 'rgba(22, 194, 199, 0.2)' 
                       : isDragOver
@@ -234,6 +406,32 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                     }
                   }}
                 >
+                  {/* Expand/collapse icon for groups */}
+                  {isGroup ? (
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      style={{
+                        width: '12px',
+                        height: '12px',
+                        transform: isGroupExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleGroup(element.id);
+                      }}
+                    >
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  ) : (
+                    <div style={{ width: '12px' }} /> // Spacer for alignment
+                  )}
+
                   {/* Drag handle / Lock icon */}
                   {isLocked ? (
                     <svg
@@ -257,8 +455,8 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="2"
-                      style={{ width: '14px', height: '14px', flexShrink: 0, cursor: 'grab' }}
-                      title="Drag to reorder"
+                      style={{ width: '14px', height: '14px', flexShrink: 0, cursor: isGroupChild ? 'default' : 'grab' }}
+                      title={isGroupChild ? '' : "Drag to reorder"}
                     >
                       <circle cx="9" cy="5" r="1" />
                       <circle cx="9" cy="12" r="1" />

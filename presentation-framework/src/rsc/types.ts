@@ -330,6 +330,7 @@ export interface SlideTransitions {
 
 export interface LayerDefinition {
   id: string;
+  name?: string;
   order: number;
   elements: ElementDefinition[];
 }
