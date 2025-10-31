@@ -15,7 +15,7 @@ export function AlignmentGuides({ draggingElementId, draggingBounds }: Alignment
   const state = useEditor();
   const deck = state.deck;
   const currentSlideIndex = state.currentSlideIndex;
-  const [guides, setGuides] = useState<Array<{ type: 'horizontal' | 'vertical'; position: number }>>([]);
+  const [guides, setGuides] = useState<Array<{ type: 'horizontal' | 'vertical'; position: number; isCenter?: boolean }>>([]);
 
   useEffect(() => {
     if (!draggingElementId || !draggingBounds || !deck) {
@@ -34,7 +34,7 @@ export function AlignmentGuides({ draggingElementId, draggingBounds }: Alignment
       ...(slide.layers?.flatMap(l => l.elements) || []),
     ].filter(el => el.id !== draggingElementId);
 
-    const detectedGuides: Array<{ type: 'horizontal' | 'vertical'; position: number }> = [];
+    const detectedGuides: Array<{ type: 'horizontal' | 'vertical'; position: number; isCenter?: boolean }> = [];
     const CANVAS_WIDTH = 1280;
     const CANVAS_HEIGHT = 720;
 
@@ -78,12 +78,27 @@ export function AlignmentGuides({ draggingElementId, draggingBounds }: Alignment
     const draggingCenterX = draggingBounds.x + draggingBounds.width / 2;
     const draggingCenterY = draggingBounds.y + draggingBounds.height / 2;
 
-    // Canvas center
-    if (Math.abs(draggingCenterX - CANVAS_WIDTH / 2) < GUIDE_THRESHOLD) {
-      detectedGuides.push({ type: 'vertical', position: CANVAS_WIDTH / 2 });
+    // Canvas center - always check, make it more prominent
+    // Check if element's center OR edges align with canvas center
+    const canvasCenterX = CANVAS_WIDTH / 2;
+    const canvasCenterY = CANVAS_HEIGHT / 2;
+    
+    // Vertical center alignment (check center, left edge, and right edge)
+    if (
+      Math.abs(draggingCenterX - canvasCenterX) < GUIDE_THRESHOLD ||
+      Math.abs(draggingBounds.x - canvasCenterX) < GUIDE_THRESHOLD ||
+      Math.abs(draggingBounds.x + draggingBounds.width - canvasCenterX) < GUIDE_THRESHOLD
+    ) {
+      detectedGuides.push({ type: 'vertical', position: canvasCenterX, isCenter: true });
     }
-    if (Math.abs(draggingCenterY - CANVAS_HEIGHT / 2) < GUIDE_THRESHOLD) {
-      detectedGuides.push({ type: 'horizontal', position: CANVAS_HEIGHT / 2 });
+    
+    // Horizontal center alignment (check center, top edge, and bottom edge)
+    if (
+      Math.abs(draggingCenterY - canvasCenterY) < GUIDE_THRESHOLD ||
+      Math.abs(draggingBounds.y - canvasCenterY) < GUIDE_THRESHOLD ||
+      Math.abs(draggingBounds.y + draggingBounds.height - canvasCenterY) < GUIDE_THRESHOLD
+    ) {
+      detectedGuides.push({ type: 'horizontal', position: canvasCenterY, isCenter: true });
     }
 
     // Canvas edges
@@ -107,18 +122,24 @@ export function AlignmentGuides({ draggingElementId, draggingBounds }: Alignment
 
   return (
     <>
-      {guides.map((guide, index) => (
-        guide.type === 'vertical' ? (
+      {guides.map((guide, index) => {
+        const isCenter = guide.isCenter || false;
+        const strokeColor = isCenter ? 'var(--lume-primary)' : 'var(--lume-primary)';
+        const strokeWidth = isCenter ? '2' : '1';
+        const opacity = isCenter ? 1 : 0.8;
+        const dashArray = isCenter ? '6 3' : '4 4'; // Different dash pattern for center lines
+        
+        return guide.type === 'vertical' ? (
           <line
             key={`v-${index}`}
             x1={guide.position}
             y1={0}
             x2={guide.position}
             y2={720}
-            stroke="var(--lume-primary)"
-            strokeWidth="1"
-            strokeDasharray="4 4"
-            opacity={0.8}
+            stroke={strokeColor}
+            strokeWidth={strokeWidth}
+            strokeDasharray={dashArray}
+            opacity={opacity}
             style={{ pointerEvents: 'none' }}
           />
         ) : (
@@ -128,14 +149,14 @@ export function AlignmentGuides({ draggingElementId, draggingBounds }: Alignment
             y1={guide.position}
             x2={1280}
             y2={guide.position}
-            stroke="var(--lume-primary)"
-            strokeWidth="1"
-            strokeDasharray="4 4"
-            opacity={0.8}
+            stroke={strokeColor}
+            strokeWidth={strokeWidth}
+            strokeDasharray={dashArray}
+            opacity={opacity}
             style={{ pointerEvents: 'none' }}
           />
-        )
-      ))}
+        );
+      })}
     </>
   );
 }
