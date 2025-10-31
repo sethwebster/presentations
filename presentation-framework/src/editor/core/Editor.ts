@@ -1217,15 +1217,13 @@ export class Editor {
     if (elementsToGroup.length < 2) return;
 
     // Calculate group bounds from ORIGINAL absolute positions
-    const groupBounds = this.calculateGroupBounds(elementsToGroup.map(({ element }) => ({
-      ...element,
-      bounds: {
-        x: element.bounds?.x || 0,
-        y: element.bounds?.y || 0,
-        width: element.bounds?.width || 100,
-        height: element.bounds?.height || 100,
-      },
-    })));
+    // Use originalBounds directly to ensure we're calculating from the exact current positions
+    const groupBounds = this.calculateGroupBounds(elementsToGroup.map(({ originalBounds }) => ({
+      id: 'temp',
+      type: 'shape',
+      shapeType: 'rectangle',
+      bounds: originalBounds,
+    } as ElementDefinition)));
     if (!groupBounds) return;
 
     // Adjust children bounds to be relative to group origin
