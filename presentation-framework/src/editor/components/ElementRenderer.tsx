@@ -442,17 +442,20 @@ function GroupBoundsOverlay({
   );
 }
 
-export function ElementRenderer({ element, slideId }: ElementRendererProps) {
+export function ElementRenderer({ element, slideId, disableInteractions = false }: ElementRendererProps & { disableInteractions?: boolean }) {
+  // When rendering in preview (like slide list), disable all interactions
+  const previewStyle = disableInteractions ? { pointerEvents: 'none' as const, userSelect: 'none' as const } : {};
+  
   switch (element.type) {
     case 'text':
     case 'richtext':
-      return <TextElement element={element as any} slideId={slideId} />;
+      return <div style={previewStyle}><TextElement element={element as any} slideId={slideId} /></div>;
     case 'shape':
-      return <ShapeElement element={element as any} slideId={slideId} />;
+      return <div style={previewStyle}><ShapeElement element={element as any} slideId={slideId} /></div>;
     case 'image':
-      return <ImageElement element={element as any} slideId={slideId} />;
+      return <div style={previewStyle}><ImageElement element={element as any} slideId={slideId} /></div>;
     case 'group':
-      return <GroupElementRenderer element={element as GroupElementDefinition} slideId={slideId} />;
+      return <div style={previewStyle}><GroupElementRenderer element={element as GroupElementDefinition} slideId={slideId} /></div>;
     default:
       return null;
   }

@@ -299,12 +299,10 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
     setDragOverIndex(null);
   };
 
-  // Slide Preview Component - renders at scale for efficient preview
+  // Slide Preview Component - renders similar to presenter view preview
   const SlidePreview = ({ slide, index }: { slide: SlideDefinition; index: number }) => {
     const isSelected = selectedSlideId === slide.id;
-    const previewScale = 0.15;
-    const previewWidth = 1280 * previewScale;
-    const previewHeight = 720 * previewScale;
+    const isHidden = slide.hidden || false;
 
     // Helper to convert gradient object to CSS string
     const gradientToCSS = (grad: any): string => {
@@ -346,64 +344,101 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
           editor.setSelectedSlide(slide.id);
         }}
         className="relative cursor-pointer transition-all mx-auto"
-        style={{
-          width: `${previewWidth + 8}px`,
-          height: `${previewHeight + 24}px`,
-        }}
       >
-        {/* Slide preview wrapper with border and shadow */}
+        {/* Outer wrapper for border - renders outside without affecting size */}
         <div
           className={`
-            relative mx-auto mt-1 rounded-lg
-            transition-all duration-200 ease-out
+            relative mx-auto mt-1 w-full max-w-[200px] rounded-xl
+            transition-all duration-200 ease-out border-2
             ${isSelected 
-              ? 'border-2 border-lume-primary/60 shadow-[0_8px_24px_rgba(0,0,0,0.15),0_2px_8px_rgba(0,0,0,0.08)]' 
-              : 'border border-black/20 shadow-[0_4px_12px_rgba(0,0,0,0.1),0_2px_4px_rgba(0,0,0,0.06)] hover:border-black/25 hover:shadow-[0_6px_20px_rgba(0,0,0,0.12),0_2px_6px_rgba(0,0,0,0.08)]'
+              ? 'border-lume-primary shadow-[0_0_0_1px_rgba(97,218,251,0.25)]' 
+              : 'border-transparent'
             }
+            ${isHidden ? 'opacity-50' : ''}
           `}
-          style={{
-            width: `${previewWidth}px`,
-            height: `${previewHeight}px`,
-          }}
         >
-          {/* Slide preview - rendered at scale for efficient display */}
+          {/* Slide preview wrapper with shadow - similar to presenter view */}
           <div
-            className="relative overflow-hidden rounded-lg origin-top-left"
+            className={`
+              relative rounded-lg overflow-hidden
+              transition-all duration-200 ease-out
+              aspect-[16/9] w-full
+              ${isSelected 
+                ? 'shadow-[0_8px_24px_rgba(0,0,0,0.15),0_2px_8px_rgba(0,0,0,0.08)]' 
+                : 'shadow-[0_4px_12px_rgba(0,0,0,0.1),0_2px_4px_rgba(0,0,0,0.06)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.12),0_2px_6px_rgba(0,0,0,0.08)]'
+              }
+            `}
             style={{
-              width: `${previewWidth}px`,
-              height: `${previewHeight}px`,
               background: getBackground(),
-              transform: `scale(${previewScale})`,
             }}
           >
-          {/* Render elements at full size, scaled down */}
-          <div className="relative pointer-events-none w-[1280px] h-[720px]">
-            {slide.elements?.map((element) => (
-              <ElementRenderer
-                key={element.id}
-                element={element}
-                slideId={slide.id}
-              />
-            ))}
-            {slide.layers
-              ?.sort((a, b) => a.order - b.order)
-              .map((layer) =>
-                layer.elements.map((element) => (
+          {/* Slide preview content - rendered at full size, scaled down via CSS */}
+          <div
+            className="relative w-full h-full"
+            style={{
+              transform: 'scale(0.15625)', // 200px / 1280px = 0.15625
+              transformOrigin: 'top left',
+              pointerEvents: 'none', // Disable pointer events on the scaled container
+            }}
+          >
+            {/* Render slide at full 1280x720 size, scaled down */}
+            <div 
+              className="relative w-[1280px] h-[720px]"
+              style={{ 
+                pointerEvents: 'none',
+              }}
+            >
+              {/* Force all child elements to ignore pointer events */}
+              <div style={{ pointerEvents: 'none' }} className="[&_*]:pointer-events-none [&_*]:select-none">
+                {slide.elements?.map((element) => (
                   <ElementRenderer
                     key={element.id}
                     element={element}
                     slideId={slide.id}
+                    disableInteractions={true}
                   />
-                ))
-              )}
+                ))}
+                {slide.layers
+                  ?.sort((a, b) => a.order - b.order)
+                  .map((layer) =>
+                    layer.elements.map((element) => (
+                      <ElementRenderer
+                        key={element.id}
+                        element={element}
+                        slideId={slide.id}
+                        disableInteractions={true}
+                      />
+                    ))
+                  )}
+              </div>
+            </div>
           </div>
-          </div>
+          
+          {/* Transparent overlay to capture all clicks - absolutely positioned on top */}
+          <div
+            className="absolute inset-0 cursor-pointer"
+            style={{
+              pointerEvents: 'auto',
+              zIndex: 10,
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              editor.setCurrentSlide(index);
+              editor.setSelectedSlide(slide.id);
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+          />
+        </div>
         </div>
         
-        {/* Slide number badge */}
+        {/* Slide number badge - below preview */}
         <div
           className={`
-            absolute -bottom-1 left-1/2 -translate-x-1/2 
+            mt-1 text-center
             px-2 py-0.5 rounded text-xs font-semibold
             ${isSelected
               ? 'bg-lume-primary text-lume-midnight dark:text-white'
