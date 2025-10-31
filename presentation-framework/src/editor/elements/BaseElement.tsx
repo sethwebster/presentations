@@ -89,12 +89,28 @@ function findSnapPoints(
   }
 
   // Check alignment with canvas center and edges
-  // Canvas center
-  if (Math.abs(elementCenterX - CANVAS_WIDTH / 2) < SNAP_THRESHOLD) {
-    snapPointsX.push(CANVAS_WIDTH / 2 - elementBounds.width / 2);
+  // Canvas center - check center, left edge, and right edge for vertical center
+  const canvasCenterX = CANVAS_WIDTH / 2;
+  const canvasCenterY = CANVAS_HEIGHT / 2;
+  
+  // Vertical center alignment (element center, left edge, or right edge aligns with canvas center)
+  if (
+    Math.abs(elementCenterX - canvasCenterX) < SNAP_THRESHOLD ||
+    Math.abs(elementLeft - canvasCenterX) < SNAP_THRESHOLD ||
+    Math.abs(elementRight - canvasCenterX) < SNAP_THRESHOLD
+  ) {
+    // Snap element center to canvas center
+    snapPointsX.push(canvasCenterX - elementBounds.width / 2);
   }
-  if (Math.abs(elementCenterY - CANVAS_HEIGHT / 2) < SNAP_THRESHOLD) {
-    snapPointsY.push(CANVAS_HEIGHT / 2 - elementBounds.height / 2);
+  
+  // Horizontal center alignment (element center, top edge, or bottom edge aligns with canvas center)
+  if (
+    Math.abs(elementCenterY - canvasCenterY) < SNAP_THRESHOLD ||
+    Math.abs(elementTop - canvasCenterY) < SNAP_THRESHOLD ||
+    Math.abs(elementBottom - canvasCenterY) < SNAP_THRESHOLD
+  ) {
+    // Snap element center to canvas center
+    snapPointsY.push(canvasCenterY - elementBounds.height / 2);
   }
   // Canvas edges
   if (Math.abs(elementLeft) < SNAP_THRESHOLD) {
