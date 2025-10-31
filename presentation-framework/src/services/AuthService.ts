@@ -88,16 +88,39 @@ class AuthService {
   }
 
   /**
-   * Login with password
+   * Force refresh auth state from localStorage
+   * Useful when token is set in another window/tab
+   * Always updates the snapshot, even if token hasn't changed
    */
-  async login(password: string, remember = true): Promise<LoginResult> {
+  refreshAuthState(): void {
+    if (!this.hasWindow()) {
+      return;
+    }
+    // Force read from localStorage
+    this.resolveCachedToken();
+    const token = window.localStorage.getItem(this.TOKEN_KEY);
+    console.log('AuthService.refreshAuthState: token from localStorage:', token ? 'exists' : 'missing');
+    // Always update, even if token hasn't changed (to ensure snapshot is correct)
+    this.cachedToken = token;
+    const event = token ? { type: 'authenticated' as const, token } : { type: 'logged_out' as const };
+    console.log('AuthService.refreshAuthState: emitting event:', event.type);
+    this.emitAuthState(event);
+  }
+
+  /**
+   * Login with password
+   * @param password - The password to authenticate with
+   * @param remember - Whether to remember the token
+   * @param deckId - Optional deckId for deck-specific authentication
+   */
+  async login(password: string, remember = true, deckId?: string): Promise<LoginResult> {
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password, deckId }),
       });
 
       if (response.ok) {

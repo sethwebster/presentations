@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { ElementDefinition, GroupElementDefinition } from '@/rsc/types';
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { EditableTextElement } from './EditableTextElement';
+import { ElementContextMenu } from '../components/ElementContextMenu';
 
 const CANVAS_WIDTH = 1280;
 const CANVAS_HEIGHT = 720;
@@ -152,9 +153,10 @@ function findSnapPoints(
 interface BaseElementProps {
   element: ElementDefinition;
   slideId: string;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }
 
-export function BaseElement({ element, slideId }: BaseElementProps) {
+export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu }: BaseElementProps) {
   const elementRef = useRef<HTMLDivElement>(null);
   const state = useEditor();
   const editor = useEditorInstance();
@@ -167,6 +169,7 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
   const bounds = element.bounds || { x: 0, y: 0, width: 100, height: 50 };
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [selectedElementsInitialBounds, setSelectedElementsInitialBounds] = useState<Map<string, { x: number; y: number; width: number; height: number }>>(new Map());
   const [draggedSelectedIds, setDraggedSelectedIds] = useState<Set<string>>(new Set());
   const [isEditingText, setIsEditingText] = useState(false);
@@ -204,6 +207,24 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
     if (element.type === 'text') {
       setIsEditingText(true);
     }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Call prop handler if provided
+    if (propOnContextMenu) {
+      propOnContextMenu(e);
+      return;
+    }
+    
+    // Ensure element is selected when showing context menu
+    if (!isSelected) {
+      editor.selectElement(element.id, false);
+    }
+    
+    setContextMenu({ x: e.clientX, y: e.clientY });
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -484,6 +505,7 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
       data-element-id={element.id}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
+      onContextMenu={handleContextMenu}
       className={`
         absolute outline-none select-none
         ${isSelected ? 'border-2 border-lume-primary' : 'border-2 border-transparent'}
@@ -524,6 +546,15 @@ export function BaseElement({ element, slideId }: BaseElementProps) {
       {isSelected && (
         <SelectionHandles element={element} />
       )}
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <ElementContextMenu
+          element={element}
+          position={contextMenu}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   );
 }
@@ -534,7 +565,7 @@ function TextElementContent({ element }: { element: ElementDefinition }) {
   
   return (
     <div
-      className="w-full h-full flex items-center p-2 whitespace-pre-wrap break-words"
+      className="flex items-center w-full h-full p-2 break-words whitespace-pre-wrap"
       style={{
         fontSize: textElement.style?.fontSize || '16px',
         fontFamily: textElement.style?.fontFamily || 'inherit',
@@ -617,7 +648,7 @@ function GroupElementContent({ element }: { element: ElementDefinition }) {
   const childCount = groupElement.children?.length || 0;
   
   return (
-    <div className="w-full h-full flex items-center justify-center bg-lume-primary/10 border border-dashed border-lume-primary/50 rounded text-lume-primary text-xs font-medium">
+    <div className="flex items-center justify-center w-full h-full text-xs font-medium border border-dashed rounded bg-lume-primary/10 border-lume-primary/50 text-lume-primary">
       Group ({childCount} {childCount === 1 ? 'element' : 'elements'})
     </div>
   );
@@ -629,8 +660,13 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
   const bounds = element.bounds || { x: 0, y: 0, width: 100, height: 50 };
   const zoom = state.zoom;
   const pan = state.pan;
-  const [isResizing, setIsResizing] = useState(false);
-  const [resizeStart, setResizeStart] = useState({ 
+  const [isResizing, setIsResizing] = useState<string | false>(false);
+  const [isAltPressedDuringResize, setIsAltPressedDuringResize] = useState(false);
+  const [resizeStart, setResizeStart] = useState<{ 
+    mouseX: number; 
+    mouseY: number; 
+    initialBounds: { x: number; y: number; width: number; height: number; aspectRatio?: number } 
+  }>({ 
     mouseX: 0, 
     mouseY: 0, 
     initialBounds: { x: 0, y: 0, width: 0, height: 0 } 
@@ -655,10 +691,16 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
       height: bounds.height || 50,
     };
     
+    // Calculate initial aspect ratio for images
+    const initialAspectRatio = initialBounds.width / initialBounds.height;
+    
     setResizeStart({
       mouseX: initialMouseCanvas.x,
       mouseY: initialMouseCanvas.y,
-      initialBounds,
+      initialBounds: {
+        ...initialBounds,
+        aspectRatio: initialAspectRatio, // Store aspect ratio for images
+      },
     });
   };
 
@@ -680,6 +722,13 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
     const handleMouseMove = (e: MouseEvent) => {
       e.preventDefault();
       
+      // Check if Alt key is pressed (allows free resizing for images)
+      const isAltPressed = e.altKey;
+      setIsAltPressedDuringResize(isAltPressed);
+      
+      // Check if this is an image element
+      const isImage = element.type === 'image';
+      
       // Convert current mouse position to canvas coordinates
       const currentMouseCanvas = screenToCanvas(e.clientX, e.clientY, zoom, pan);
       
@@ -693,24 +742,309 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
       let newX = resizeStart.initialBounds.x;
       let newY = resizeStart.initialBounds.y;
 
-      // Apply resize based on handle
-      if (isResizing.includes('e')) {
-        // East handle: width increases/decreases with mouse X movement
-        newWidth = Math.max(20, resizeStart.initialBounds.width + deltaX);
+      // Handle corner handles first (they affect both X and Y)
+      // Each corner drags with its opposite corner as the origin (fixed point)
+      if (isResizing.includes('nw')) {
+        // Northwest corner: SE corner stays fixed (opposite corner)
+        // Calculate new size based on distance from SE corner
+        const seCornerX = resizeStart.initialBounds.x + resizeStart.initialBounds.width;
+        const seCornerY = resizeStart.initialBounds.y + resizeStart.initialBounds.height;
+        const newSeCornerX = seCornerX; // SE corner X stays fixed
+        const newSeCornerY = seCornerY; // SE corner Y stays fixed
+        
+        // New NW corner position is current mouse position
+        const newNwCornerX = resizeStart.initialBounds.x + deltaX;
+        const newNwCornerY = resizeStart.initialBounds.y + deltaY;
+        
+        // Calculate new width and height from fixed SE corner to new NW corner
+        newWidth = Math.max(20, newSeCornerX - newNwCornerX);
+        newHeight = Math.max(20, newSeCornerY - newNwCornerY);
+        newX = newNwCornerX;
+        newY = newNwCornerY;
+      } else if (isResizing.includes('ne')) {
+        // Northeast corner: SW corner stays fixed (opposite corner)
+        const swCornerX = resizeStart.initialBounds.x;
+        const swCornerY = resizeStart.initialBounds.y + resizeStart.initialBounds.height;
+        const newSwCornerX = swCornerX; // SW corner X stays fixed
+        const newSwCornerY = swCornerY; // SW corner Y stays fixed
+        
+        // New NE corner position
+        const newNeCornerX = resizeStart.initialBounds.x + resizeStart.initialBounds.width + deltaX;
+        const newNeCornerY = resizeStart.initialBounds.y + deltaY;
+        
+        // Calculate new width and height from fixed SW corner to new NE corner
+        newWidth = Math.max(20, newNeCornerX - newSwCornerX);
+        newHeight = Math.max(20, newSwCornerY - newNeCornerY);
+        newX = newSwCornerX; // X stays at SW corner
+        newY = newNeCornerY; // Y moves to new NE corner
+      } else if (isResizing.includes('sw')) {
+        // Southwest corner: NE corner stays fixed (opposite corner)
+        const neCornerX = resizeStart.initialBounds.x + resizeStart.initialBounds.width;
+        const neCornerY = resizeStart.initialBounds.y;
+        const newNeCornerX = neCornerX; // NE corner X stays fixed
+        const newNeCornerY = neCornerY; // NE corner Y stays fixed
+        
+        // New SW corner position
+        const newSwCornerX = resizeStart.initialBounds.x + deltaX;
+        const newSwCornerY = resizeStart.initialBounds.y + resizeStart.initialBounds.height + deltaY;
+        
+        // Calculate new width and height from fixed NE corner to new SW corner
+        newWidth = Math.max(20, newNeCornerX - newSwCornerX);
+        newHeight = Math.max(20, newSwCornerY - newNeCornerY);
+        newX = newSwCornerX; // X moves to new SW corner
+        newY = newNeCornerY; // Y stays at NE corner
+      } else if (isResizing.includes('se')) {
+        // Southeast corner: NW corner stays fixed (opposite corner)
+        const nwCornerX = resizeStart.initialBounds.x;
+        const nwCornerY = resizeStart.initialBounds.y;
+        const newNwCornerX = nwCornerX; // NW corner X stays fixed
+        const newNwCornerY = nwCornerY; // NW corner Y stays fixed
+        
+        // New SE corner position
+        const newSeCornerX = resizeStart.initialBounds.x + resizeStart.initialBounds.width + deltaX;
+        const newSeCornerY = resizeStart.initialBounds.y + resizeStart.initialBounds.height + deltaY;
+        
+        // Calculate new width and height from fixed NW corner to new SE corner
+        newWidth = Math.max(20, newSeCornerX - newNwCornerX);
+        newHeight = Math.max(20, newSeCornerY - newNwCornerY);
+        newX = newNwCornerX; // X stays at NW corner
+        newY = newNwCornerY; // Y stays at NW corner
+      } else {
+        // Edge handles - opposite edge stays fixed
+        if (isResizing.includes('e')) {
+          // East handle: West edge stays fixed
+          const fixedX = resizeStart.initialBounds.x;
+          const newEastX = resizeStart.initialBounds.x + resizeStart.initialBounds.width + deltaX;
+          newWidth = Math.max(20, newEastX - fixedX);
+          newX = fixedX; // X stays at fixed west edge
+          // Height stays the same (no Y change for horizontal edges)
+          newHeight = resizeStart.initialBounds.height;
+          newY = resizeStart.initialBounds.y;
+        }
+        if (isResizing.includes('w')) {
+          // West handle: East edge stays fixed
+          const fixedEastX = resizeStart.initialBounds.x + resizeStart.initialBounds.width;
+          const newWestX = resizeStart.initialBounds.x + deltaX;
+          newWidth = Math.max(20, fixedEastX - newWestX);
+          newX = newWestX; // X moves to new west position
+          // Height stays the same (no Y change for horizontal edges)
+          newHeight = resizeStart.initialBounds.height;
+          newY = resizeStart.initialBounds.y;
+        }
+        if (isResizing.includes('s')) {
+          // South handle: North edge stays fixed
+          const fixedY = resizeStart.initialBounds.y;
+          const newSouthY = resizeStart.initialBounds.y + resizeStart.initialBounds.height + deltaY;
+          newHeight = Math.max(20, newSouthY - fixedY);
+          newY = fixedY; // Y stays at fixed north edge
+          // Width stays the same (no X change for vertical edges)
+          newWidth = resizeStart.initialBounds.width;
+          newX = resizeStart.initialBounds.x;
+        }
+        if (isResizing.includes('n')) {
+          // North handle: South edge stays fixed
+          const fixedSouthY = resizeStart.initialBounds.y + resizeStart.initialBounds.height;
+          const newNorthY = resizeStart.initialBounds.y + deltaY;
+          newHeight = Math.max(20, fixedSouthY - newNorthY);
+          newY = newNorthY; // Y moves to new north position
+          // Width stays the same (no X change for vertical edges)
+          newWidth = resizeStart.initialBounds.width;
+          newX = resizeStart.initialBounds.x;
+        }
       }
-      if (isResizing.includes('w')) {
-        // West handle: width decreases/increases, position moves right/left
-        newWidth = Math.max(20, resizeStart.initialBounds.width - deltaX);
-        newX = resizeStart.initialBounds.x + deltaX;
-      }
-      if (isResizing.includes('s')) {
-        // South handle: height increases/decreases with mouse Y movement
-        newHeight = Math.max(20, resizeStart.initialBounds.height + deltaY);
-      }
-      if (isResizing.includes('n')) {
-        // North handle: height decreases/increases, position moves down/up
-        newHeight = Math.max(20, resizeStart.initialBounds.height - deltaY);
-        newY = resizeStart.initialBounds.y + deltaY;
+
+      // For images, maintain aspect ratio unless Alt is pressed
+      if (isImage && resizeStart.initialBounds.aspectRatio) {
+        const aspectRatio = resizeStart.initialBounds.aspectRatio;
+        const initialWidth = resizeStart.initialBounds.width;
+        const initialHeight = resizeStart.initialBounds.height;
+        const initialX = resizeStart.initialBounds.x;
+        const initialY = resizeStart.initialBounds.y;
+        
+        const isAltPressed = isAltPressedDuringResize;
+        
+        if (isAltPressed) {
+          // Alt pressed: Freeform resize - only resize along the dragged axis
+          // Keep opposite edge fixed, but don't maintain aspect ratio
+          // For images, we need to update objectFit to 'fill' so the image stretches
+          // We'll update this when the resize completes (in handleMouseUp)
+        } else {
+          // No Alt: Maintain aspect ratio and keep opposite edge fixed
+          // Determine which dimension changed and maintain aspect ratio
+          if (isResizing.includes('e') || isResizing.includes('w')) {
+            // Width changed - adjust height to maintain aspect ratio
+            newHeight = newWidth / aspectRatio;
+            
+            // Keep opposite edge fixed
+            if (isResizing.includes('e')) {
+              // East handle: West edge stays fixed, adjust Y to keep South edge fixed
+              const fixedSouthY = initialY + initialHeight;
+              newY = fixedSouthY - newHeight;
+            } else {
+              // West handle: East edge stays fixed, adjust Y to keep South edge fixed
+              const fixedEastX = initialX + initialWidth;
+              const fixedSouthY = initialY + initialHeight;
+              newX = fixedEastX - newWidth;
+              newY = fixedSouthY - newHeight;
+            }
+          } else if (isResizing.includes('s') || isResizing.includes('n')) {
+            // Height changed - adjust width to maintain aspect ratio
+            newWidth = newHeight * aspectRatio;
+            
+            // Keep opposite edge fixed AND keep center X fixed (expand equally left/right)
+            if (isResizing.includes('s')) {
+              // South handle: North edge stays fixed, keep center X fixed
+              const centerX = initialX + initialWidth / 2;
+              newX = centerX - newWidth / 2;
+              // Y stays at North edge (already set above)
+            } else {
+              // North handle: South edge stays fixed, keep center X fixed
+              const fixedSouthY = initialY + initialHeight;
+              const centerX = initialX + initialWidth / 2;
+              newX = centerX - newWidth / 2;
+              newY = fixedSouthY - newHeight;
+            }
+          } else if (isResizing.includes('nw') || isResizing.includes('ne') || 
+                   isResizing.includes('sw') || isResizing.includes('se')) {
+            // Corner handle - maintain aspect ratio with opposite corner as origin
+            // Determine which dimension changed more, then adjust the other
+            const absDeltaX = Math.abs(deltaX);
+            const absDeltaY = Math.abs(deltaY);
+            
+            // Everyone corner has an opposite corner that stays fixed
+            let fixedCornerX: number;
+            let fixedCornerY: number;
+            
+            if (isResizing.includes('nw')) {
+              // NW corner: SE corner is fixed
+              fixedCornerX = initialX + initialWidth;
+              fixedCornerY = initialY + initialHeight;
+            } else if (isResizing.includes('ne')) {
+              // NE corner: SW corner is fixed
+              fixedCornerX = initialX;
+              fixedCornerY = initialY + initialHeight;
+            } else if (isResizing.includes('sw')) {
+              // SW corner: NE corner is fixed
+              fixedCornerX = initialX + initialWidth;
+              fixedCornerY = initialY;
+            } else {
+              // SE corner: NW corner is fixed
+              fixedCornerX = initialX;
+              fixedCornerY = initialY;
+            }
+            
+            if (absDeltaX > absDeltaY) {
+              // Width change is dominant - adjust height based on new width
+              newHeight = newWidth / aspectRatio;
+              
+              // Recalculate position to keep opposite corner fixed
+              if (isResizing.includes('nw')) {
+                // NW corner: calculate from fixed SE corner
+                newX = fixedCornerX - newWidth;
+                newY = fixedCornerY - newHeight;
+              } else if (isResizing.includes('ne')) {
+                // NE corner: calculate from fixed SW corner
+                newX = fixedCornerX;
+                newY = fixedCornerY - newHeight;
+              } else if (isResizing.includes('sw')) {
+                // SW corner: calculate from fixed NE corner
+                newX = fixedCornerX - newWidth;
+                newY = fixedCornerY;
+              } else {
+                // SE corner: calculate from fixed NW corner
+                newX = fixedCornerX;
+                newY = fixedCornerY;
+              }
+            } else {
+              // Height change is dominant - adjust width based on new height
+              newWidth = newHeight * aspectRatio;
+              
+              // Recalculate position to keep opposite corner fixed
+              if (isResizing.includes('nw')) {
+                // NW corner: calculate from fixed SE corner
+                newX = fixedCornerX - newWidth;
+                newY = fixedCornerY - newHeight;
+              } else if (isResizing.includes('ne')) {
+                // NE corner: calculate from fixed SW corner
+                newX = fixedCornerX;
+                newY = fixedCornerY - newHeight;
+              } else if (isResizing.includes('sw')) {
+                // SW corner: calculate from fixed NE corner
+                newX = fixedCornerX - newWidth;
+                newY = fixedCornerY;
+              } else {
+                // SE corner: calculate from fixed NW corner
+                newX = fixedCornerX;
+                newY = fixedCornerY;
+              }
+            }
+          }
+        }
+        
+        // Ensure minimum size while maintaining aspect ratio
+        // Recalculate position from fixed corner when enforcing minimums
+        if (newWidth < 20 || newHeight < 20) {
+          if (newWidth < 20) {
+            newWidth = 20;
+            newHeight = newWidth / aspectRatio;
+          } else {
+            newHeight = 20;
+            newWidth = newHeight * aspectRatio;
+          }
+          
+          // Recalculate position from fixed corner
+          if (isResizing.includes('nw') || isResizing.includes('ne') || 
+              isResizing.includes('sw') || isResizing.includes('se')) {
+            // Corner handles - use opposite corner as fixed point
+            let fixedCornerX: number;
+            let fixedCornerY: number;
+            
+            if (isResizing.includes('nw')) {
+              fixedCornerX = initialX + initialWidth;
+              fixedCornerY = initialY + initialHeight;
+              newX = fixedCornerX - newWidth;
+              newY = fixedCornerY - newHeight;
+            } else if (isResizing.includes('ne')) {
+              fixedCornerX = initialX;
+              fixedCornerY = initialY + initialHeight;
+              newX = fixedCornerX;
+              newY = fixedCornerY - newHeight;
+            } else if (isResizing.includes('sw')) {
+              fixedCornerX = initialX + initialWidth;
+              fixedCornerY = initialY;
+              newX = fixedCornerX - newWidth;
+              newY = fixedCornerY;
+            } else {
+              fixedCornerX = initialX;
+              fixedCornerY = initialY;
+              newX = fixedCornerX;
+              newY = fixedCornerY;
+            }
+          } else {
+            // Edge handles - keep opposite edge fixed
+            if (isResizing.includes('e')) {
+              // East handle: West edge fixed, South edge fixed
+              const fixedSouthY = initialY + initialHeight;
+              newY = fixedSouthY - newHeight;
+            } else if (isResizing.includes('w')) {
+              // West handle: East edge fixed, South edge fixed
+              const fixedEastX = initialX + initialWidth;
+              const fixedSouthY = initialY + initialHeight;
+              newX = fixedEastX - newWidth;
+              newY = fixedSouthY - newHeight;
+            } else if (isResizing.includes('s')) {
+              // South handle: North edge fixed, East edge fixed
+              const fixedEastX = initialX + initialWidth;
+              newX = fixedEastX - newWidth;
+            } else if (isResizing.includes('n')) {
+              // North handle: South edge fixed, East edge fixed
+              const fixedEastX = initialX + initialWidth;
+              const fixedSouthY = initialY + initialHeight;
+              newX = fixedEastX - newWidth;
+              newY = fixedSouthY - newHeight;
+            }
+          }
+        }
       }
 
       // Store pending update
@@ -743,9 +1077,16 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
       
       // Apply any pending update immediately on mouse up
       if (pendingUpdate) {
-        editor.updateElement(element.id, {
+        const updateData: any = {
           bounds: pendingUpdate,
-        });
+        };
+        
+        // If this is an image and Alt was pressed during resize, set objectFit to 'fill' for freeform stretching
+        if (element.type === 'image' && isAltPressedDuringResize) {
+          updateData.objectFit = 'fill';
+        }
+        
+        editor.updateElement(element.id, updateData);
         pendingUpdate = null;
       }
       
@@ -754,6 +1095,9 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
         cancelAnimationFrame(rafId);
         rafId = null;
       }
+      
+      // Reset Alt key state
+      setIsAltPressedDuringResize(false);
       
       document.body.style.userSelect = '';
       document.body.style.webkitUserSelect = '';
@@ -779,7 +1123,7 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
       document.body.style.userSelect = '';
       document.body.style.webkitUserSelect = '';
     };
-  }, [isResizing, resizeStart, element.id, zoom, pan, editor]);
+  }, [isResizing, resizeStart, element.id, element.type, isAltPressedDuringResize, zoom, pan, editor]);
 
   const handleBaseClasses = "absolute w-2 h-2 bg-lume-primary border border-white rounded-sm";
 

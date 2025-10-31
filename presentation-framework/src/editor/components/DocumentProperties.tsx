@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import type { DeckMeta } from '@/rsc/types';
 
 export function DocumentProperties() {
   // Observe editor state (triggers re-render when state changes)
@@ -15,7 +16,7 @@ export function DocumentProperties() {
 
   // Memoize settings and meta to avoid creating new object references on every render
   const settings = useMemo(() => state.deck?.settings || {}, [state.deck?.settings]);
-  const meta = useMemo(() => state.deck?.meta || {}, [state.deck?.meta]);
+  const meta = useMemo(() => state.deck?.meta || ({} as Partial<DeckMeta>), [state.deck?.meta]);
 
   if (!state.deck) {
     return (
@@ -47,6 +48,60 @@ export function DocumentProperties() {
           placeholder="Describe the intent or audience"
           className="editor-textarea min-h-[90px] resize-y"
         />
+      </div>
+
+      {/* Public Visibility */}
+      <div className="space-y-2">
+        <Label className="editor-section-heading">Public Visibility</Label>
+        <label className="flex items-center gap-3 text-sm text-[var(--editor-text-muted)]">
+          <input
+            type="checkbox"
+            checked={meta.public || false}
+            onChange={(e) => editor.updateDeckMeta({ public: e.target.checked })}
+            className="editor-checkbox"
+          />
+          Make this presentation public
+        </label>
+        <p className="text-xs text-[var(--editor-text-muted)]">
+          When public, your presentation will be visible on your profile page at /u/[your-username]
+        </p>
+      </div>
+
+      {/* Presenter Password */}
+      <div className="space-y-2">
+        <Label className="editor-section-heading">Presenter Password</Label>
+        <p className="text-xs text-[var(--editor-text-muted)] mb-2">
+          Set a password to control this presentation. Leave empty to disable presenter mode.
+        </p>
+        <Input
+          type="password"
+          value={meta.presenterPasswordHash ? '••••••••' : ''}
+          onChange={async (e) => {
+            const password = e.target.value;
+            if (password) {
+              // Hash the password before storing
+              const encoder = new TextEncoder();
+              const data = encoder.encode(password);
+              const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+              const hashArray = Array.from(new Uint8Array(hashBuffer));
+              const hash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+              editor.updateDeckMeta({ presenterPasswordHash: hash });
+            } else {
+              // Clear password if empty
+              editor.updateDeckMeta({ presenterPasswordHash: undefined });
+            }
+          }}
+          placeholder={meta.presenterPasswordHash ? "Enter new password to change" : "Set presenter password"}
+          className="editor-input"
+        />
+        {meta.presenterPasswordHash && (
+          <button
+            onClick={() => editor.updateDeckMeta({ presenterPasswordHash: undefined })}
+            className="text-xs text-[var(--editor-text-muted)] hover:text-[var(--editor-text)] underline"
+          >
+            Clear password
+          </button>
+        )}
       </div>
 
       {/* Slide Size */}
@@ -114,8 +169,8 @@ export function DocumentProperties() {
                 value={settings.slideSize?.width || 1280}
                 onChange={(e) => editor.updateDeckSettings({
                   slideSize: {
-                    ...settings.slideSize,
                     width: parseInt(e.target.value) || 1280,
+                    height: settings.slideSize?.height || 720,
                     preset: 'custom',
                     units: 'pixels',
                   },
@@ -130,7 +185,7 @@ export function DocumentProperties() {
                 value={settings.slideSize?.height || 720}
                 onChange={(e) => editor.updateDeckSettings({
                   slideSize: {
-                    ...settings.slideSize,
+                    width: settings.slideSize?.width || 1280,
                     height: parseInt(e.target.value) || 720,
                     preset: 'custom',
                     units: 'pixels',
@@ -162,9 +217,9 @@ export function DocumentProperties() {
       <div className="space-y-2">
         <Label className="editor-section-heading">Default Background</Label>
         <ColorPicker
-          value={settings.defaultBackground || '#ffffff'}
+          value={typeof settings.defaultBackground === 'string' ? settings.defaultBackground : '#ffffff'}
           onChange={(value) => editor.updateDeckSettings({
-            defaultBackground: value,
+            defaultBackground: typeof value === 'string' ? value : '#ffffff',
           })}
         />
       </div>
@@ -179,7 +234,12 @@ export function DocumentProperties() {
               checked={settings.presentation?.loop || false}
               onChange={(e) => editor.updateDeckSettings({
                 presentation: {
+                  ...settings.presentation,
                   loop: e.target.checked,
+                  autoAdvance: settings.presentation?.autoAdvance || false,
+                  skipHiddenSlides: settings.presentation?.skipHiddenSlides || false,
+                  showSlideNumbers: settings.presentation?.showSlideNumbers || false,
+                  showPresenterNotes: settings.presentation?.showPresenterNotes || false,
                 },
               })}
               className="editor-checkbox"
@@ -192,7 +252,12 @@ export function DocumentProperties() {
               checked={settings.presentation?.autoAdvance || false}
               onChange={(e) => editor.updateDeckSettings({
                 presentation: {
+                  ...settings.presentation,
                   autoAdvance: e.target.checked,
+                  loop: settings.presentation?.loop || false,
+                  skipHiddenSlides: settings.presentation?.skipHiddenSlides || false,
+                  showSlideNumbers: settings.presentation?.showSlideNumbers || false,
+                  showPresenterNotes: settings.presentation?.showPresenterNotes || false,
                 },
               })}
               className="editor-checkbox"
@@ -211,7 +276,13 @@ export function DocumentProperties() {
                 value={settings.presentation?.autoAdvanceDelay || 5}
                 onChange={(e) => editor.updateDeckSettings({
                   presentation: {
+                    ...settings.presentation,
                     autoAdvanceDelay: parseInt(e.target.value) || 5,
+                    autoAdvance: settings.presentation?.autoAdvance || false,
+                    loop: settings.presentation?.loop || false,
+                    skipHiddenSlides: settings.presentation?.skipHiddenSlides || false,
+                    showSlideNumbers: settings.presentation?.showSlideNumbers || false,
+                    showPresenterNotes: settings.presentation?.showPresenterNotes || false,
                   },
                 })}
                 className="editor-input h-9"
@@ -224,7 +295,12 @@ export function DocumentProperties() {
               checked={settings.presentation?.showSlideNumbers || false}
               onChange={(e) => editor.updateDeckSettings({
                 presentation: {
+                  ...settings.presentation,
                   showSlideNumbers: e.target.checked,
+                  loop: settings.presentation?.loop || false,
+                  autoAdvance: settings.presentation?.autoAdvance || false,
+                  skipHiddenSlides: settings.presentation?.skipHiddenSlides || false,
+                  showPresenterNotes: settings.presentation?.showPresenterNotes || false,
                 },
               })}
               className="editor-checkbox"

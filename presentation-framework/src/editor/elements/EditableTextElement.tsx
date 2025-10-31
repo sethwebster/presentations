@@ -58,16 +58,16 @@ export function EditableTextElement({ element, onBlur }: EditableTextElementProp
           border: 'none',
           outline: '2px solid var(--lume-primary)',
           padding: '8px',
-          fontSize: element.style?.fontSize || '16px',
-          fontFamily: element.style?.fontFamily || 'inherit',
-          color: element.style?.color || '#000000',
-          fontWeight: element.style?.fontWeight || 'normal',
-          fontStyle: element.style?.fontStyle || 'normal',
-          textAlign: element.style?.textAlign || 'left',
+          fontSize: (typeof element.style?.fontSize === 'string' ? element.style.fontSize : '16px'),
+          fontFamily: (typeof element.style?.fontFamily === 'string' ? element.style.fontFamily : 'inherit'),
+          color: (typeof element.style?.color === 'string' ? element.style.color : '#000000'),
+          fontWeight: (typeof element.style?.fontWeight === 'string' ? element.style.fontWeight : 'normal'),
+          fontStyle: (typeof element.style?.fontStyle === 'string' ? element.style.fontStyle : 'normal'),
+          textAlign: (typeof element.style?.textAlign === 'string' ? element.style.textAlign : 'left') as React.CSSProperties['textAlign'],
           background: 'transparent',
           resize: 'none',
           overflow: 'hidden',
-        }}
+        } as React.CSSProperties}
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
       />
@@ -83,14 +83,14 @@ export function EditableTextElement({ element, onBlur }: EditableTextElementProp
         display: 'flex',
         alignItems: 'center',
         padding: '8px',
-        fontSize: element.style?.fontSize || '16px',
-        fontFamily: element.style?.fontFamily || 'inherit',
-        color: element.style?.color || '#000000',
-        fontWeight: element.style?.fontWeight || 'normal',
+        fontSize: (typeof element.style?.fontSize === 'string' ? element.style.fontSize : '16px'),
+        fontFamily: (typeof element.style?.fontFamily === 'string' ? element.style.fontFamily : 'inherit'),
+        color: (typeof element.style?.color === 'string' ? element.style.color : '#000000'),
+        fontWeight: (typeof element.style?.fontWeight === 'string' ? element.style.fontWeight : 'normal'),
         cursor: 'text',
         whiteSpace: 'pre-wrap',
         wordBreak: 'break-word',
-      }}
+      } as React.CSSProperties}
     >
       {content || 'Text'}
     </div>

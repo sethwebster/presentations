@@ -10,11 +10,12 @@ interface ToolbarProps {
   onToggleTimeline: () => void;
 }
 
-export function Toolbar({ onToggleTimeline }: ToolbarProps) {
+export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
   const state = useEditor();
   const editor = useEditorInstance();
   
   const showGrid = state.showGrid;
+  const deck = state.deck;
   const currentSlideIndex = state.currentSlideIndex;
   const selectedElementIds = state.selectedElementIds;
   const autosaveEnabled = state.autosaveEnabled;
@@ -41,93 +42,202 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
   // Process image files
   const processImageFiles = useCallback((files: File[]) => {
     files.forEach((file) => {
-      if (!file || file.size === 0) return;
-      
+      if (!file || file.size === 0) {
+        console.error('Invalid file:', { name: file?.name, size: file?.size });
+        return;
+      }
+
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        console.error('File is not an image:', { name: file.name, type: file.type });
+        return;
+      }
+
       // Convert file to base64 data URL for persistence
       const reader = new FileReader();
       reader.onload = (e) => {
         const originalDataUrl = e.target?.result as string;
-        if (!originalDataUrl) {
-          console.error('Failed to read image file');
+        if (!originalDataUrl || typeof originalDataUrl !== 'string') {
+          console.error('Failed to read image file:', { 
+            fileName: file.name, 
+            fileType: file.type,
+            hasResult: !!e.target?.result,
+            resultType: typeof e.target?.result 
+          });
+          return;
+        }
+
+        // Validate data URL format
+        if (!originalDataUrl.startsWith('data:image/')) {
+          console.error('Invalid data URL format:', {
+            fileName: file.name,
+            prefix: originalDataUrl.substring(0, 20),
+          });
           return;
         }
         
-        // Load image to get dimensions and compress
+        // Use createObjectURL instead of data URL for loading the image
+        // This avoids CSP/data URL issues and is more efficient
+        // We'll still convert to data URL for storage after processing
+        const objectUrl = URL.createObjectURL(file);
         const img = new Image();
+        let loadTimeout: ReturnType<typeof setTimeout> | null = null;
+        
         img.onload = () => {
-          // Calculate size maintaining aspect ratio, max 800px width or height for storage
-          // (larger than display size to maintain quality, but small enough to fit in KV)
-          const maxStorageSize = 800;
-          let displayWidth = img.width;
-          let displayHeight = img.height;
-          let storageWidth = img.width;
-          let storageHeight = img.height;
-          
-          // Calculate display size (max 400px)
-          const maxDisplaySize = 400;
-          if (displayWidth > maxDisplaySize || displayHeight > maxDisplaySize) {
-            const ratio = Math.min(maxDisplaySize / displayWidth, maxDisplaySize / displayHeight);
-            displayWidth = displayWidth * ratio;
-            displayHeight = displayHeight * ratio;
+          // Clear timeout if image loads successfully
+          if (loadTimeout) {
+            clearTimeout(loadTimeout);
+            loadTimeout = null;
           }
           
-          // Calculate storage size (max 800px, but use display size if smaller)
-          if (storageWidth > maxStorageSize || storageHeight > maxStorageSize) {
-            const ratio = Math.min(maxStorageSize / storageWidth, maxStorageSize / storageHeight);
-            storageWidth = storageWidth * ratio;
-            storageHeight = storageHeight * ratio;
+          try {
+            // Validate image dimensions
+            if (img.width === 0 || img.height === 0 || !isFinite(img.width) || !isFinite(img.height)) {
+              console.error('Invalid image dimensions:', {
+                fileName: file.name,
+                width: img.width,
+                height: img.height,
+              });
+              URL.revokeObjectURL(objectUrl);
+              return;
+            }
+
+            // Calculate size maintaining aspect ratio, max 800px width or height for storage
+            // (larger than display size to maintain quality, but small enough to fit in KV)
+            const maxStorageSize = 800;
+            let displayWidth = img.width;
+            let displayHeight = img.height;
+            let storageWidth = img.width;
+            let storageHeight = img.height;
+            
+            // Calculate display size (max 400px)
+            const maxDisplaySize = 400;
+            if (displayWidth > maxDisplaySize || displayHeight > maxDisplaySize) {
+              const ratio = Math.min(maxDisplaySize / displayWidth, maxDisplaySize / displayHeight);
+              displayWidth = displayWidth * ratio;
+              displayHeight = displayHeight * ratio;
+            }
+            
+            // Calculate storage size (max 800px, but use display size if smaller)
+            if (storageWidth > maxStorageSize || storageHeight > maxStorageSize) {
+              const ratio = Math.min(maxStorageSize / storageWidth, maxStorageSize / storageHeight);
+              storageWidth = storageWidth * ratio;
+              storageHeight = storageHeight * ratio;
+            }
+            
+            // Use display size for storage if it's smaller (save space)
+            if (displayWidth < storageWidth) {
+              storageWidth = displayWidth;
+              storageHeight = displayHeight;
+            }
+            
+            // Compress image by drawing to canvas at reduced size
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(storageWidth);
+            canvas.height = Math.round(storageHeight);
+            const ctx = canvas.getContext('2d');
+            
+            if (!ctx) {
+              console.error('Failed to get canvas context');
+              URL.revokeObjectURL(objectUrl);
+              return;
+            }
+            
+            // Draw image to canvas (this resizes it)
+            ctx.drawImage(img, 0, 0, storageWidth, storageHeight);
+            
+            // Convert to compressed base64 (JPEG with 0.85 quality)
+            // Use JPEG for better compression, PNG only if original was PNG and is small
+            const useJpeg = file.type !== 'image/png' || file.size > 100000; // Use JPEG for large PNGs too
+            const mimeType = useJpeg ? 'image/jpeg' : 'image/png';
+            const quality = useJpeg ? 0.85 : undefined;
+            
+            const compressedDataUrl = canvas.toDataURL(mimeType, quality);
+            
+            // Clean up object URL
+            URL.revokeObjectURL(objectUrl);
+            
+            if (!compressedDataUrl || compressedDataUrl.length === 0) {
+              console.error('Failed to compress image - canvas.toDataURL returned empty result');
+              return;
+            }
+            
+            // Center the image on canvas
+            const x = (1280 - displayWidth) / 2;
+            const y = (720 - displayHeight) / 2;
+            
+            const imageElement = {
+              id: `image-${Date.now()}`,
+              type: 'image' as const,
+              src: compressedDataUrl, // Store as compressed base64 data URL
+              alt: file.name,
+              bounds: { x, y, width: displayWidth, height: displayHeight },
+              objectFit: 'contain' as const,
+            };
+            
+            editor.addElement(imageElement, currentSlideIndex);
+          } catch (error) {
+            URL.revokeObjectURL(objectUrl);
+            console.error('Error processing image:', error, {
+              fileName: file.name,
+              fileType: file.type,
+              fileSize: file.size,
+              imageWidth: img.width,
+              imageHeight: img.height,
+              errorMessage: error instanceof Error ? error.message : String(error),
+            });
           }
-          
-          // Use display size for storage if it's smaller (save space)
-          if (displayWidth < storageWidth) {
-            storageWidth = displayWidth;
-            storageHeight = displayHeight;
-          }
-          
-          // Compress image by drawing to canvas at reduced size
-          const canvas = document.createElement('canvas');
-          canvas.width = storageWidth;
-          canvas.height = storageHeight;
-          const ctx = canvas.getContext('2d');
-          
-          if (!ctx) {
-            console.error('Failed to get canvas context');
-            return;
-          }
-          
-          // Draw image to canvas (this resizes it)
-          ctx.drawImage(img, 0, 0, storageWidth, storageHeight);
-          
-          // Convert to compressed base64 (JPEG with 0.85 quality)
-          // Use JPEG for better compression, PNG only if original was PNG and is small
-          const useJpeg = file.type !== 'image/png' || file.size > 100000; // Use JPEG for large PNGs too
-          const mimeType = useJpeg ? 'image/jpeg' : 'image/png';
-          const quality = useJpeg ? 0.85 : undefined;
-          
-          const compressedDataUrl = canvas.toDataURL(mimeType, quality);
-          
-          // Center the image on canvas
-          const x = (1280 - displayWidth) / 2;
-          const y = (720 - displayHeight) / 2;
-          
-          const imageElement = {
-            id: `image-${Date.now()}`,
-            type: 'image' as const,
-            src: compressedDataUrl, // Store as compressed base64 data URL
-            alt: file.name,
-            bounds: { x, y, width: displayWidth, height: displayHeight },
-            objectFit: 'contain' as const,
-          };
-          
-          editor.addElement(imageElement, currentSlideIndex);
         };
-        img.onerror = (err) => {
-          console.error('Error loading image:', err);
+        img.onerror = (event) => {
+          // Clear timeout on error
+          if (loadTimeout) {
+            clearTimeout(loadTimeout);
+            loadTimeout = null;
+          }
+          
+          URL.revokeObjectURL(objectUrl);
+          console.error('Error loading image:', {
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size,
+            dataUrlLength: originalDataUrl?.length,
+            dataUrlPrefix: originalDataUrl?.substring(0, 50),
+            event: event,
+            errorEvent: event instanceof ErrorEvent ? {
+              message: event.message,
+              filename: event.filename,
+              lineno: event.lineno,
+              colno: event.colno,
+            } : null,
+          });
         };
-        img.src = originalDataUrl;
+        
+        // Set a timeout to detect if image fails to load (10 seconds)
+        loadTimeout = setTimeout(() => {
+          URL.revokeObjectURL(objectUrl);
+          console.error('Image load timeout:', {
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size,
+          });
+        }, 10000);
+        
+        // Use object URL instead of data URL for loading
+        img.src = objectUrl;
       };
-      reader.onerror = (err) => {
-        console.error('Error reading file:', err);
+      reader.onerror = (event) => {
+        console.error('Error reading file:', {
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          event: event,
+          errorEvent: event instanceof ErrorEvent ? {
+            message: event.message,
+            filename: event.filename,
+            lineno: event.lineno,
+            colno: event.colno,
+          } : null,
+        });
       };
       reader.readAsDataURL(file);
     });
@@ -437,8 +547,71 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
         </div>
       )}
 
-      {/* Save Button */}
+      {/* Right Side Actions */}
       <div className="flex items-center gap-2 ml-auto pr-4 border-r border-[var(--editor-border)]">
+        {/* Play Button - Before Autosave */}
+        <ToolbarButton 
+          title="Play Presentation" 
+          onClick={async () => {
+            // Auto-authenticate when coming from editor
+            // Check if deck has a presenter password set
+            const deckPasswordHash = deck?.meta?.presenterPasswordHash;
+            
+            // Check if we have a presenter token, if not try to auto-authenticate
+            let token = localStorage.getItem('lume-presenter-token');
+            if (!token && deckPasswordHash) {
+              // Deck has a password set, but we can't auto-authenticate without the password
+              // The user will need to enter it in the presentation view
+              console.log('⚠️ Deck has presenter password set. User will need to enter password in presentation view.');
+            } else if (!token) {
+              // No deck password and no token - try global fallback for backwards compatibility
+              try {
+                // @ts-ignore - process.env types don't include custom env vars
+                const nextPublicSecret = typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_LUME_CONTROL_SECRET;
+                
+                if (nextPublicSecret) {
+                  console.log('Attempting auto-authentication with global secret...');
+                  const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: nextPublicSecret, deckId }),
+                  });
+                  if (response.ok) {
+                    const data = await response.json();
+                    if (data.token) {
+                      localStorage.setItem('lume-presenter-token', data.token);
+                      token = data.token;
+                      console.log('✅ Auto-authenticated successfully');
+                      // Trigger a storage event so AuthService in new window picks it up
+                      window.dispatchEvent(new StorageEvent('storage', {
+                        key: 'lume-presenter-token',
+                        newValue: data.token,
+                        storageArea: localStorage,
+                      }));
+                    }
+                  } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    console.warn('Auto-authentication failed:', response.status, errorData);
+                  }
+                }
+              } catch (err) {
+                console.warn('Auto-authentication error:', err);
+              }
+            } else {
+              console.log('✅ Already authenticated with existing token');
+            }
+            // Small delay to ensure localStorage is synced across windows
+            await new Promise(resolve => setTimeout(resolve, 100));
+            // Navigate to presentation mode with deckId and autoAuth parameters
+            // The token is set in localStorage, which is shared across windows on the same origin
+            window.open(`/present/${deckId}?deckId=${deckId}&autoAuth=true`, '_blank');
+          }}
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+            <polygon points="5 3 19 12 5 21 5 3" />
+          </svg>
+        </ToolbarButton>
+        {/* Save Button */}
         <ToolbarButton
           title={autosaveEnabled ? "Autosave ON - Click to disable (Cmd/Ctrl+S to save)" : "Autosave OFF - Click to enable (Cmd/Ctrl+S to save)"}
           onClick={() => editor.toggleAutosave()}
@@ -479,21 +652,6 @@ export function Toolbar({ onToggleTimeline }: ToolbarProps) {
         <ToolbarButton title="Toggle Timeline" onClick={onToggleTimeline}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-          </svg>
-        </ToolbarButton>
-      </div>
-
-      {/* Play Button - Top Right */}
-      <div className="ml-auto flex items-center gap-2">
-        <ToolbarButton 
-          title="Play Presentation" 
-          onClick={() => {
-            // Navigate to presentation mode
-            window.open(`/present/${deckId}`, '_blank');
-          }}
-        >
-          <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-            <polygon points="5 3 19 12 5 21 5 3" />
           </svg>
         </ToolbarButton>
       </div>

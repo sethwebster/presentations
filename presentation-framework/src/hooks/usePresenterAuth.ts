@@ -14,8 +14,8 @@ export function usePresenterAuth(): UsePresenterAuthReturn {
   );
   const [showWelcomeToast, setShowWelcomeToast] = useState<boolean>(false);
 
-  const login = useCallback(async (password: string, remember: boolean = true): Promise<{ success: boolean; error?: string }> => {
-    const result = await authService.login(password, remember);
+  const login = useCallback(async (password: string, remember: boolean = true, deckId?: string): Promise<{ success: boolean; error?: string }> => {
+    const result = await authService.login(password, remember, deckId);
 
     if (result.success) {
       setShowWelcomeToast(true);

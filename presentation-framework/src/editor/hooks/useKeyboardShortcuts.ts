@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useEditor, useEditorInstance } from './useEditor';
 
 export function useKeyboardShortcuts() {
   const state = useEditor();
   const editor = useEditorInstance();
+  const router = useRouter();
+  const lastEscapeTime = useRef<number>(0);
+  const DOUBLE_ESCAPE_THRESHOLD_MS = 500;
   
   const selectedElementIds = state.selectedElementIds;
 
@@ -81,8 +85,22 @@ export function useKeyboardShortcuts() {
         return;
       }
 
-      // Escape - Close opened group or clear selection
+      // Escape - Close opened group, clear selection, or navigate home on double-escape
       if (e.key === 'Escape') {
+        const now = Date.now();
+        const timeSinceLastEscape = now - lastEscapeTime.current;
+        
+        // Check for double-escape (within threshold)
+        if (timeSinceLastEscape < DOUBLE_ESCAPE_THRESHOLD_MS && timeSinceLastEscape > 0) {
+          // Double escape - navigate to home
+          e.preventDefault();
+          router.push('/');
+          lastEscapeTime.current = 0; // Reset to prevent triple-escape
+          return;
+        }
+        
+        // Single escape - normal behavior
+        lastEscapeTime.current = now;
         if (state.openedGroupId) {
           editor.closeGroup();
           editor.clearSelection();
@@ -168,6 +186,6 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedElementIds, state.deck, state.currentSlideIndex, state.openedGroupId, editor]);
+  }, [selectedElementIds, state.deck, state.currentSlideIndex, state.openedGroupId, editor, router]);
 }
 

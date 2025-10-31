@@ -78,8 +78,24 @@ export function SlideProperties() {
         <ColorPicker
           value={getBackgroundValue()}
           onChange={(value) => {
+            // Convert ColorPicker value to slide background format
+            // ColorPicker returns: string for colors, or { type: 'linear'|'radial', angle: number, stops: Array } for gradients
+            let backgroundValue: string | { type: 'color' | 'gradient' | 'image' | 'video'; value: string | object; opacity?: number };
+            
+            if (typeof value === 'string') {
+              backgroundValue = value;
+            } else if (value && typeof value === 'object') {
+              // Gradient object from ColorPicker
+              backgroundValue = {
+                type: 'gradient',
+                value: value,
+              };
+            } else {
+              backgroundValue = '#ffffff';
+            }
+            
             editor.updateSlide(selectedSlideId, {
-              background: value,
+              background: backgroundValue,
             });
           }}
         />

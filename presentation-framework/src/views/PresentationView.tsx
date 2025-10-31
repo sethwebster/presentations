@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { Presentation } from '../Presentation';
 import { loadPresentation } from '@/presentations';
 import type { PresentationModule, PresentationConfig, SlideData } from '../types/presentation';
@@ -9,6 +9,7 @@ import { exportSlidesAsLume, downloadLumeArchive } from '../services/LumePackage
 import { fetchDeckDefinition } from '../rsc/client';
 import type { DeckDefinition } from '../rsc/types';
 import { deckDefinitionToPresentation, createPresentationModuleFromDeck } from '../rsc/bridge';
+import { authService } from '../services/AuthService';
 
 interface PresentationState {
   slides: SlideData[];
@@ -18,7 +19,25 @@ interface PresentationState {
 
 export function PresentationView() {
   const params = useParams<{ presentationName: string }>();
+  const searchParams = useSearchParams();
   const presentationName = params?.presentationName;
+  
+  // Check for deckId in URL query params (for editor decks)
+  const deckId = searchParams?.get('deckId');
+  const autoAuth = searchParams?.get('autoAuth') === 'true';
+
+  // Auto-authenticate if coming from editor - MUST happen synchronously before React renders
+  // The token should already be set in localStorage by the Toolbar before opening this window
+  // Force AuthService to immediately check localStorage and update its state
+  if (autoAuth && typeof window !== 'undefined') {
+    // Call synchronously before any React hooks run
+    const token = localStorage.getItem('lume-presenter-token');
+    console.log('PresentationView: autoAuth=true, token exists:', !!token);
+    authService.refreshAuthState();
+    // Double-check after refresh
+    const isAuth = authService.isAuthenticated();
+    console.log('PresentationView: After refreshAuthState, isAuthenticated:', isAuth);
+  }
 
   const [presentation, setPresentation] = useState<PresentationState | null>(null);
   const [presentationModule, setPresentationModule] = useState<PresentationModule | null>(null);
@@ -30,14 +49,18 @@ export function PresentationView() {
   const [exportFeedback, setExportFeedback] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!presentationName) {
+
+    // If deckId is provided, use it as the presentation name; otherwise use presentationName from params
+    const effectivePresentationName = deckId || presentationName;
+    
+    if (!effectivePresentationName) {
       setError('Presentation not found');
       setLoading(false);
       return;
     }
 
     let cancelled = false;
-    const assetsDir = `/presentations/${presentationName}-assets`;
+    const assetsDir = deckId ? `/presentations/${deckId}-assets` : `/presentations/${presentationName}-assets`;
     setAssetsPath(assetsDir);
 
     const loadPresentationData = async () => {
@@ -46,11 +69,13 @@ export function PresentationView() {
       let lastModuleError: unknown = null;
       let lastRscError: unknown = null;
 
-      try {
-        const module = await loadPresentation(presentationName);
+      // Only try to load module if not using deckId (editor decks don't have modules)
+      if (!deckId) {
+        try {
+          const presentationModule = await loadPresentation(presentationName);
         if (!cancelled) {
-          setPresentationModule(module as PresentationModule);
-          const { getSlides, getBrandLogo, presentationConfig, customStyles } = module as PresentationModule;
+          setPresentationModule(presentationModule as PresentationModule);
+          const { getSlides, getBrandLogo, presentationConfig, customStyles } = presentationModule as PresentationModule;
           const slides = getSlides(assetsDir);
           const config: PresentationConfig = {
             ...(presentationConfig ?? {}),
@@ -67,14 +92,16 @@ export function PresentationView() {
           moduleLoaded = true;
           setError(null);
         }
-      } catch (moduleError) {
-        lastModuleError = moduleError;
-        console.warn('Presentation module load failed:', moduleError);
+        } catch (moduleError) {
+          lastModuleError = moduleError;
+          console.warn('Presentation module load failed:', moduleError);
+        }
       }
 
-      const rscUrl = `/api/rsc/${presentationName}`;
+      // Try loading from editor API if deckId is provided, otherwise try RSC API
+      const apiUrl = deckId ? `/api/editor/${deckId}` : `/api/rsc/${presentationName}`;
       try {
-        const deck = await fetchDeckDefinition(rscUrl);
+        const deck = await fetchDeckDefinition(apiUrl);
         if (!cancelled) {
           setDeckDefinition(deck);
           deckLoaded = true;
@@ -84,7 +111,7 @@ export function PresentationView() {
         }
       } catch (rscError) {
         lastRscError = rscError;
-        console.warn('RSC deck load failed:', rscError);
+        console.warn(`${deckId ? 'Editor' : 'RSC'} deck load failed:`, rscError);
       }
 
       if (!cancelled && !moduleLoaded && !deckLoaded) {
@@ -107,7 +134,7 @@ export function PresentationView() {
     return () => {
       cancelled = true;
     };
-  }, [presentationName]);
+  }, [presentationName, deckId, autoAuth]);
 
   const injectedStyles = useMemo(() => {
     const blocks: string[] = [];

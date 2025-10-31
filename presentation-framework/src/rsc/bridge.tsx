@@ -15,6 +15,7 @@ import type {
   GroupElementDefinition,
   CustomElementDefinition,
   AnimationDefinition,
+  ImageElementDefinition,
 } from './types';
 import type { SlideData, PresentationConfig, PresentationModule } from '../types/presentation';
 import { renderCustomComponent } from './components/custom';
@@ -109,11 +110,45 @@ function extractTimelineTargets(timeline?: SlideDefinition['timeline']): Set<str
 }
 
 function renderSlide(slide: SlideDefinition, assetsBase?: string, timelineTargets?: Set<string>): ReactNode {
+  // Helper to convert gradient object to CSS string
+  const gradientToCSS = (grad: any): string => {
+    if (!grad || typeof grad !== 'object') return '#ffffff';
+    if (grad.type === 'linear') {
+      const stops = grad.stops?.map((s: any) => `${s.color} ${s.position}%`).join(', ') || '';
+      return `linear-gradient(${grad.angle || 0}deg, ${stops})`;
+    }
+    if (grad.type === 'radial') {
+      const stops = grad.stops?.map((s: any) => `${s.color} ${s.position}%`).join(', ') || '';
+      return `radial-gradient(${stops})`;
+    }
+    return '#ffffff';
+  };
+
+  // Get background value
+  let backgroundValue: string | undefined;
+  if (slide.background) {
+    if (typeof slide.background === 'string') {
+      backgroundValue = slide.background;
+    } else if (slide.background.type === 'color') {
+      backgroundValue = slide.background.value as string;
+    } else if (slide.background.type === 'gradient') {
+      backgroundValue = gradientToCSS(slide.background.value);
+    }
+  } else if (slide.style?.background) {
+    const bg = slide.style.background;
+    if (typeof bg === 'string') {
+      backgroundValue = bg;
+    } else {
+      backgroundValue = gradientToCSS(bg);
+    }
+  }
+
   const slideStyle: CSSProperties = {
     position: 'relative',
     width: '1280px',
     height: '720px',
     overflow: 'hidden',
+    ...(backgroundValue ? { background: backgroundValue } : {}),
   };
   (slideStyle as Record<string, unknown>).viewTransitionName = `slide-${slide.id}`;
 
@@ -129,10 +164,7 @@ function renderSlide(slide: SlideDefinition, assetsBase?: string, timelineTarget
 }
 
 function extractLayerList(slide: SlideDefinition): LayerDefinition[] {
-  if (Array.isArray(slide.layers) && slide.layers.length > 0) {
-    return slide.layers;
-  }
-
+  // First, check if inline elements exist (elements added directly to slide)
   const inlineElements = (slide as SlideDefinition & { elements?: ElementDefinition[] }).elements;
   if (Array.isArray(inlineElements) && inlineElements.length > 0) {
     return [
@@ -142,6 +174,17 @@ function extractLayerList(slide: SlideDefinition): LayerDefinition[] {
         elements: inlineElements,
       },
     ];
+  }
+
+  // If no inline elements, check layers
+  if (Array.isArray(slide.layers)) {
+    // Filter to only layers that have elements
+    const layersWithElements = slide.layers.filter(layer => 
+      Array.isArray(layer.elements) && layer.elements.length > 0
+    );
+    if (layersWithElements.length > 0) {
+      return layersWithElements;
+    }
   }
 
   return [];
@@ -178,6 +221,17 @@ function renderElement(element: ElementDefinition, assetsBase?: string, timeline
       return renderTableElement(element, assetsBase, skipCssAnimation);
     case 'media':
       return renderMediaElement(element, assetsBase, skipCssAnimation);
+    case 'image': {
+      // Convert image element to media element for rendering
+      const imageElement = element as ImageElementDefinition;
+      const mediaElement: MediaElementDefinition = {
+        ...imageElement,
+        type: 'media',
+        mediaType: 'image',
+        src: imageElement.src || '',
+      };
+      return renderMediaElement(mediaElement, assetsBase, skipCssAnimation);
+    }
     case 'shape':
       return renderShapeElement(element, assetsBase, skipCssAnimation);
     case 'chart':

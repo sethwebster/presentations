@@ -20,6 +20,29 @@ export function HomePage() {
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState(false);
   const [liveDecks, setLiveDecks] = useState<Set<string>>(new Set());
+  const [editorDecks, setEditorDecks] = useState<Array<{
+    id: string;
+    title: string;
+    createdAt: string;
+    updatedAt: string;
+    slideCount: number;
+  }>>([]);
+
+  // Load editor-created decks
+  useEffect(() => {
+    const loadEditorDecks = async () => {
+      try {
+        const response = await fetch('/api/editor/list');
+        if (response.ok) {
+          const decks = await response.json();
+          setEditorDecks(decks);
+        }
+      } catch (err) {
+        console.error('Failed to load editor decks:', err);
+      }
+    };
+    loadEditorDecks();
+  }, []);
 
   // Preload all presentations on mount (delegate to PresentationLoaderService)
   useEffect(() => {
@@ -267,10 +290,129 @@ export function HomePage() {
               </Card>
             );
           })}
+
+          {/* Editor-created decks */}
+          {editorDecks.map((deck) => {
+            const isHovered = hoveredCard === `editor-${deck.id}`;
+
+            return (
+              <Card
+                key={`editor-${deck.id}`}
+                onMouseEnter={(e) => {
+                  setHoveredCard(`editor-${deck.id}`);
+                  e.currentTarget.style.background = 'rgba(22, 194, 199, 0.05)';
+                  e.currentTarget.style.borderColor = 'var(--lume-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  setHoveredCard(null);
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
+                  e.currentTarget.style.borderColor = 'rgba(236, 236, 236, 0.1)';
+                }}
+                className="group cursor-pointer overflow-hidden transition-all duration-300 hover:scale-[1.02]"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  borderColor: 'rgba(236, 236, 236, 0.1)',
+                }}
+              >
+                <CardContent className="p-0">
+                  {/* Thumbnail placeholder for editor decks */}
+                  <div className="w-full aspect-video flex items-center justify-center"
+                       style={{ background: 'rgba(255, 255, 255, 0.03)' }}>
+                    <div className="text-4xl opacity-20">
+                      {deck.title.charAt(0).toUpperCase()}
+                    </div>
+                  </div>
+
+                  {/* Card footer */}
+                  <div className="p-6">
+                    <div className="mb-3">
+                      <h3 className="text-xl font-medium mb-2" style={{ color: 'var(--lume-mist)' }}>
+                        {deck.title}
+                      </h3>
+                      <p className="text-sm opacity-50">
+                        {deck.slideCount} {deck.slideCount === 1 ? 'slide' : 'slides'}
+                      </p>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/present/${deck.id}?deckId=${deck.id}&viewer=true`);
+                        }}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all hover:scale-105 cursor-pointer"
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          color: 'var(--lume-mist)',
+                        }}
+                        title="Watch presentation"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
+                          <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                        <span className="text-sm">Watch</span>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/editor/${deck.id}`);
+                        }}
+                        className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all hover:scale-105 cursor-pointer"
+                        style={{
+                          background: 'rgba(200, 75, 210, 0.2)',
+                          border: '1px solid rgba(200, 75, 210, 0.4)',
+                          color: 'var(--lume-accent)',
+                        }}
+                        title="Edit in editor"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                        <span className="text-sm">Edit</span>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (auth.isAuthenticated) {
+                            router.push(`/present/${deck.id}?deckId=${deck.id}`);
+                          } else {
+                            setSelectedPresentation(deck.id);
+                            setShowPasswordPrompt(true);
+                          }
+                        }}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all hover:scale-105 cursor-pointer"
+                        style={{
+                          background: 'var(--lume-primary, #16c2c7)',
+                          border: '1px solid rgba(22, 194, 199, 0.4)',
+                          color: 'white',
+                        }}
+                        title={auth.isAuthenticated ? "Present (authenticated)" : "Present (login required)"}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
+                          <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+                          <path d="M21 3v5h-5"/>
+                        </svg>
+                        <span className="text-sm font-medium">Present</span>
+                        {!auth.isAuthenticated && (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '14px', height: '14px', marginLeft: '-4px' }}>
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
         {/* Empty state hint */}
-        {Object.keys(presentations).length === 0 && (
+        {Object.keys(presentations).length === 0 && editorDecks.length === 0 && (
           <div className="text-center py-20">
             <p className="text-lg opacity-40">No presentations yet</p>
             <p className="text-sm opacity-30 mt-2">

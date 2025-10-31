@@ -29,6 +29,14 @@ export interface DeckMeta {
   manager?: string;
   comments?: string;
   customProperties?: Record<string, string | number | boolean>;
+  // Presenter password set by deck owner/creator (stored as hash)
+  presenterPasswordHash?: string;
+  // Owner/Creator user ID (from NextAuth session)
+  ownerId?: string;
+  // Shared users with access (array of user IDs)
+  sharedWith?: string[];
+  // Public visibility - if true, presentation is visible on user's public profile
+  public?: boolean;
 }
 
 export interface SlideSize {

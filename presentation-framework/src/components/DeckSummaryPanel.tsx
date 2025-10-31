@@ -40,10 +40,16 @@ export function DeckSummaryPanel({ summary }: DeckSummaryPanelProps) {
             }}
           >
             <div style={{ fontWeight: 600 }}>{slide.id}</div>
-            {slide.notes?.presenter && (
+            {typeof slide.notes === 'object' && slide.notes !== null && slide.notes.presenter && (
               <div style={{ opacity: 0.7 }}>
                 {slide.notes.presenter.slice(0, 80)}
                 {slide.notes.presenter.length > 80 ? '…' : ''}
+              </div>
+            )}
+            {typeof slide.notes === 'string' && slide.notes && (
+              <div style={{ opacity: 0.7 }}>
+                {slide.notes.slice(0, 80)}
+                {slide.notes.length > 80 ? '…' : ''}
               </div>
             )}
             {slide.layers?.[0]?.elements && (

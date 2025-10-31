@@ -276,7 +276,8 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
   const handlePasswordSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     if (passwordInput.trim()) {
-      const result = await auth.login(passwordInput.trim(), rememberKey);
+      // Pass deckId for deck-specific authentication
+      const result = await auth.login(passwordInput.trim(), rememberKey, deckId || undefined);
 
       if (result.success) {
         closePasswordPrompt();
