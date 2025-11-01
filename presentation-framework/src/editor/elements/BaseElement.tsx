@@ -417,7 +417,7 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
 function TextElementContent({ element }: { element: ElementDefinition }) {
   if (element.type !== 'text') return null;
   const textElement = element as any;
-  const textAlign: React.CSSProperties['textAlign'] = (textElement.style?.textAlign || 'left') as React.CSSProperties['textAlign'];
+  const textAlign = (textElement.style?.textAlign || 'left') as React.CSSProperties['textAlign'];
 
   const justifyContent = (() => {
     switch (textAlign) {
@@ -425,8 +425,6 @@ function TextElementContent({ element }: { element: ElementDefinition }) {
         return 'center';
       case 'right':
         return 'flex-end';
-      case 'justify':
-        return 'space-between';
       default:
         return 'flex-start';
     }
@@ -434,18 +432,25 @@ function TextElementContent({ element }: { element: ElementDefinition }) {
   
   return (
     <div
-      className="flex items-center w-full h-full p-2 break-words whitespace-pre-wrap"
-      style={{
-        fontSize: textElement.style?.fontSize || '16px',
-        fontFamily: textElement.style?.fontFamily || 'inherit',
-        color: textElement.style?.color || '#000000',
-        fontWeight: textElement.style?.fontWeight || 'normal',
-        fontStyle: textElement.style?.fontStyle || 'normal',
-        textAlign,
-        justifyContent,
-      }}
+      className="flex h-full w-full items-center p-2"
+      style={{ justifyContent }}
     >
-      {textElement.content || 'Text'}
+      <span
+        style={{
+          display: 'block',
+          width: '100%',
+          fontSize: textElement.style?.fontSize || '16px',
+          fontFamily: textElement.style?.fontFamily || 'inherit',
+          color: textElement.style?.color || '#000000',
+          fontWeight: textElement.style?.fontWeight || 'normal',
+          fontStyle: textElement.style?.fontStyle || 'normal',
+          textAlign,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+        }}
+      >
+        {textElement.content || 'Text'}
+      </span>
     </div>
   );
 }

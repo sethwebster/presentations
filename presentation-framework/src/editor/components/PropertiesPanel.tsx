@@ -880,7 +880,7 @@ export function PropertiesPanel() {
                   <section className="space-y-4">
                     <div className="space-y-2">
                       <Label className={SECTION_HEADING}>
-                        Fill
+                        Text Color
                       </Label>
                       <ColorPicker value={textColorValue} onChange={handleColorChange} />
                     </div>
