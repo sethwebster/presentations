@@ -62,6 +62,7 @@ class DragResizeService {
     pan: { x: number; y: number };
     isAltPressed: boolean;
     isShiftPressed: boolean;
+    initialObjectFit?: 'contain' | 'cover' | 'fill' | 'none' | 'scale-down'; // For images - track original objectFit
   } | null = null;
 
   // RAF throttling
@@ -321,6 +322,24 @@ class DragResizeService {
       pan
     );
 
+    // For images, capture the initial objectFit value so we can revert it when Alt is released
+    let initialObjectFit: 'contain' | 'cover' | 'fill' | 'none' | 'scale-down' | undefined = undefined;
+    if (elementType === 'image') {
+      const currentState = this.editor.getState();
+      const currentDeck = currentState.deck;
+      const currentSlide = currentDeck?.slides[currentState.currentSlideIndex];
+      if (currentSlide) {
+        const allElements = [
+          ...(currentSlide.elements || []),
+          ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+        ];
+        const imageElement = allElements.find(el => el.id === elementId);
+        if (imageElement && imageElement.type === 'image') {
+          initialObjectFit = (imageElement as any).objectFit || 'cover';
+        }
+      }
+    }
+
     this.activeResize = {
       elementId,
       elementType,
@@ -334,6 +353,7 @@ class DragResizeService {
       pan,
       isAltPressed: false,
       isShiftPressed: false,
+      initialObjectFit, // Store original objectFit for images
     };
 
     // Set draggingElementId to block autosave during resize
@@ -694,9 +714,24 @@ class DragResizeService {
     const pendingBounds = this.pendingResizeUpdate;
     
     if (pendingBounds) {
-      this.editor.updateElement(this.activeResize.elementId, {
+      // For images, dynamically update objectFit based on Alt key state
+      // Alt pressed: stretch image to fill bounding box (objectFit: 'fill')
+      // Alt released: revert to original objectFit
+      const updateData: any = {
         bounds: pendingBounds,
-      });
+      };
+
+      if (this.activeResize.elementType === 'image') {
+        if (this.activeResize.isAltPressed) {
+          // Alt pressed: stretch image to fill bounding box
+          updateData.objectFit = 'fill';
+        } else if (this.activeResize.initialObjectFit !== undefined) {
+          // Alt released: revert to original objectFit
+          updateData.objectFit = this.activeResize.initialObjectFit;
+        }
+      }
+
+      this.editor.updateElement(this.activeResize.elementId, updateData);
       this.pendingResizeUpdate = null;
 
       // Update dragging state for alignment guides
