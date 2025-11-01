@@ -1,15 +1,21 @@
 "use client";
 
-import { useEditor, useEditorInstance } from '../hooks/useEditor';
-import { useEffect, useState } from 'react';
+import { useEditor } from '../hooks/useEditor';
+import { useSaveManager } from '../hooks/useSaveManager';
 
 interface StatusBarProps {
   deckId: string;
 }
 
-export function StatusBar({ deckId }: StatusBarProps) {
+// eslint-disable-next-line no-unused-vars
+export function StatusBar({ deckId: _deckId }: StatusBarProps) {
   const state = useEditor();
-  const editor = useEditorInstance();
+  
+  // Pure UI: just observe save status from the service
+  const saveState = useSaveManager(
+    state.autosaveEnabled,
+    state.draggingElementId !== null
+  );
   
   const deck = state.deck;
   const currentSlideIndex = state.currentSlideIndex;
@@ -18,95 +24,6 @@ export function StatusBar({ deckId }: StatusBarProps) {
   const error = state.error;
   const isLoading = state.isLoading;
   const selectedElementIds = state.selectedElementIds;
-  const draggingElementId = state.draggingElementId;
-  
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [previousDeckHash, setPreviousDeckHash] = useState<string>('');
-  const [pendingSaveHash, setPendingSaveHash] = useState<string>('');
-
-  // Track save status by monitoring deck changes
-  useEffect(() => {
-    if (!deck) {
-      setSaveStatus('saved');
-      setPreviousDeckHash('');
-      setPendingSaveHash('');
-      return;
-    }
-
-    // Create a simple hash of the deck to detect changes
-    // Exclude updatedAt from hash since it changes on every save
-    const deckForHash = {
-      ...deck,
-      meta: deck.meta ? { ...deck.meta, updatedAt: undefined } : undefined,
-    };
-    const deckHash = JSON.stringify(deckForHash);
-    
-    // If deck content changed (not just timestamp), mark as unsaved
-    if (deckHash !== previousDeckHash && previousDeckHash !== '') {
-      setSaveStatus('unsaved');
-    }
-
-    // CRITICAL: Don't autosave while dragging/resizing - wait until drag completes
-    const isDragging = draggingElementId !== null;
-    
-    if (isDragging) {
-      // Store the hash for saving after drag completes
-      if (deckHash !== previousDeckHash) {
-        setPendingSaveHash(deckHash);
-      }
-      return; // Skip autosave while dragging
-    }
-
-    // Auto-save if enabled and deck content has changed (and not dragging)
-    if (autosaveEnabled && deckHash !== previousDeckHash && previousDeckHash !== '') {
-      console.log('Deck changed, scheduling autosave...', { deckHash: deckHash.substring(0, 50), previousHash: previousDeckHash.substring(0, 50) });
-      const saveTimeout = setTimeout(async () => {
-        console.log('Executing autosave...');
-        setSaveStatus('saving');
-        try {
-          await editor.saveDeck();
-          console.log('Autosave completed successfully');
-          setSaveStatus('saved');
-          setLastSaved(new Date());
-          setPreviousDeckHash(deckHash);
-          setPendingSaveHash(''); // Clear pending save
-        } catch (error) {
-          console.error('Save failed:', error);
-          setSaveStatus('unsaved');
-        }
-      }, 1000); // Debounce saves by 1 second
-
-      return () => clearTimeout(saveTimeout);
-    }
-
-    // If drag just completed and we have a pending save
-    if (!isDragging && pendingSaveHash && pendingSaveHash !== previousDeckHash) {
-      console.log('Drag completed, saving pending changes...');
-      const saveTimeout = setTimeout(async () => {
-        setSaveStatus('saving');
-        try {
-          await editor.saveDeck();
-          console.log('Post-drag autosave completed successfully');
-          setSaveStatus('saved');
-          setLastSaved(new Date());
-          setPreviousDeckHash(pendingSaveHash);
-          setPendingSaveHash('');
-        } catch (error) {
-          console.error('Post-drag save failed:', error);
-          setSaveStatus('unsaved');
-        }
-      }, 500); // Shorter debounce after drag
-
-      return () => clearTimeout(saveTimeout);
-    }
-
-    // Initialize hash on first load
-    if (previousDeckHash === '') {
-      console.log('Initializing deck hash on first load');
-      setPreviousDeckHash(deckHash);
-    }
-  }, [deck, autosaveEnabled, previousDeckHash, editor, draggingElementId, pendingSaveHash]);
 
   const currentSlide = deck?.slides[currentSlideIndex];
   const elementCount = currentSlide 
@@ -128,19 +45,19 @@ export function StatusBar({ deckId }: StatusBarProps) {
       <div className="flex items-center gap-4 flex-1">
         {/* Save Status */}
         <div className="flex items-center gap-1">
-          {saveStatus === 'saving' && (
+          {saveState.status === 'saving' && (
             <>
               <div className="h-2 w-2 animate-[statusBarPulse_1s_ease-in-out_infinite] rounded-full bg-primary" />
               <span>Saving...</span>
             </>
           )}
-          {saveStatus === 'saved' && (
+          {saveState.status === 'saved' && (
             <>
               <div className="h-2 w-2 rounded-full bg-emerald-500" />
-              <span>{lastSaved ? `Saved ${formatTime(lastSaved)}` : 'Saved'}</span>
+              <span>{saveState.lastSaved ? `Saved ${formatTime(saveState.lastSaved)}` : 'Saved'}</span>
             </>
           )}
-          {saveStatus === 'unsaved' && !autosaveEnabled && (
+          {saveState.status === 'unsaved' && !autosaveEnabled && (
             <>
               <div className="h-2 w-2 rounded-full bg-amber-500" />
               <span>Unsaved</span>

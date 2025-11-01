@@ -2,7 +2,7 @@
 
 import { useEditor } from '../hooks/useEditor';
 import type { ElementDefinition } from '@/rsc/types';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 
 interface AlignmentGuidesProps {
   draggingElementId: string | null;
@@ -16,116 +16,159 @@ export function AlignmentGuides({ draggingElementId, draggingBounds }: Alignment
   const deck = state.deck;
   const currentSlideIndex = state.currentSlideIndex;
   const [guides, setGuides] = useState<Array<{ type: 'horizontal' | 'vertical'; position: number; isCenter?: boolean }>>([]);
+  const rafRef = useRef<number | null>(null);
+  const lastBoundsRef = useRef<string>('');
+
+  // Memoize slide data to prevent unnecessary recalculations
+  const slideData = useMemo(() => {
+    if (!deck || !draggingElementId) return null;
+    const slide = deck.slides[currentSlideIndex];
+    if (!slide) return null;
+
+    return {
+      slide,
+      allElements: [
+        ...(slide.elements || []),
+        ...(slide.layers?.flatMap(l => l.elements) || []),
+      ].filter(el => el.id !== draggingElementId),
+    };
+  }, [deck, currentSlideIndex, draggingElementId]);
 
   useEffect(() => {
-    if (!draggingElementId || !draggingBounds || !deck) {
+    // Cancel any pending animation frame
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+    }
+
+    if (!draggingElementId || !draggingBounds || !deck || !slideData) {
       setGuides([]);
+      lastBoundsRef.current = '';
       return;
     }
 
-    const slide = deck.slides[currentSlideIndex];
-    if (!slide) {
-      setGuides([]);
+    // Create a stable key for the current bounds to detect actual changes
+    const boundsKey = draggingBounds
+      ? `${Math.round(draggingBounds.x)}-${Math.round(draggingBounds.y)}-${Math.round(draggingBounds.width)}-${Math.round(draggingBounds.height)}`
+      : '';
+
+    // Skip if bounds haven't meaningfully changed
+    if (boundsKey === lastBoundsRef.current) {
       return;
     }
 
-    const allElements = [
-      ...(slide.elements || []),
-      ...(slide.layers?.flatMap(l => l.elements) || []),
-    ].filter(el => el.id !== draggingElementId);
-
-    const detectedGuides: Array<{ type: 'horizontal' | 'vertical'; position: number; isCenter?: boolean }> = [];
-    const CANVAS_WIDTH = 1280;
-    const CANVAS_HEIGHT = 720;
-
-    // Check alignment with other elements
-    for (const element of allElements) {
-      const bounds = element.bounds;
-      if (!bounds) continue;
-
-      // Left edge alignment
-      if (Math.abs(draggingBounds.x - bounds.x) < GUIDE_THRESHOLD) {
-        detectedGuides.push({ type: 'vertical', position: bounds.x });
-      }
-      // Right edge alignment
-      if (Math.abs((draggingBounds.x + draggingBounds.width) - (bounds.x + bounds.width)) < GUIDE_THRESHOLD) {
-        detectedGuides.push({ type: 'vertical', position: bounds.x + bounds.width });
-      }
-      // Center X alignment
-      const draggingCenterX = draggingBounds.x + draggingBounds.width / 2;
-      const elementCenterX = bounds.x + bounds.width / 2;
-      if (Math.abs(draggingCenterX - elementCenterX) < GUIDE_THRESHOLD) {
-        detectedGuides.push({ type: 'vertical', position: elementCenterX });
+    // Use requestAnimationFrame to throttle updates during fast dragging
+    rafRef.current = requestAnimationFrame(() => {
+      if (!draggingBounds || !slideData) {
+        setGuides([]);
+        return;
       }
 
-      // Top edge alignment
-      if (Math.abs(draggingBounds.y - bounds.y) < GUIDE_THRESHOLD) {
-        detectedGuides.push({ type: 'horizontal', position: bounds.y });
-      }
-      // Bottom edge alignment
-      if (Math.abs((draggingBounds.y + draggingBounds.height) - (bounds.y + bounds.height)) < GUIDE_THRESHOLD) {
-        detectedGuides.push({ type: 'horizontal', position: bounds.y + bounds.height });
-      }
-      // Center Y alignment
-      const draggingCenterY = draggingBounds.y + draggingBounds.height / 2;
-      const elementCenterY = bounds.y + bounds.height / 2;
-      if (Math.abs(draggingCenterY - elementCenterY) < GUIDE_THRESHOLD) {
-        detectedGuides.push({ type: 'horizontal', position: elementCenterY });
-      }
-    }
+      lastBoundsRef.current = boundsKey;
 
-    // Check alignment with canvas center and edges
-    const draggingCenterX = draggingBounds.x + draggingBounds.width / 2;
-    const draggingCenterY = draggingBounds.y + draggingBounds.height / 2;
+      const { allElements } = slideData;
+      const detectedGuides: Array<{ type: 'horizontal' | 'vertical'; position: number; isCenter?: boolean }> = [];
+      const CANVAS_WIDTH = 1280;
+      const CANVAS_HEIGHT = 720;
 
-    // Canvas center - always check, make it more prominent
-    // Check if element's center OR edges align with canvas center
-    const canvasCenterX = CANVAS_WIDTH / 2;
-    const canvasCenterY = CANVAS_HEIGHT / 2;
-    
-    // Vertical center alignment (check center, left edge, and right edge)
-    if (
-      Math.abs(draggingCenterX - canvasCenterX) < GUIDE_THRESHOLD ||
-      Math.abs(draggingBounds.x - canvasCenterX) < GUIDE_THRESHOLD ||
-      Math.abs(draggingBounds.x + draggingBounds.width - canvasCenterX) < GUIDE_THRESHOLD
-    ) {
-      detectedGuides.push({ type: 'vertical', position: canvasCenterX, isCenter: true });
-    }
-    
-    // Horizontal center alignment (check center, top edge, and bottom edge)
-    if (
-      Math.abs(draggingCenterY - canvasCenterY) < GUIDE_THRESHOLD ||
-      Math.abs(draggingBounds.y - canvasCenterY) < GUIDE_THRESHOLD ||
-      Math.abs(draggingBounds.y + draggingBounds.height - canvasCenterY) < GUIDE_THRESHOLD
-    ) {
-      detectedGuides.push({ type: 'horizontal', position: canvasCenterY, isCenter: true });
-    }
+      // Check alignment with other elements
+      for (const element of allElements) {
+        const bounds = element.bounds;
+        if (!bounds) continue;
 
-    // Canvas edges
-    if (Math.abs(draggingBounds.x) < GUIDE_THRESHOLD) {
-      detectedGuides.push({ type: 'vertical', position: 0 });
-    }
-    if (Math.abs(draggingBounds.x + draggingBounds.width - CANVAS_WIDTH) < GUIDE_THRESHOLD) {
-      detectedGuides.push({ type: 'vertical', position: CANVAS_WIDTH });
-    }
-    if (Math.abs(draggingBounds.y) < GUIDE_THRESHOLD) {
-      detectedGuides.push({ type: 'horizontal', position: 0 });
-    }
-    if (Math.abs(draggingBounds.y + draggingBounds.height - CANVAS_HEIGHT) < GUIDE_THRESHOLD) {
-      detectedGuides.push({ type: 'horizontal', position: CANVAS_HEIGHT });
-    }
+        // Left edge alignment
+        if (Math.abs(draggingBounds.x - bounds.x) < GUIDE_THRESHOLD) {
+          detectedGuides.push({ type: 'vertical', position: bounds.x });
+        }
+        // Right edge alignment
+        if (Math.abs((draggingBounds.x + draggingBounds.width) - (bounds.x + bounds.width)) < GUIDE_THRESHOLD) {
+          detectedGuides.push({ type: 'vertical', position: bounds.x + bounds.width });
+        }
+        // Center X alignment
+        const draggingCenterX = draggingBounds.x + draggingBounds.width / 2;
+        const elementCenterX = bounds.x + bounds.width / 2;
+        if (Math.abs(draggingCenterX - elementCenterX) < GUIDE_THRESHOLD) {
+          detectedGuides.push({ type: 'vertical', position: elementCenterX });
+        }
 
-    setGuides(prev => {
-      if (prev.length === detectedGuides.length) {
-        const prevKey = prev.map(guide => `${guide.type}-${guide.position}-${guide.isCenter ? 1 : 0}`).join('|');
-        const nextKey = detectedGuides.map(guide => `${guide.type}-${guide.position}-${guide.isCenter ? 1 : 0}`).join('|');
-        if (prevKey === nextKey) {
-          return prev;
+        // Top edge alignment
+        if (Math.abs(draggingBounds.y - bounds.y) < GUIDE_THRESHOLD) {
+          detectedGuides.push({ type: 'horizontal', position: bounds.y });
+        }
+        // Bottom edge alignment
+        if (Math.abs((draggingBounds.y + draggingBounds.height) - (bounds.y + bounds.height)) < GUIDE_THRESHOLD) {
+          detectedGuides.push({ type: 'horizontal', position: bounds.y + bounds.height });
+        }
+        // Center Y alignment
+        const draggingCenterY = draggingBounds.y + draggingBounds.height / 2;
+        const elementCenterY = bounds.y + bounds.height / 2;
+        if (Math.abs(draggingCenterY - elementCenterY) < GUIDE_THRESHOLD) {
+          detectedGuides.push({ type: 'horizontal', position: elementCenterY });
         }
       }
-      return detectedGuides;
+
+      // Check alignment with canvas center and edges
+      const draggingCenterX = draggingBounds.x + draggingBounds.width / 2;
+      const draggingCenterY = draggingBounds.y + draggingBounds.height / 2;
+
+      // Canvas center - always check, make it more prominent
+      // Check if element's center OR edges align with canvas center
+      const canvasCenterX = CANVAS_WIDTH / 2;
+      const canvasCenterY = CANVAS_HEIGHT / 2;
+      
+      // Vertical center alignment (check center, left edge, and right edge)
+      if (
+        Math.abs(draggingCenterX - canvasCenterX) < GUIDE_THRESHOLD ||
+        Math.abs(draggingBounds.x - canvasCenterX) < GUIDE_THRESHOLD ||
+        Math.abs(draggingBounds.x + draggingBounds.width - canvasCenterX) < GUIDE_THRESHOLD
+      ) {
+        detectedGuides.push({ type: 'vertical', position: canvasCenterX, isCenter: true });
+      }
+      
+      // Horizontal center alignment (check center, top edge, and bottom edge)
+      if (
+        Math.abs(draggingCenterY - canvasCenterY) < GUIDE_THRESHOLD ||
+        Math.abs(draggingBounds.y - canvasCenterY) < GUIDE_THRESHOLD ||
+        Math.abs(draggingBounds.y + draggingBounds.height - canvasCenterY) < GUIDE_THRESHOLD
+      ) {
+        detectedGuides.push({ type: 'horizontal', position: canvasCenterY, isCenter: true });
+      }
+
+      // Canvas edges
+      if (Math.abs(draggingBounds.x) < GUIDE_THRESHOLD) {
+        detectedGuides.push({ type: 'vertical', position: 0 });
+      }
+      if (Math.abs(draggingBounds.x + draggingBounds.width - CANVAS_WIDTH) < GUIDE_THRESHOLD) {
+        detectedGuides.push({ type: 'vertical', position: CANVAS_WIDTH });
+      }
+      if (Math.abs(draggingBounds.y) < GUIDE_THRESHOLD) {
+        detectedGuides.push({ type: 'horizontal', position: 0 });
+      }
+      if (Math.abs(draggingBounds.y + draggingBounds.height - CANVAS_HEIGHT) < GUIDE_THRESHOLD) {
+        detectedGuides.push({ type: 'horizontal', position: CANVAS_HEIGHT });
+      }
+
+      // Only update if guides actually changed
+      setGuides(prev => {
+        if (prev.length === detectedGuides.length) {
+          const prevKey = prev.map(guide => `${guide.type}-${Math.round(guide.position)}-${guide.isCenter ? 1 : 0}`).join('|');
+          const nextKey = detectedGuides.map(guide => `${guide.type}-${Math.round(guide.position)}-${guide.isCenter ? 1 : 0}`).join('|');
+          if (prevKey === nextKey) {
+            return prev;
+          }
+        }
+        return detectedGuides;
+      });
+
+      rafRef.current = null;
     });
-  }, [draggingElementId, draggingBounds, deck, currentSlideIndex]);
+
+    return () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [draggingElementId, draggingBounds, deck, slideData]);
 
   if (guides.length === 0) return null;
 
