@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useMemo, type CSSProperties } from 'react';
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import type { ElementDefinition } from '@/rsc/types';
 import { AlignmentTools } from './AlignmentTools';
@@ -8,6 +9,30 @@ import { DocumentProperties } from './DocumentProperties';
 import { SlideProperties } from './SlideProperties';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SegmentedControl } from '@/components/ui/segmented-control';
+import { Slider } from '@/components/ui/slider';
+import { Toggle } from '@/components/ui/toggle';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
+import { Select } from '@/components/ui/select';
+import { ColorInput } from '@/components/ui/color-input';
+
+type TextStyleUpdate = {
+  style?: Record<string, any> | null;
+  metadata?: Record<string, any> | null;
+};
+
+type TextStyleContext = {
+  style: Record<string, any>;
+  element: ElementDefinition;
+};
+
+// eslint-disable-next-line no-unused-vars
+type TextStyleUpdater = (context: TextStyleContext) => TextStyleUpdate | null | undefined;
+
+const SECTION_HEADING = "text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground";
+const MICRO_HEADING = "text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground";
 
 export function PropertiesPanel() {
   const state = useEditor();
@@ -19,42 +44,589 @@ export function PropertiesPanel() {
   const currentSlideIndex = state.currentSlideIndex;
 
   const currentSlide = deck?.slides[currentSlideIndex];
-  const selectedElements: ElementDefinition[] = [];
-
-  if (currentSlide && selectedElementIds.size > 0) {
+  const selectedElements = useMemo<ElementDefinition[]>(() => {
+    if (!currentSlide || selectedElementIds.size === 0) return [];
     const allElements = [
       ...(currentSlide.elements || []),
-      ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+      ...(currentSlide.layers?.flatMap((l) => l.elements) || []),
     ];
-    selectedElements.push(
-      ...allElements.filter(el => selectedElementIds.has(el.id))
-    );
-  }
+    return allElements.filter((el) => selectedElementIds.has(el.id));
+  }, [currentSlide, selectedElementIds]);
 
   const selectedElement = selectedElements[0];
 
+  const elementById = useMemo(() => {
+    const map = new Map<string, ElementDefinition>();
+    selectedElements.forEach((el) => {
+      map.set(el.id, el);
+    });
+    return map;
+  }, [selectedElements]);
+
+  const selectedTextElements = useMemo(
+    () => selectedElements.filter((el) => el.type === 'text'),
+    [selectedElements]
+  );
+
+  const applyTextStyle = useCallback((updater: TextStyleUpdater) => {
+      selectedElementIds.forEach((id) => {
+        const element = elementById.get(id);
+        if (!element || element.type !== 'text') return;
+        const currentStyle: Record<string, any> = {
+          ...((element.style as Record<string, any>) ?? {}),
+        };
+        const updates = updater({ style: currentStyle, element });
+        if (!updates) return;
+
+        const nextStyle: Record<string, any> = { ...currentStyle };
+        let nextMetadata = element.metadata ? { ...element.metadata } : undefined;
+        let styleChanged = false;
+        let metadataChanged = false;
+
+        if (updates.style) {
+          Object.entries(updates.style).forEach(([key, value]) => {
+            if (value === undefined || value === null) {
+              if (key in nextStyle) {
+                delete nextStyle[key];
+                styleChanged = true;
+              }
+            } else if (nextStyle[key] !== value) {
+              nextStyle[key] = value;
+              styleChanged = true;
+            }
+          });
+        }
+
+        if ('metadata' in updates) {
+          if (updates.metadata && Object.keys(updates.metadata).length > 0) {
+            nextMetadata = { ...(nextMetadata ?? {}), ...updates.metadata };
+            metadataChanged = true;
+          } else if (nextMetadata) {
+            nextMetadata = undefined;
+            metadataChanged = true;
+          }
+        }
+
+        const payload: Record<string, any> = {};
+        if (styleChanged) {
+          payload.style = nextStyle;
+        }
+        if (metadataChanged) {
+          payload.metadata = nextMetadata;
+        }
+
+        if (Object.keys(payload).length > 0) {
+          editor.updateElement(id, payload);
+        }
+      });
+    }, [selectedElementIds, elementById, editor]);
+
+  const getSharedStyleValue = useCallback(
+    (property: keyof CSSProperties, fallback?: any) => {
+      if (selectedTextElements.length === 0) {
+        return { value: fallback, mixed: false };
+      }
+      const firstValue = (selectedTextElements[0].style as any)?.[property];
+      const resolvedFirst = firstValue ?? fallback;
+      const mixed = selectedTextElements.some((el) => {
+        const value = (el.style as any)?.[property];
+        return (value ?? fallback) !== resolvedFirst;
+      });
+      return {
+        value: resolvedFirst,
+        mixed,
+      };
+    },
+    [selectedTextElements]
+  );
+
+  const clamp = useCallback((value: number, min: number, max: number) =>
+    Math.min(max, Math.max(min, value)), []);
+
+  const hexToRgb = useCallback((hex: string) => {
+    const normalized = hex.replace('#', '');
+    const bigint = parseInt(normalized.length === 3 ? normalized.repeat(2) : normalized, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return { r, g, b };
+  }, []);
+
+  const rgbToHex = useCallback((r: number, g: number, b: number) => {
+    const toHex = (component: number) =>
+      clamp(Math.round(component), 0, 255).toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  }, [clamp]);
+
+  const parseTextShadow = useCallback((value?: string) => {
+    const defaultShadow = {
+      offsetX: 0,
+      offsetY: 4,
+      blur: 16,
+      color: '#000000',
+      opacity: 0.25,
+    };
+    if (!value || value === 'none') return defaultShadow;
+    const match = value.match(
+      /(-?\d+(?:\.\d+)?)px\s+(-?\d+(?:\.\d+)?)px\s+(\d+(?:\.\d+)?)px\s+(rgba?\([^)]*\)|#[0-9a-fA-F]{3,8})/i
+    );
+    if (!match) return defaultShadow;
+    const [, offsetX, offsetY, blur, colorMatch] = match;
+    let color = '#000000';
+    let opacity = defaultShadow.opacity;
+    if (colorMatch.startsWith('rgba') || colorMatch.startsWith('rgb')) {
+      const components = colorMatch
+        .replace(/rgba?\(/, '')
+        .replace(')', '')
+        .split(',')
+        .map((part) => part.trim());
+      const [r, g, b, alpha] = components;
+      color = rgbToHex(Number(r), Number(g), Number(b));
+      opacity = alpha !== undefined ? clamp(Number(alpha), 0, 1) : 1;
+    } else {
+      color = colorMatch;
+      opacity = defaultShadow.opacity;
+    }
+    return {
+      offsetX: Number(offsetX) || 0,
+      offsetY: Number(offsetY) || 0,
+      blur: Number(blur) || defaultShadow.blur,
+      color,
+      opacity,
+    };
+  }, [rgbToHex, clamp]);
+
+  const formatTextShadow = useCallback((shadow: ReturnType<typeof parseTextShadow>) => {
+    const { r, g, b } = hexToRgb(shadow.color);
+    return `${shadow.offsetX}px ${shadow.offsetY}px ${shadow.blur}px rgba(${r}, ${g}, ${b}, ${clamp(shadow.opacity, 0, 1)})`;
+  }, [hexToRgb, clamp]);
+
+  const parseReflection = useCallback((value?: string) => {
+    if (!value || value === 'none') {
+      return {
+        enabled: false,
+        distance: 10,
+      };
+    }
+    const parts = value.split(' ');
+    const distance = parseInt(parts[0] || '10', 10);
+    return {
+      enabled: true,
+      distance: Number.isNaN(distance) ? 10 : distance,
+    };
+  }, []);
+
+  const gradientToCss = useCallback((gradient: any) => {
+    if (!gradient) return '';
+    const stops = gradient.stops
+      ?.map((stop: { color: string; position: number }) => `${stop.color} ${stop.position}%`)
+      .join(', ');
+    if (!stops) return '';
+    if (gradient.type === 'radial') {
+      return `radial-gradient(${stops})`;
+    }
+    return `linear-gradient(${gradient.angle ?? 0}deg, ${stops})`;
+  }, []);
+
+  const sharedFontFamily = getSharedStyleValue('fontFamily', 'inherit');
+  const sharedFontSize = getSharedStyleValue('fontSize', '24px');
+  const sharedLineHeight = getSharedStyleValue('lineHeight', '1.2');
+  const sharedLetterSpacing = getSharedStyleValue('letterSpacing', '0px');
+  const sharedTextAlign = getSharedStyleValue('textAlign', 'left');
+  const sharedColor = getSharedStyleValue('color', '#000000');
+
+  const alignmentValue = (sharedTextAlign.value as string) ?? 'left';
+  const alignmentMixed = sharedTextAlign.mixed;
+
+  const fontSizeNumber = parseInt(
+    typeof sharedFontSize.value === 'string'
+      ? sharedFontSize.value.replace('px', '')
+      : `${sharedFontSize.value}`,
+    10
+  ) || 24;
+
+  const lineHeightNumber = parseFloat(`${sharedLineHeight.value ?? 1.2}`) || 1.2;
+
+  const letterSpacingNumber = parseFloat(
+    typeof sharedLetterSpacing.value === 'string'
+      ? sharedLetterSpacing.value.replace('px', '')
+      : `${sharedLetterSpacing.value ?? 0}`
+  ) || 0;
+
+  const textDecorationSets = selectedTextElements.map((el) => {
+    const style = (el.style as Record<string, any>) ?? {};
+    const raw = (style.textDecorationLine ?? style.textDecoration ?? '') as string;
+    return new Set(raw.split(/\s+/).filter(Boolean));
+  });
+
+  const underlineAll =
+    selectedTextElements.length > 0 && textDecorationSets.every((set) => set.has('underline'));
+  const underlineSome = textDecorationSets.some((set) => set.has('underline'));
+  const strikethroughAll =
+    selectedTextElements.length > 0 && textDecorationSets.every((set) => set.has('line-through'));
+  const strikethroughSome = textDecorationSets.some((set) => set.has('line-through'));
+
+  const boldAll =
+    selectedTextElements.length > 0 &&
+    selectedTextElements.every((el) => {
+      const weight = (el.style as any)?.fontWeight;
+      if (!weight) return false;
+      if (typeof weight === 'number') return weight >= 600;
+      if (typeof weight === 'string') {
+        return weight === 'bold' || Number(weight) >= 600;
+      }
+      return false;
+    });
+
+  const boldSome =
+    selectedTextElements.length > 0 &&
+    selectedTextElements.some((el) => {
+      const weight = (el.style as any)?.fontWeight;
+      if (!weight) return false;
+      if (typeof weight === 'number') return weight >= 600;
+      if (typeof weight === 'string') {
+        return weight === 'bold' || Number(weight) >= 600;
+      }
+      return false;
+    });
+
+  const italicAll =
+    selectedTextElements.length > 0 &&
+    selectedTextElements.every((el) => (el.style as any)?.fontStyle === 'italic');
+
+  const italicSome = selectedTextElements.some((el) => (el.style as any)?.fontStyle === 'italic');
+
+  const sharedShadow = useMemo(() => {
+    if (selectedTextElements.length === 0) {
+      return {
+        enabled: false,
+        state: parseTextShadow(undefined),
+        mixed: false,
+      };
+    }
+    const shadows = selectedTextElements.map(
+      (el) => ((el.style as any)?.textShadow ?? 'none') as string
+    );
+    const first = shadows[0];
+    const mixed = shadows.some((value) => value !== first);
+    return {
+      enabled: first !== 'none',
+      state: parseTextShadow(first === 'none' ? undefined : first),
+      mixed,
+    };
+  }, [selectedTextElements, parseTextShadow]);
+
+  const sharedReflection = useMemo(() => {
+    if (selectedTextElements.length === 0) {
+      return { enabled: false, distance: 10, mixed: false };
+    }
+    const reflections = selectedTextElements.map((el) => {
+      const style = (el.style as any) ?? {};
+      return (style.WebkitBoxReflect ?? style.boxReflect ?? 'none') as string;
+    });
+    const first = reflections[0];
+    const mixed = reflections.some((value) => value !== first);
+    const parsed = parseReflection(first);
+    return { ...parsed, mixed };
+  }, [selectedTextElements, parseReflection]);
+
+  const textGradientMetadata = selectedTextElements.length
+    ? selectedTextElements[0].metadata?.textGradient
+    : undefined;
+  const gradientConsistent = selectedTextElements.every(
+    (el) => JSON.stringify(el.metadata?.textGradient ?? null) === JSON.stringify(textGradientMetadata ?? null)
+  );
+  const textColorValue = gradientConsistent && textGradientMetadata
+    ? textGradientMetadata
+    : (sharedColor.value ?? '#000000');
+
+  const setFontFamily = useCallback(
+    (family: string) => {
+      applyTextStyle(() => ({
+        style: family === 'inherit' ? { fontFamily: undefined } : { fontFamily: family },
+      }));
+    },
+    [applyTextStyle]
+  );
+
+  const setFontSize = useCallback(
+    (size: number) => {
+      const bounded = clamp(Math.round(size), 8, 200);
+      applyTextStyle(() => ({ style: { fontSize: `${bounded}px` } }));
+    },
+    [applyTextStyle, clamp]
+  );
+
+  const toggleBold = useCallback(() => {
+    applyTextStyle(({ style }) => {
+      const weight = style.fontWeight;
+      const isBold =
+        weight === 'bold' ||
+        weight === '700' ||
+        (typeof weight === 'number' && weight >= 600) ||
+        (!weight && boldAll);
+      return { style: { fontWeight: isBold ? undefined : '700' } };
+    });
+  }, [applyTextStyle, boldAll]);
+
+  const toggleItalic = useCallback(() => {
+    applyTextStyle(({ style }) => {
+      const isItalic = style.fontStyle === 'italic';
+      return { style: { fontStyle: isItalic ? undefined : 'italic' } };
+    });
+  }, [applyTextStyle]);
+
+  const toggleDecoration = useCallback(
+    (token: 'underline' | 'line-through') => {
+      applyTextStyle(({ style }) => {
+        const raw = (style.textDecorationLine ?? style.textDecoration ?? '') as string;
+        const parts = new Set(raw.split(/\s+/).filter(Boolean));
+        if (parts.has(token)) {
+          parts.delete(token);
+        } else {
+          parts.add(token);
+        }
+        const nextValue = parts.size > 0 ? Array.from(parts).join(' ') : undefined;
+        return {
+          style: {
+            textDecorationLine: nextValue,
+            textDecoration: nextValue,
+          },
+        };
+      });
+    },
+    [applyTextStyle]
+  );
+
+  const handleAlignmentChange = useCallback(
+    (nextAlignment: string) => {
+      applyTextStyle(() => ({ style: { textAlign: nextAlignment } }));
+    },
+    [applyTextStyle]
+  );
+
+  const setLineHeight = useCallback(
+    (next: number) => {
+      const value = clamp(Number.isFinite(next) ? next : 1.2, 0.5, 3);
+      applyTextStyle(() => ({ style: { lineHeight: `${value}` } }));
+    },
+    [applyTextStyle, clamp]
+  );
+
+  const setLetterSpacing = useCallback(
+    (next: number) => {
+      const value = clamp(Number.isFinite(next) ? next : 0, -5, 20);
+      applyTextStyle(() => ({ style: { letterSpacing: `${value}px` } }));
+    },
+    [applyTextStyle, clamp]
+  );
+
+  const handleColorChange = useCallback(
+    (value: string | Record<string, any>) => {
+      if (typeof value === 'string') {
+        applyTextStyle(() => ({
+          style: {
+            color: value,
+            backgroundImage: undefined,
+            WebkitBackgroundClip: undefined,
+            backgroundClip: undefined,
+          },
+          metadata: null,
+        }));
+        return;
+      }
+
+      const gradientCss = gradientToCss(value);
+      applyTextStyle(() => ({
+        style: {
+          color: 'transparent',
+          backgroundImage: gradientCss,
+          WebkitBackgroundClip: 'text',
+          backgroundClip: 'text',
+        },
+        metadata: { textGradient: value },
+      }));
+    },
+    [applyTextStyle, gradientToCss]
+  );
+
+  const toggleShadow = useCallback(
+    (enabled: boolean) => {
+      if (!enabled) {
+        applyTextStyle(() => ({ style: { textShadow: undefined } }));
+        return;
+      }
+      applyTextStyle(({ style }) => ({
+        style: { textShadow: formatTextShadow(parseTextShadow(style.textShadow)) },
+      }));
+    },
+    [applyTextStyle, formatTextShadow, parseTextShadow]
+  );
+
+  const updateShadow = useCallback(
+    (partial: Partial<{ offsetX: number; offsetY: number; blur: number; color: string; opacity: number }>) => {
+      applyTextStyle(({ style }) => {
+        const base = parseTextShadow(style.textShadow);
+        const next = { ...base, ...partial };
+        return { style: { textShadow: formatTextShadow(next) } };
+      });
+    },
+    [applyTextStyle, formatTextShadow, parseTextShadow]
+  );
+
+  const toggleReflection = useCallback(
+    (enabled: boolean) => {
+      if (!enabled) {
+        applyTextStyle(() => ({
+          style: {
+            WebkitBoxReflect: undefined,
+            boxReflect: undefined,
+          },
+        }));
+        return;
+      }
+      applyTextStyle(() => ({
+        style: {
+          WebkitBoxReflect:
+            '10px linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.3))',
+          boxReflect:
+            '10px linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.3))',
+        },
+      }));
+    },
+    [applyTextStyle]
+  );
+
+  const setReflectionDistance = useCallback(
+    (distance: number) => {
+      const bounded = clamp(Math.round(distance), 0, 120);
+      applyTextStyle(({ style }) => {
+        const raw = (style.WebkitBoxReflect ?? style.boxReflect ??
+          '10px linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.3))') as string;
+        const gradient = raw.split(' ').slice(1).join(' ') ||
+          'linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.3))';
+        const nextReflection = `${bounded}px ${gradient}`;
+        return {
+          style: {
+            WebkitBoxReflect: nextReflection,
+            boxReflect: nextReflection,
+          },
+        };
+      });
+    },
+    [applyTextStyle, clamp]
+  );
+
+  const alignmentItems = useMemo(
+    () => [
+      {
+        value: 'left',
+        tooltip: 'Align left',
+        label: (
+          <svg
+            className="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="21" y1="10" x2="7" y2="10" />
+            <line x1="21" y1="6" x2="3" y2="6" />
+            <line x1="21" y1="14" x2="3" y2="14" />
+            <line x1="21" y1="18" x2="7" y2="18" />
+          </svg>
+        ),
+      },
+      {
+        value: 'center',
+        tooltip: 'Align center',
+        label: (
+          <svg
+            className="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="18" y1="10" x2="6" y2="10" />
+            <line x1="21" y1="6" x2="3" y2="6" />
+            <line x1="21" y1="14" x2="3" y2="14" />
+            <line x1="18" y1="18" x2="6" y2="18" />
+          </svg>
+        ),
+      },
+      {
+        value: 'right',
+        tooltip: 'Align right',
+        label: (
+          <svg
+            className="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="3" y1="10" x2="17" y2="10" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="14" x2="21" y2="14" />
+            <line x1="3" y1="18" x2="17" y2="18" />
+          </svg>
+        ),
+      },
+      {
+        value: 'justify',
+        tooltip: 'Justify',
+        label: (
+          <svg
+            className="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="21" y1="6" x2="3" y2="6" />
+            <line x1="21" y1="10" x2="3" y2="10" />
+            <line x1="21" y1="14" x2="3" y2="14" />
+            <line x1="21" y1="18" x2="3" y2="18" />
+          </svg>
+        ),
+      },
+    ],
+    []
+  );
+
   return (
-    <div className="editor-panel w-[280px] flex flex-col overflow-hidden border-l border-[var(--editor-border-strong)]">
-      <div className="editor-panel-header px-5 py-5 border-b border-[var(--editor-border-strong)]">
-        Properties
-        {selectedElementIds.size > 1 && (
-          <span className="ml-2 text-xs text-[var(--editor-text-muted)]">
-            ({selectedElementIds.size} selected)
-          </span>
-        )}
-      </div>
-      <div className="flex-1 p-5 overflow-y-auto editor-panel-body">
+    <Panel className="w-[300px] border-l border-border/20">
+      <PanelHeader className="px-5 py-4">
+        <div className="flex w-full items-center justify-between gap-2">
+          <PanelTitle>Properties</PanelTitle>
+          {selectedElementIds.size > 1 && (
+            <span className="text-xs text-muted-foreground">
+              {selectedElementIds.size} selected
+            </span>
+          )}
+        </div>
+      </PanelHeader>
+      <PanelBody className="space-y-4">
         {selectedElement ? (
           <div className="flex flex-col gap-4">
             {/* Position & Size */}
             <div>
-              <Label className="mb-2 editor-section-heading">
+              <Label className={`mb-2 ${SECTION_HEADING}`}>
                 Position &amp; Size
               </Label>
               <div className="grid grid-cols-2 gap-2">
                 <PropertyInput
                   label="X"
-                  value={selectedElement.bounds?.x || 0}
+                  numericValue={selectedElement.bounds?.x || 0}
                   onChange={(val) => {
                     if (selectedElementIds.size > 1) {
                       // For multi-selection, apply relative offset
@@ -82,7 +654,7 @@ export function PropertiesPanel() {
                 />
                 <PropertyInput
                   label="Y"
-                  value={selectedElement.bounds?.y || 0}
+                  numericValue={selectedElement.bounds?.y || 0}
                   onChange={(val) => {
                     if (selectedElementIds.size > 1) {
                       // For multi-selection, apply relative offset
@@ -110,7 +682,7 @@ export function PropertiesPanel() {
                 />
                 <PropertyInput
                   label="W"
-                  value={selectedElement.bounds?.width || 100}
+                  numericValue={selectedElement.bounds?.width || 100}
                   onChange={(val) => {
                     if (selectedElementIds.size > 1) {
                       // For multi-selection, scale proportionally
@@ -138,7 +710,7 @@ export function PropertiesPanel() {
                 />
                 <PropertyInput
                   label="H"
-                  value={selectedElement.bounds?.height || 50}
+                  numericValue={selectedElement.bounds?.height || 50}
                   onChange={(val) => {
                     if (selectedElementIds.size > 1) {
                       // For multi-selection, scale proportionally
@@ -169,588 +741,299 @@ export function PropertiesPanel() {
 
             {/* Text Properties */}
             {selectedElement.type === 'text' && (
-              <>
-                {/* Text Content */}
-                <div>
-                  <Label className="mb-2 editor-section-heading">
-                    Text Content
-                  </Label>
-                  <textarea
-                    value={(selectedElement as any).content || ''}
-                    onChange={(e) => {
-                      selectedElementIds.forEach((id) => {
-                        const element = selectedElements.find(el => el.id === id);
-                        if (element && element.type === 'text') {
-                          editor.updateElement(id, { content: e.target.value });
-                        }
-                      });
-                    }}
-                    className="w-full min-h-[60px] p-2 bg-background dark:bg-muted/50 border border-border/20 dark:border-border/30 dark:border-border/10 rounded text-foreground text-sm font-inherit resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-lume-primary/50"
-                  />
-                </div>
-
-                {/* Font Family */}
-                <div>
-                  <Label className="mb-2 editor-section-heading">
-                    Font Family
-                  </Label>
-                  <select
-                    value={(selectedElement.style as any)?.fontFamily || 'inherit'}
-                    onChange={(e) => {
-                      selectedElementIds.forEach((id) => {
-                        const el = selectedElements.find(e => e.id === id);
-                        if (el && el.type === 'text') {
-                          editor.updateElement(id, {
-                            style: { ...el.style, fontFamily: e.target.value },
-                          });
-                        }
-                      });
-                    }}
-                    className="w-full px-2 text-sm border rounded h-9 bg-background dark:bg-muted/50 border-border/30 dark:border-border/10 text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-lume-primary/50"
-                  >
-                    <option value="inherit">System Default</option>
-                    <option value="Arial, sans-serif">Arial</option>
-                    <option value="Helvetica, sans-serif">Helvetica</option>
-                    <option value="'Times New Roman', serif">Times New Roman</option>
-                    <option value="Georgia, serif">Georgia</option>
-                    <option value="'Courier New', monospace">Courier New</option>
-                    <option value="Verdana, sans-serif">Verdana</option>
-                    <option value="Tahoma, sans-serif">Tahoma</option>
-                    <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
-                    <option value="'Palatino Linotype', serif">Palatino</option>
-                    <option value="'Comic Sans MS', cursive">Comic Sans MS</option>
-                    <option value="Impact, sans-serif">Impact</option>
-                    <option value="'Lucida Console', monospace">Lucida Console</option>
-                  </select>
-                </div>
-
-                {/* Font Size */}
-                <div>
-                  <Label className="mb-2 editor-section-heading">
-                    Font Size
-                  </Label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="range"
-                      min="8"
-                      max="200"
-                      value={parseInt((selectedElement.style as any)?.fontSize?.replace('px', '') || '24')}
-                      onChange={(e) => {
-                        const fontSize = `${e.target.value}px`;
-                        selectedElementIds.forEach((id) => {
-                          const el = selectedElements.find(e => e.id === id);
-                          if (el && el.type === 'text') {
-                            editor.updateElement(id, {
-                              style: { ...el.style, fontSize },
-                            });
-                          }
-                        });
-                      }}
-                      className="flex-1 h-1 rounded-sm outline-none bg-border/30 dark:bg-white/10 accent-lume-primary"
-                    />
-                    <Input
-                      type="number"
-                      min="8"
-                      max="200"
-                      value={parseInt((selectedElement.style as any)?.fontSize?.replace('px', '') || '24')}
-                      onChange={(e) => {
-                        const fontSize = `${Math.max(8, Math.min(200, parseInt(e.target.value) || 24))}px`;
-                        selectedElementIds.forEach((id) => {
-                          const el = selectedElements.find(e => e.id === id);
-                          if (el && el.type === 'text') {
-                            editor.updateElement(id, {
-                              style: { ...el.style, fontSize },
-                            });
-                          }
-                        });
-                      }}
-                      className="w-[70px] h-9 px-2 bg-background dark:bg-muted/50 border border-border/30 dark:border-border/10 text-foreground text-sm"
-                    />
-                    <span className="text-xs text-foreground/60">px</span>
-                  </div>
-                </div>
-
-                {/* Text Style Buttons (B, I, U, ~) */}
-                <div>
-                  <Label className="mb-2 editor-section-heading">
-                    Style
-                  </Label>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        selectedElementIds.forEach((id) => {
-                          const el = selectedElements.find(e => e.id === id);
-                          if (el && el.type === 'text') {
-                            const currentWeight = (el.style as any)?.fontWeight || 'normal';
-                            editor.updateElement(id, {
-                              style: { ...el.style, fontWeight: currentWeight === 'bold' ? 'normal' : 'bold' },
-                            });
-                          }
-                        });
-                      }}
-                      className={`flex-1 h-9 px-3 rounded border transition-colors ${
-                        (selectedElement.style as any)?.fontWeight === 'bold'
-                          ? 'bg-lume-primary/20 border-lume-primary text-lume-primary'
-                          : 'bg-background dark:bg-muted/50 border-border/30 dark:border-border/10 text-foreground hover:bg-muted/50'
-                      }`}
-                      title="Bold"
-                    >
-                      <strong>B</strong>
-                    </button>
-                    <button
-                      onClick={() => {
-                        selectedElementIds.forEach((id) => {
-                          const el = selectedElements.find(e => e.id === id);
-                          if (el && el.type === 'text') {
-                            const currentStyle = (el.style as any)?.fontStyle || 'normal';
-                            editor.updateElement(id, {
-                              style: { ...el.style, fontStyle: currentStyle === 'italic' ? 'normal' : 'italic' },
-                            });
-                          }
-                        });
-                      }}
-                      className={`flex-1 h-9 px-3 rounded border transition-colors ${
-                        (selectedElement.style as any)?.fontStyle === 'italic'
-                          ? 'bg-lume-primary/20 border-lume-primary text-lume-primary'
-                          : 'bg-background dark:bg-muted/50 border-border/30 dark:border-border/10 text-foreground hover:bg-muted/50'
-                      }`}
-                      title="Italic"
-                    >
-                      <em>I</em>
-                    </button>
-                    <button
-                      onClick={() => {
-                        selectedElementIds.forEach((id) => {
-                          const el = selectedElements.find(e => e.id === id);
-                          if (el && el.type === 'text') {
-                            const currentDecoration = (el.style as any)?.textDecoration || 'none';
-                            editor.updateElement(id, {
-                              style: { ...el.style, textDecoration: currentDecoration === 'underline' ? 'none' : 'underline' },
-                            });
-                          }
-                        });
-                      }}
-                      className={`flex-1 h-9 px-3 rounded border transition-colors ${
-                        (selectedElement.style as any)?.textDecoration === 'underline'
-                          ? 'bg-lume-primary/20 border-lume-primary text-lume-primary'
-                          : 'bg-background dark:bg-muted/50 border-border/30 dark:border-border/10 text-foreground hover:bg-muted/50'
-                      }`}
-                      title="Underline"
-                    >
-                      <u>U</u>
-                    </button>
-                    <button
-                      onClick={() => {
-                        selectedElementIds.forEach((id) => {
-                          const el = selectedElements.find(e => e.id === id);
-                          if (el && el.type === 'text') {
-                            const currentDecoration = (el.style as any)?.textDecoration || 'none';
-                            editor.updateElement(id, {
-                              style: { ...el.style, textDecoration: currentDecoration === 'line-through' ? 'none' : 'line-through' },
-                            });
-                          }
-                        });
-                      }}
-                      className={`flex-1 h-9 px-3 rounded border transition-colors ${
-                        (selectedElement.style as any)?.textDecoration === 'line-through'
-                          ? 'bg-lume-primary/20 border-lume-primary text-lume-primary'
-                          : 'bg-background dark:bg-muted/50 border-border/30 dark:border-border/10 text-foreground hover:bg-muted/50'
-                      }`}
-                      title="Strikethrough"
-                    >
-                      <span style={{ textDecoration: 'line-through' }}>S</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Text Color with Gradient Support */}
-                <div>
-                  <Label className="mb-2 editor-section-heading">
-                    Text Color
-                  </Label>
-                  <ColorPicker
-                    value={(selectedElement.style as any)?.color || '#000000'}
-                    onChange={(value) => {
-                      selectedElementIds.forEach((id) => {
-                        const el = selectedElements.find(e => e.id === id);
-                        if (el && el.type === 'text') {
-                          editor.updateElement(id, {
-                            style: { ...el.style, color: value },
-                          });
-                        }
-                      });
-                    }}
-                  />
-                </div>
-
-                {/* Text Alignment */}
-                <div>
-                  <Label className="mb-2 editor-section-heading">
-                    Alignment
-                  </Label>
-                  <div className="grid grid-cols-4 gap-2">
-                    <button
-                      onClick={() => {
-                        selectedElementIds.forEach((id) => {
-                          const el = selectedElements.find(e => e.id === id);
-                          if (el && el.type === 'text') {
-                            editor.updateElement(id, {
-                              style: { ...el.style, textAlign: 'left' },
-                            });
-                          }
-                        });
-                      }}
-                      className={`h-9 px-3 rounded border transition-colors ${
-                        (selectedElement.style as any)?.textAlign === 'left' || !(selectedElement.style as any)?.textAlign
-                          ? 'bg-lume-primary/20 border-lume-primary text-lume-primary'
-                          : 'bg-background dark:bg-muted/50 border-border/30 dark:border-border/10 text-foreground hover:bg-muted/50'
-                      }`}
-                      title="Align Left"
-                    >
-                      <svg className="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <line x1="21" y1="10" x2="7" y2="10" />
-                        <line x1="21" y1="6" x2="3" y2="6" />
-                        <line x1="21" y1="14" x2="3" y2="14" />
-                        <line x1="21" y1="18" x2="7" y2="18" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => {
-                        selectedElementIds.forEach((id) => {
-                          const el = selectedElements.find(e => e.id === id);
-                          if (el && el.type === 'text') {
-                            editor.updateElement(id, {
-                              style: { ...el.style, textAlign: 'center' },
-                            });
-                          }
-                        });
-                      }}
-                      className={`h-9 px-3 rounded border transition-colors ${
-                        (selectedElement.style as any)?.textAlign === 'center'
-                          ? 'bg-lume-primary/20 border-lume-primary text-lume-primary'
-                          : 'bg-background dark:bg-muted/50 border-border/30 dark:border-border/10 text-foreground hover:bg-muted/50'
-                      }`}
-                      title="Align Center"
-                    >
-                      <svg className="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <line x1="18" y1="10" x2="6" y2="10" />
-                        <line x1="21" y1="6" x2="3" y2="6" />
-                        <line x1="21" y1="14" x2="3" y2="14" />
-                        <line x1="18" y1="18" x2="6" y2="18" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => {
-                        selectedElementIds.forEach((id) => {
-                          const el = selectedElements.find(e => e.id === id);
-                          if (el && el.type === 'text') {
-                            editor.updateElement(id, {
-                              style: { ...el.style, textAlign: 'right' },
-                            });
-                          }
-                        });
-                      }}
-                      className={`h-9 px-3 rounded border transition-colors ${
-                        (selectedElement.style as any)?.textAlign === 'right'
-                          ? 'bg-lume-primary/20 border-lume-primary text-lume-primary'
-                          : 'bg-background dark:bg-muted/50 border-border/30 dark:border-border/10 text-foreground hover:bg-muted/50'
-                      }`}
-                      title="Align Right"
-                    >
-                      <svg className="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <line x1="3" y1="10" x2="17" y2="10" />
-                        <line x1="3" y1="6" x2="21" y2="6" />
-                        <line x1="3" y1="14" x2="21" y2="14" />
-                        <line x1="3" y1="18" x2="17" y2="18" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => {
-                        selectedElementIds.forEach((id) => {
-                          const el = selectedElements.find(e => e.id === id);
-                          if (el && el.type === 'text') {
-                            editor.updateElement(id, {
-                              style: { ...el.style, textAlign: 'justify' },
-                            });
-                          }
-                        });
-                      }}
-                      className={`h-9 px-3 rounded border transition-colors ${
-                        (selectedElement.style as any)?.textAlign === 'justify'
-                          ? 'bg-lume-primary/20 border-lume-primary text-lume-primary'
-                          : 'bg-background dark:bg-muted/50 border-border/30 dark:border-border/10 text-foreground hover:bg-muted/50'
-                      }`}
-                      title="Justify"
-                    >
-                      <svg className="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <line x1="21" y1="10" x2="3" y2="10" />
-                        <line x1="21" y1="6" x2="3" y2="6" />
-                        <line x1="21" y1="14" x2="3" y2="14" />
-                        <line x1="21" y1="18" x2="3" y2="18" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Line Height */}
-                <div>
-                  <Label className="mb-2 editor-section-heading">
-                    Line Height
-                  </Label>
-                  <Input
-                    type="number"
-                    min="0.5"
-                    max="3"
-                    step="0.1"
-                    value={(selectedElement.style as any)?.lineHeight?.replace('px', '')?.replace('em', '') || '1.2'}
-                    onChange={(e) => {
-                      const lineHeight = parseFloat(e.target.value) || 1.2;
-                      selectedElementIds.forEach((id) => {
-                        const el = selectedElements.find(e => e.id === id);
-                        if (el && el.type === 'text') {
-                          editor.updateElement(id, {
-                            style: { ...el.style, lineHeight: `${lineHeight}` },
-                          });
-                        }
-                      });
-                    }}
-                    className="w-full bg-background dark:bg-muted/50 border-border/30 dark:border-border/10 text-foreground"
-                  />
-                </div>
-
-                {/* Letter Spacing */}
-                <div>
-                  <Label className="mb-2 editor-section-heading">
-                    Letter Spacing
-                  </Label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="range"
-                      min="-5"
-                      max="20"
-                      step="0.5"
-                      value={(selectedElement.style as any)?.letterSpacing?.replace('px', '')?.replace('em', '') || '0'}
-                      onChange={(e) => {
-                        const letterSpacing = `${e.target.value}px`;
-                        selectedElementIds.forEach((id) => {
-                          const el = selectedElements.find(e => e.id === id);
-                          if (el && el.type === 'text') {
-                            editor.updateElement(id, {
-                              style: { ...el.style, letterSpacing },
-                            });
-                          }
-                        });
-                      }}
-                      className="flex-1 h-1 rounded-sm outline-none bg-border/30 dark:bg-white/10 accent-lume-primary"
-                    />
-                    <Input
-                      type="number"
-                      min="-5"
-                      max="20"
-                      step="0.5"
-                      value={(selectedElement.style as any)?.letterSpacing?.replace('px', '')?.replace('em', '') || '0'}
-                      onChange={(e) => {
-                        const letterSpacing = `${parseFloat(e.target.value) || 0}px`;
-                        selectedElementIds.forEach((id) => {
-                          const el = selectedElements.find(e => e.id === id);
-                          if (el && el.type === 'text') {
-                            editor.updateElement(id, {
-                              style: { ...el.style, letterSpacing },
-                            });
-                          }
-                        });
-                      }}
-                      className="w-[70px] h-9 px-2 bg-background dark:bg-muted/50 border border-border/30 dark:border-border/10 text-foreground text-sm"
-                    />
-                    <span className="text-xs text-foreground/60">px</span>
-                  </div>
-                </div>
-
-                {/* Drop Shadow */}
-                <div>
-                  <Label className="mb-2 editor-section-heading">
-                    Drop Shadow
-                  </Label>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={!!(selectedElement.style as any)?.textShadow && (selectedElement.style as any)?.textShadow !== 'none'}
-                        onChange={(e) => {
-                          selectedElementIds.forEach((id) => {
-                            const el = selectedElements.find(e => e.id === id);
-                            if (el && el.type === 'text') {
-                              const currentShadow = (el.style as any)?.textShadow;
-                              editor.updateElement(id, {
-                                style: { 
-                                  ...el.style, 
-                                  textShadow: e.target.checked 
-                                    ? (currentShadow && currentShadow !== 'none' ? currentShadow : '2px 2px 4px rgba(0,0,0,0.3)')
-                                    : 'none'
-                                },
-                              });
-                            }
-                          });
-                        }}
-                        className="w-4 h-4 accent-lume-primary"
-                      />
-                      <Label className="text-sm">Enable Shadow</Label>
-                    </div>
-                    {!!(selectedElement.style as any)?.textShadow && (selectedElement.style as any)?.textShadow !== 'none' && (
-                      <>
-                        <div className="grid grid-cols-3 gap-2">
-                          <PropertyInput
-                            label="X"
-                            value={parseInt((selectedElement.style as any)?.textShadow?.split(' ')[0] || '2')}
-                            onChange={(val) => {
-                              const shadow = (selectedElement.style as any)?.textShadow || '2px 2px 4px rgba(0,0,0,0.3)';
-                              const parts = shadow.split(' ');
-                              const newShadow = `${val}px ${parts[1] || '2px'} ${parts[2] || '4px'} ${parts[3] || 'rgba(0,0,0,0.3)'}`;
-                              selectedElementIds.forEach((id) => {
-                                const el = selectedElements.find(e => e.id === id);
-                                if (el && el.type === 'text') {
-                                  editor.updateElement(id, {
-                                    style: { ...el.style, textShadow: newShadow },
-                                  });
-                                }
-                              });
-                            }}
-                          />
-                          <PropertyInput
-                            label="Y"
-                            value={parseInt((selectedElement.style as any)?.textShadow?.split(' ')[1] || '2')}
-                            onChange={(val) => {
-                              const shadow = (selectedElement.style as any)?.textShadow || '2px 2px 4px rgba(0,0,0,0.3)';
-                              const parts = shadow.split(' ');
-                              const newShadow = `${parts[0] || '2px'} ${val}px ${parts[2] || '4px'} ${parts[3] || 'rgba(0,0,0,0.3)'}`;
-                              selectedElementIds.forEach((id) => {
-                                const el = selectedElements.find(e => e.id === id);
-                                if (el && el.type === 'text') {
-                                  editor.updateElement(id, {
-                                    style: { ...el.style, textShadow: newShadow },
-                                  });
-                                }
-                              });
-                            }}
-                          />
-                          <PropertyInput
-                            label="Blur"
-                            value={parseInt((selectedElement.style as any)?.textShadow?.split(' ')[2] || '4')}
-                            onChange={(val) => {
-                              const shadow = (selectedElement.style as any)?.textShadow || '2px 2px 4px rgba(0,0,0,0.3)';
-                              const parts = shadow.split(' ');
-                              const newShadow = `${parts[0] || '2px'} ${parts[1] || '2px'} ${val}px ${parts[3] || 'rgba(0,0,0,0.3)'}`;
-                              selectedElementIds.forEach((id) => {
-                                const el = selectedElements.find(e => e.id === id);
-                                if (el && el.type === 'text') {
-                                  editor.updateElement(id, {
-                                    style: { ...el.style, textShadow: newShadow },
-                                  });
-                                }
-                              });
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <Label className="mb-1 text-[0.65rem]">Shadow Color</Label>
-                          <input
-                            type="color"
-                            value={(selectedElement.style as any)?.textShadow?.match(/rgba?\([^)]+\)/) 
-                              ? 'rgba(0,0,0,0.3)' // Default, color picker doesn't support rgba
-                              : (selectedElement.style as any)?.textShadow?.split(' ').pop() || '#000000'}
-                            onChange={(e) => {
-                              const shadow = (selectedElement.style as any)?.textShadow || '2px 2px 4px rgba(0,0,0,0.3)';
-                              const parts = shadow.split(' ');
-                              const rgb = e.target.value;
-                              const r = parseInt(rgb.slice(1, 3), 16);
-                              const g = parseInt(rgb.slice(3, 5), 16);
-                              const b = parseInt(rgb.slice(5, 7), 16);
-                              const newShadow = `${parts[0]} ${parts[1]} ${parts[2]} rgba(${r},${g},${b},0.3)`;
-                              selectedElementIds.forEach((id) => {
-                                const el = selectedElements.find(e => e.id === id);
-                                if (el && el.type === 'text') {
-                                  editor.updateElement(id, {
-                                    style: { ...el.style, textShadow: newShadow },
-                                  });
-                                }
-                              });
-                            }}
-                            className="w-full border rounded h-9 border-border/30 dark:border-border/10"
-                          />
-                        </div>
-                      </>
+              <div className="rounded-2xl border border-border/25 bg-card/96 shadow-[0_12px_28px_rgba(11,16,34,0.08)] backdrop-blur-sm supports-[backdrop-filter]:bg-card/88">
+                <div className="flex items-center justify-between border-b border-border/25 px-4 py-3">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      Text
+                    </p>
+                    {selectedTextElements.length > 1 && (
+                      <p className="mt-1 text-[10px] text-muted-foreground/70">
+                        Editing {selectedTextElements.length} text layers
+                      </p>
                     )}
                   </div>
                 </div>
+                <div className="space-y-6 px-4 py-4">
+                  <section className="space-y-3">
+                    <Label className={SECTION_HEADING}>
+                      Font
+                    </Label>
+                    <Select
+                      value={sharedFontFamily.mixed ? '__mixed__' : (sharedFontFamily.value as string) ?? 'inherit'}
+                      onChange={(e) => {
+                        if (e.target.value === '__mixed__') return;
+                        setFontFamily(e.target.value);
+                      }}
+                    >
+                      {sharedFontFamily.mixed && (
+                        <option value="__mixed__" disabled>
+                          Mixed fonts
+                        </option>
+                      )}
+                      <option value="inherit">System Default</option>
+                      <option value="Arial, sans-serif">Arial</option>
+                      <option value="Helvetica, sans-serif">Helvetica</option>
+                      <option value="'Times New Roman', serif">Times New Roman</option>
+                      <option value="Georgia, serif">Georgia</option>
+                      <option value="'Courier New', monospace">Courier New</option>
+                      <option value="Verdana, sans-serif">Verdana</option>
+                      <option value="Tahoma, sans-serif">Tahoma</option>
+                      <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                      <option value="'Palatino Linotype', serif">Palatino</option>
+                      <option value="'Comic Sans MS', cursive">Comic Sans</option>
+                      <option value="Impact, sans-serif">Impact</option>
+                      <option value="'Lucida Console', monospace">Lucida Console</option>
+                    </Select>
+                  </section>
 
-                {/* Text Reflection */}
-                <div>
-                  <Label className="mb-2 editor-section-heading">
-                    Reflection
-                  </Label>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={!!(selectedElement.style as any)?.WebkitBoxReflect || !!(selectedElement.style as any)?.boxReflect}
-                        onChange={(e) => {
-                          selectedElementIds.forEach((id) => {
-                            const el = selectedElements.find(e => e.id === id);
-                            if (el && el.type === 'text') {
-                              const reflection = e.target.checked ? '10px linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.3))' : 'none';
-                              editor.updateElement(id, {
-                                style: { 
-                                  ...el.style, 
-                                  WebkitBoxReflect: reflection,
-                                  boxReflect: reflection,
-                                },
-                              });
-                            }
-                          });
-                        }}
-                        className="w-4 h-4 accent-lume-primary"
-                      />
-                      <Label className="text-sm">Enable Reflection</Label>
+                  <section className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className={SECTION_HEADING}>
+                        Size
+                      </Label>
+                      <span className="text-xs font-medium text-muted-foreground/80">
+                        {fontSizeNumber}px{sharedFontSize.mixed ? ' • mixed' : ''}
+                      </span>
                     </div>
-                    {!!(selectedElement.style as any)?.WebkitBoxReflect || !!(selectedElement.style as any)?.boxReflect ? (
-                      <div>
-                        <Label className="mb-1 text-[0.65rem]">Reflection Distance</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={parseInt(((selectedElement.style as any)?.WebkitBoxReflect || (selectedElement.style as any)?.boxReflect || '10px').split(' ')[0]) || 10}
-                          onChange={(e) => {
-                            const distance = `${Math.max(0, Math.min(100, parseInt(e.target.value) || 10))}px`;
-                            const gradient = ((selectedElement.style as any)?.WebkitBoxReflect || (selectedElement.style as any)?.boxReflect || '10px linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.3))').split(' ').slice(1).join(' ') || 'linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.3))';
-                            const reflection = `${distance} ${gradient}`;
-                            selectedElementIds.forEach((id) => {
-                              const el = selectedElements.find(e => e.id === id);
-                              if (el && el.type === 'text') {
-                                editor.updateElement(id, {
-                                  style: { 
-                                    ...el.style, 
-                                    WebkitBoxReflect: reflection,
-                                    boxReflect: reflection,
-                                  },
-                                });
-                              }
-                            });
-                          }}
-                          className="w-full bg-background dark:bg-muted/50 border-border/30 dark:border-border/10 text-foreground"
+                    <Slider
+                      value={[fontSizeNumber]}
+                      min={8}
+                      max={200}
+                      step={1}
+                      onValueChange={(value) => setFontSize(value[0] ?? fontSizeNumber)}
+                    />
+                    <Input
+                      type="number"
+                      min={8}
+                      max={200}
+                      value={fontSizeNumber}
+                      onChange={(e) => setFontSize(Number(e.target.value) || fontSizeNumber)}
+                      className="h-9 w-24 rounded-lg"
+                    />
+                  </section>
+
+                  <section className="space-y-3">
+                    <Label className={SECTION_HEADING}>
+                      Style
+                    </Label>
+                    <div className="grid grid-cols-4 gap-2">
+                      <Toggle
+                        aria-label="Bold"
+                        pressed={boldAll}
+                        data-indeterminate={boldSome && !boldAll ? true : undefined}
+                        onPressedChange={() => toggleBold()}
+                        className="h-9 rounded-lg border border-border/25 text-sm font-semibold"
+                      >
+                        B
+                      </Toggle>
+                      <Toggle
+                        aria-label="Italic"
+                        pressed={italicAll}
+                        data-indeterminate={italicSome && !italicAll ? true : undefined}
+                        onPressedChange={() => toggleItalic()}
+                        className="h-9 rounded-lg border border-border/25 text-sm italic"
+                      >
+                        I
+                      </Toggle>
+                      <Toggle
+                        aria-label="Underline"
+                        pressed={underlineAll}
+                        data-indeterminate={underlineSome && !underlineAll ? true : undefined}
+                        onPressedChange={() => toggleDecoration('underline')}
+                        className="h-9 rounded-lg border border-border/25 text-sm"
+                      >
+                        <span className="underline">U</span>
+                      </Toggle>
+                      <Toggle
+                        aria-label="Strikethrough"
+                        pressed={strikethroughAll}
+                        data-indeterminate={strikethroughSome && !strikethroughAll ? true : undefined}
+                        onPressedChange={() => toggleDecoration('line-through')}
+                        className="h-9 rounded-lg border border-border/25 text-sm"
+                      >
+                        <span style={{ textDecoration: 'line-through' }}>S</span>
+                      </Toggle>
+                    </div>
+                  </section>
+
+                  <Separator className="bg-border/20" />
+
+                  <section className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className={SECTION_HEADING}>
+                        Fill
+                      </Label>
+                      <ColorPicker value={textColorValue} onChange={handleColorChange} />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className={SECTION_HEADING}>
+                          Alignment
+                        </Label>
+                        {alignmentMixed && (
+                          <span className="text-[10px] text-muted-foreground/70">Mixed</span>
+                        )}
+                      </div>
+                      <SegmentedControl
+                        variant="editor"
+                        items={alignmentItems}
+                        value={alignmentValue}
+                        onValueChange={handleAlignmentChange}
+                      />
+                    </div>
+                  </section>
+
+                  <section className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className={SECTION_HEADING}>
+                          Line Height
+                        </Label>
+                        <span className="text-xs text-muted-foreground/80">
+                          {lineHeightNumber.toFixed(2)}{sharedLineHeight.mixed ? ' • mixed' : ''}
+                        </span>
+                      </div>
+                      <Slider
+                        value={[lineHeightNumber]}
+                        min={0.5}
+                        max={3}
+                        step={0.05}
+                        onValueChange={(value) => setLineHeight(value[0] ?? lineHeightNumber)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className={SECTION_HEADING}>
+                          Letter Spacing
+                        </Label>
+                        <span className="text-xs text-muted-foreground/80">
+                          {letterSpacingNumber.toFixed(1)}px{sharedLetterSpacing.mixed ? ' • mixed' : ''}
+                        </span>
+                      </div>
+                      <Slider
+                        value={[letterSpacingNumber]}
+                        min={-5}
+                        max={20}
+                        step={0.5}
+                        onValueChange={(value) => setLetterSpacing(value[0] ?? letterSpacingNumber)}
+                      />
+                    </div>
+                  </section>
+
+                  <Separator className="bg-border/20" />
+
+                  <section className="space-y-4">
+                    <div className="space-y-3 rounded-xl border border-border/25 bg-card/96 p-3 shadow-[0_10px_26px_rgba(11,16,34,0.07)] backdrop-blur-sm supports-[backdrop-filter]:bg-card/88">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className={SECTION_HEADING}>
+                            Drop Shadow
+                          </Label>
+                          {sharedShadow.mixed && (
+                            <p className="text-[10px] text-muted-foreground/70">Mixed settings</p>
+                          )}
+                        </div>
+                        <Switch
+                          checked={sharedShadow.enabled}
+                          onCheckedChange={toggleShadow}
+                          aria-label="Toggle drop shadow"
                         />
                       </div>
-                    ) : null}
-                  </div>
-                </div>
-              </>
-            )}
+                      {sharedShadow.enabled && (
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div className="space-y-1">
+                            <span className={MICRO_HEADING}>Horizontal</span>
+                            <Slider
+                              value={[sharedShadow.state.offsetX]}
+                              min={-100}
+                              max={100}
+                              step={1}
+                              onValueChange={(value) => updateShadow({ offsetX: value[0] ?? sharedShadow.state.offsetX })}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <span className={MICRO_HEADING}>Vertical</span>
+                            <Slider
+                              value={[sharedShadow.state.offsetY]}
+                              min={-100}
+                              max={100}
+                              step={1}
+                              onValueChange={(value) => updateShadow({ offsetY: value[0] ?? sharedShadow.state.offsetY })}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <span className={MICRO_HEADING}>Blur</span>
+                            <Slider
+                              value={[sharedShadow.state.blur]}
+                              min={0}
+                              max={200}
+                              step={1}
+                              onValueChange={(value) => updateShadow({ blur: value[0] ?? sharedShadow.state.blur })}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <span className={`${MICRO_HEADING} text-muted-foreground`}>Opacity {Math.round(sharedShadow.state.opacity * 100)}%</span>
+                            <Slider
+                              value={[Math.round(sharedShadow.state.opacity * 100)]}
+                              min={0}
+                              max={100}
+                              step={1}
+                              onValueChange={(value) => updateShadow({ opacity: (value[0] ?? Math.round(sharedShadow.state.opacity * 100)) / 100 })}
+                            />
+                          </div>
+                          <div className="space-y-2 md:col-span-2">
+                            <span className={MICRO_HEADING}>Color</span>
+                            <ColorInput
+                              value={sharedShadow.state.color}
+                              onChange={(e) => updateShadow({ color: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
+                    <div className="space-y-3 rounded-xl border border-border/25 bg-card/96 p-3 shadow-[0_10px_26px_rgba(11,16,34,0.07)] backdrop-blur-sm supports-[backdrop-filter]:bg-card/88">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className={SECTION_HEADING}>
+                            Reflection
+                          </Label>
+                          {sharedReflection.mixed && (
+                            <p className="text-[10px] text-muted-foreground/70">Mixed settings</p>
+                          )}
+                        </div>
+                        <Switch
+                          checked={sharedReflection.enabled}
+                          onCheckedChange={toggleReflection}
+                          aria-label="Toggle reflection"
+                        />
+                      </div>
+                      {sharedReflection.enabled && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className={MICRO_HEADING}>Distance</span>
+                            <span className="text-xs text-muted-foreground/80">{sharedReflection.distance}px</span>
+                          </div>
+                          <Slider
+                            value={[sharedReflection.distance]}
+                            min={0}
+                            max={120}
+                            step={1}
+                            onValueChange={(value) => setReflectionDistance(value[0] ?? sharedReflection.distance)}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                </div>
+              </div>
+            )}
             {/* Style Properties */}
             {selectedElement.type === 'shape' && (
               <>
                 <div>
-                  <Label className="mb-2 editor-section-heading">
+                  <Label className={`mb-2 ${SECTION_HEADING}`}>
                     Fill Color
                   </Label>
                   <ColorPicker
@@ -769,7 +1052,7 @@ export function PropertiesPanel() {
                   />
                 </div>
                 <div>
-                  <Label className="mb-2 editor-section-heading">
+                  <Label className={`mb-2 ${SECTION_HEADING}`}>
                     Stroke Color
                   </Label>
                   <ColorPicker
@@ -789,7 +1072,7 @@ export function PropertiesPanel() {
                 </div>
                 {(selectedElement.style as any)?.stroke && (selectedElement.style as any).stroke !== 'transparent' && (
                   <div>
-                    <Label className="mb-2 editor-section-heading">
+                    <Label className={`mb-2 ${SECTION_HEADING}`}>
                       Stroke Width
                     </Label>
                     <Input
@@ -809,7 +1092,7 @@ export function PropertiesPanel() {
                           }
                         });
                       }}
-                      className="w-full bg-background dark:bg-muted/50 border-border/30 dark:border-border/10 text-foreground"
+                      className="w-full bg-background dark:bg-muted/50 border-border/20 dark:border-border/10 text-foreground"
                     />
                   </div>
                 )}
@@ -818,18 +1101,17 @@ export function PropertiesPanel() {
 
             {/* Opacity - Available for all element types */}
             <div>
-              <Label className="mb-2 editor-section-heading">
+              <Label className={`mb-2 ${SECTION_HEADING}`}>
                 Opacity
               </Label>
               <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={((selectedElement.style as any)?.opacity ?? 100)}
-                  onChange={(e) => {
-                    const opacity = parseInt(e.target.value);
-                    // Update all selected elements
+                <Slider
+                  value={[((selectedElement.style as any)?.opacity ?? 100)]}
+                  min={0}
+                  max={100}
+                  step={1}
+                  onValueChange={(value) => {
+                    const opacity = value[0] ?? 100;
                     selectedElementIds.forEach((id) => {
                       const el = selectedElements.find(e => e.id === id);
                       if (el) {
@@ -839,7 +1121,7 @@ export function PropertiesPanel() {
                       }
                     });
                   }}
-                  className="flex-1 h-1 rounded-sm outline-none bg-border/30 dark:bg-white/10 accent-lume-primary"
+                  className="flex-1"
                 />
                 <Input
                   type="number"
@@ -858,7 +1140,7 @@ export function PropertiesPanel() {
                       }
                     });
                   }}
-                  className="w-[60px] h-7 px-2 py-1 bg-background dark:bg-muted/50 border-border/30 dark:border-border/10 text-foreground text-xs"
+                  className="h-9 w-[72px] text-xs"
                 />
                 <span className="text-xs text-foreground/60 min-w-[12px]">%</span>
               </div>
@@ -876,22 +1158,31 @@ export function PropertiesPanel() {
         ) : (
           <DocumentProperties />
         )}
-      </div>
-    </div>
+      </PanelBody>
+    </Panel>
   );
 }
 
-function PropertyInput({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+interface PropertyInputProps {
+  label: string;
+  numericValue: number;
+  // eslint-disable-next-line no-unused-vars
+  onChange(value: number): void;
+}
+
+function PropertyInput({ label, numericValue, onChange }: PropertyInputProps) {
+  const displayValue = Number.isFinite(numericValue) ? Math.round(numericValue) : 0;
   return (
     <div>
-      <Label className="block mb-1 text-[0.65rem] font-semibold tracking-[0.08em] uppercase text-[var(--editor-text-muted)]">
+      <Label className={`mb-1 block ${MICRO_HEADING} font-semibold`}>
         {label}
       </Label>
       <Input
         type="number"
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="text-sm editor-input h-9"
+        step={1}
+        value={displayValue}
+        onChange={(e) => onChange(Math.round(Number(e.target.value)))}
+        className="h-9 w-full"
       />
     </div>
   );

@@ -123,28 +123,26 @@ export function StatusBar({ deckId }: StatusBarProps) {
   };
 
   return (
-    <div className="editor-panel-muted h-[26px] border-t border-[var(--editor-border-strong)] flex items-center px-3 text-[11px] font-mono select-none z-[100] text-[var(--editor-text-muted)]">
+    <div className="flex h-[26px] select-none items-center border-t border-border/70 bg-card/80 px-3 text-[11px] font-mono text-muted-foreground backdrop-blur supports-[backdrop-filter]:bg-card/60">
       {/* Left side - Status indicators */}
       <div className="flex items-center gap-4 flex-1">
         {/* Save Status */}
         <div className="flex items-center gap-1">
           {saveStatus === 'saving' && (
             <>
-              <div className="w-2 h-2 rounded-full bg-lume-primary animate-[statusBarPulse_1s_ease-in-out_infinite]" />
+              <div className="h-2 w-2 animate-[statusBarPulse_1s_ease-in-out_infinite] rounded-full bg-primary" />
               <span>Saving...</span>
             </>
           )}
           {saveStatus === 'saved' && (
             <>
-              <div className="w-2 h-2 rounded-full bg-[#10B981]" />
-              <span>
-                {lastSaved ? `Saved ${formatTime(lastSaved)}` : 'Saved'}
-              </span>
+              <div className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span>{lastSaved ? `Saved ${formatTime(lastSaved)}` : 'Saved'}</span>
             </>
           )}
           {saveStatus === 'unsaved' && !autosaveEnabled && (
             <>
-              <div className="w-2 h-2 rounded-full bg-[#F59E0B]" />
+              <div className="h-2 w-2 rounded-full bg-amber-500" />
               <span>Unsaved</span>
             </>
           )}
@@ -153,7 +151,7 @@ export function StatusBar({ deckId }: StatusBarProps) {
         {/* Autosave Status */}
         {autosaveEnabled && (
           <div className="flex items-center gap-1 opacity-70">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
               <circle cx="18" cy="8" r="1" fill="currentColor"/>
             </svg>
@@ -163,8 +161,8 @@ export function StatusBar({ deckId }: StatusBarProps) {
 
         {/* Error Status */}
         {error && (
-          <div className="flex items-center gap-1 text-[#EF4444]">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3">
+          <div className="flex items-center gap-1 text-destructive">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
               <circle cx="12" cy="12" r="10"/>
               <line x1="12" y1="8" x2="12" y2="12"/>
               <line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -176,7 +174,7 @@ export function StatusBar({ deckId }: StatusBarProps) {
         {/* Loading Status */}
         {isLoading && (
           <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full border border-current border-t-transparent animate-[statusBarSpin_0.6s_linear_infinite]" />
+            <div className="h-2 w-2 animate-[statusBarSpin_0.6s_linear_infinite] rounded-full border border-current border-t-transparent" />
             <span>Loading...</span>
           </div>
         )}

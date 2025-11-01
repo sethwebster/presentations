@@ -1,10 +1,14 @@
 "use client";
 
 import React from 'react';
-import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { useState, useRef, useEffect } from 'react';
+import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import type { GroupElementDefinition, SlideDefinition } from '@/rsc/types';
 import { ElementRenderer } from './ElementRenderer';
+import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
+import { Button } from '@/components/ui/button';
+import { SegmentedControl } from '@/components/ui/segmented-control';
+import { cn } from '@/lib/utils';
 
 interface LayerPanelProps {
   deckId: string;
@@ -37,16 +41,14 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
   const currentSlide = deck?.slides[currentSlideIndex];
   if (!currentSlide) {
     return (
-      <div className="editor-panel w-[260px] flex flex-col border-r border-[var(--editor-border-strong)]">
-        <div className="editor-panel-header px-5 py-5 border-b border-[var(--editor-border-strong)]">
-          Layers
-        </div>
-        <div className="editor-panel-body flex-1 p-4 overflow-y-auto">
-          <div className="text-xs italic text-[var(--editor-text-muted)]">
-            No slide selected
-          </div>
-        </div>
-      </div>
+      <Panel className="w-[280px] border-r border-border/70">
+        <PanelHeader className="px-4 py-4">
+          <PanelTitle>Navigator</PanelTitle>
+        </PanelHeader>
+        <PanelBody>
+          <p className="text-xs italic text-muted-foreground">No slide selected</p>
+        </PanelBody>
+      </Panel>
     );
   }
 
@@ -361,57 +363,39 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
     return (
       <div
         onClick={(e) => {
-          e.stopPropagation(); // Prevent click from bubbling to parent container
+          e.stopPropagation();
           editor.setCurrentSlide(index);
           editor.setSelectedSlide(slide.id);
         }}
-        className="relative cursor-pointer transition-all mx-auto"
+        className={cn(
+          'slide-preview relative mx-auto w-full max-w-[200px] cursor-pointer transition',
+          isHidden && 'opacity-60'
+        )}
       >
-        {/* Outer wrapper for border - renders outside without affecting size */}
         <div
-          className={`
-            relative mx-auto mt-1 w-full max-w-[200px] rounded-xl
-            transition-all duration-200 ease-out border-2
-            ${isSelected 
-              ? 'border-lume-primary shadow-[0_0_0_1px_rgba(97,218,251,0.25)]' 
-              : 'border-transparent'
-            }
-            ${isHidden ? 'opacity-50' : ''}
-          `}
+          className={cn(
+            'relative mx-auto mt-1 w-full max-w-[200px] rounded-xl border-2 border-transparent transition-all duration-200 ease-out',
+            isSelected
+              ? 'border-primary shadow-[0_8px_24px_rgba(0,0,0,0.18)]'
+              : 'hover:border-border/70 hover:shadow-[0_6px_18px_rgba(0,0,0,0.12)]'
+          )}
         >
-          {/* Slide preview wrapper with shadow - similar to presenter view */}
           <div
-            className={`
-              relative rounded-lg overflow-hidden
-              transition-all duration-200 ease-out
-              aspect-[16/9] w-full
-              ${isSelected 
-                ? 'shadow-[0_8px_24px_rgba(0,0,0,0.15),0_2px_8px_rgba(0,0,0,0.08)]' 
-                : 'shadow-[0_4px_12px_rgba(0,0,0,0.1),0_2px_4px_rgba(0,0,0,0.06)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.12),0_2px_6px_rgba(0,0,0,0.08)]'
-              }
-            `}
-            style={{
-              background: getBackground(),
-            }}
+            className="relative aspect-[16/9] w-full overflow-hidden rounded-lg border border-border/60 bg-card shadow-sm"
+            style={{ background: getBackground() }}
           >
-          {/* Slide preview content - rendered at full size, scaled down via CSS */}
-          <div
-            className="relative w-full h-full"
-            style={{
-              transform: 'scale(0.15625)', // 200px / 1280px = 0.15625
-              transformOrigin: 'top left',
-              pointerEvents: 'none', // Disable pointer events on the scaled container
-            }}
-          >
-            {/* Render slide at full 1280x720 size, scaled down */}
-            <div 
-              className="relative w-[1280px] h-[720px]"
-              style={{ 
+            <div
+              className="relative w-full h-full"
+              style={{
+                transform: 'scale(0.15625)',
+                transformOrigin: 'top left',
                 pointerEvents: 'none',
               }}
             >
-              {/* Force all child elements to ignore pointer events */}
-              <div style={{ pointerEvents: 'none' }} className="[&_*]:pointer-events-none [&_*]:select-none">
+              <div
+                className="relative h-[720px] w-[1280px] [&_*]:pointer-events-none [&_*]:select-none"
+                style={{ pointerEvents: 'none' }}
+              >
                 {slide.elements?.map((element) => (
                   <ElementRenderer
                     key={element.id}
@@ -434,39 +418,26 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                   )}
               </div>
             </div>
+
+            <button
+              type="button"
+              className="absolute inset-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                editor.setCurrentSlide(index);
+                editor.setSelectedSlide(slide.id);
+              }}
+            />
           </div>
-          
-          {/* Transparent overlay to capture all clicks - absolutely positioned on top */}
-          <div
-            className="absolute inset-0 cursor-pointer"
-            style={{
-              pointerEvents: 'auto',
-              zIndex: 10,
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              editor.setCurrentSlide(index);
-              editor.setSelectedSlide(slide.id);
-            }}
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-            }}
-          />
         </div>
-        </div>
-        
-        {/* Slide number badge - below preview */}
+
         <div
-          className={`
-            mt-1 text-center
-            px-2 py-0.5 rounded text-xs font-semibold
-            ${isSelected
-              ? 'bg-lume-primary text-lume-midnight dark:text-white'
-              : 'bg-background/90 text-foreground dark:text-foreground/70'
-            }
-          `}
+          className={cn(
+            'mt-1 inline-flex min-w-[2.25rem] items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold transition-colors',
+            isSelected
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-muted text-muted-foreground'
+          )}
         >
           {index + 1}
         </div>
@@ -475,41 +446,28 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
   };
 
   return (
-    <div className="editor-panel w-[260px] flex flex-col border-r border-[var(--editor-border-strong)]">
-      {/* Tabs */}
-      <div className="flex border-b border-[var(--editor-border-strong)]">
-        <button
-          onClick={() => setActiveTab('slides')}
-          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-            activeTab === 'slides'
-              ? 'text-foreground border-b-2 border-lume-primary bg-card'
-              : 'text-muted-foreground hover:text-foreground hover:bg-card/50'
-          }`}
-        >
-          Slides
-        </button>
-        <button
-          onClick={() => setActiveTab('layers')}
-          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-            activeTab === 'layers'
-              ? 'text-foreground border-b-2 border-lume-primary bg-card'
-              : 'text-muted-foreground hover:text-foreground hover:bg-card/50'
-          }`}
-        >
-          Layers
-        </button>
-      </div>
-      
-      <div className="editor-panel-body flex-1 overflow-y-auto">
+    <Panel className="w-[280px] border-r border-border/70">
+      <PanelHeader className="flex flex-col gap-2 px-4 py-4">
+        <PanelTitle>Navigator</PanelTitle>
+        <SegmentedControl
+          items={[
+            { value: 'slides', label: 'Slides' },
+            { value: 'layers', label: 'Layers' },
+          ]}
+          value={activeTab}
+          onValueChange={(value) => setActiveTab(value as 'slides' | 'layers')}
+        />
+      </PanelHeader>
+
+      <PanelBody className="space-y-4">
         {activeTab === 'slides' ? (
-          /* Slides Tab */
           <>
-            {/* Add Slide Button */}
-            <div className="p-4 border-b border-[var(--editor-border-strong)]">
-              <button
+            <div className="pb-4 border-b border-border/60">
+              <Button
+                variant="outline"
+                className="flex items-center justify-center w-full gap-2"
                 onClick={() => {
                   editor.addSlide();
-                  // Select the newly added slide
                   const newSlideIndex = deck ? deck.slides.length : 0;
                   setTimeout(() => {
                     const newDeck = editor.getState().deck;
@@ -519,14 +477,13 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                     }
                   }, 0);
                 }}
-                className="w-full px-4 py-2 text-sm font-medium text-foreground bg-lume-primary/10 hover:bg-lume-primary/20 border border-lume-primary/30 rounded-md transition-colors flex items-center justify-center gap-2"
               >
-                <svg 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="2" 
-                  strokeLinecap="round" 
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
                   strokeLinejoin="round"
                   className="w-4 h-4"
                 >
@@ -534,31 +491,23 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
                 New Slide
-              </button>
+              </Button>
             </div>
-            
-            <div 
-              className="p-4 h-full flex-1 overflow-y-auto"
+
+            <div
+              className="flex-1 overflow-y-auto"
               onClick={(e) => {
-                // Clear selection when clicking empty area (not on a slide preview)
                 const target = e.target as HTMLElement;
-                // Check if click is on a slide preview - if not, clear selection
-                // Slide previews have the class "relative cursor-pointer"
-                const clickedSlidePreview = target.closest('.relative.cursor-pointer');
-                
-                // If we didn't click on a slide preview, clear the selection
-                // This handles: padding area, empty space between/below slides, "No slides yet" message
+                const clickedSlidePreview = target.closest('.slide-preview');
                 if (!clickedSlidePreview) {
                   editor.clearSelection();
                 }
               }}
             >
               {!deck || deck.slides.length === 0 ? (
-                <div className="text-xs italic text-[var(--editor-text-muted)]">
-                  No slides yet
-                </div>
+                <p className="text-xs italic text-muted-foreground">No slides yet</p>
               ) : (
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-3 mt-4">
                   {deck.slides.map((slide, index) => (
                     <SlidePreview key={slide.id} slide={slide} index={index} />
                   ))}
@@ -567,85 +516,72 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
             </div>
           </>
         ) : (
-          /* Layers Tab */
-          <>
-            {!currentSlide ? (
-              <div className="p-4">
-                <div className="text-xs italic text-[var(--editor-text-muted)]">
-                  No slide selected
-                </div>
+          <div className="space-y-3">
+            {(currentSlide.layers || []).length > 0 && (
+              <div className="mb-2 flex flex-col gap-0.5">
+                {(currentSlide.layers || [])
+                  .sort((a, b) => a.order - b.order)
+                  .map((layer) => {
+                    const isExpanded = expandedLayers.has(layer.id);
+                    const isEditing = editingLayerId === layer.id;
+
+                    return (
+                      <div key={layer.id} className="mb-1">
+                        <div
+                          className="flex cursor-pointer items-center gap-1.5 rounded bg-muted/50 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-foreground"
+                          onClick={() => toggleLayer(layer.id)}
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            className={`h-3 w-3 transition-transform duration-200 ${isExpanded ? 'rotate-90' : 'rotate-0'}`}
+                          >
+                            <polyline points="9 18 15 12 9 6" />
+                          </svg>
+
+                          {isEditing ? (
+                            <input
+                              ref={layerNameInputRef}
+                              value={editingLayerName}
+                              onChange={(e) => setEditingLayerName(e.target.value)}
+                              onBlur={saveLayerName}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  saveLayerName();
+                                } else if (e.key === 'Escape') {
+                                  cancelEditingLayerName();
+                                }
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex-1 rounded border border-border bg-background px-1 py-0.5 text-[11px] font-semibold uppercase text-foreground"
+                            />
+                          ) : (
+                            <span
+                              className="flex-1"
+                              onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                startEditingLayerName(layer.id, layer.name || '');
+                              }}
+                            >
+                              {layer.name || `Layer ${layer.order + 1}`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+
+            {allElements.length === 0 ? (
+              <div className="px-3 py-2 text-xs italic border border-dashed rounded-md border-border/60 text-muted-foreground">
+                No layers yet
               </div>
             ) : (
-              <div className="p-4">
-                {/* Render layers */}
-                {(currentSlide.layers || []).length > 0 && (
-          <div className="flex flex-col gap-0.5 mb-2">
-            {(currentSlide.layers || [])
-              .sort((a, b) => a.order - b.order)
-              .map((layer) => {
-                const isExpanded = expandedLayers.has(layer.id);
-                const isEditing = editingLayerId === layer.id;
-                
-                return (
-                  <div key={layer.id} className="mb-1">
-                    {/* Layer header */}
-                    <div
-                      className="px-2 py-1.5 bg-muted/50 rounded flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-foreground uppercase tracking-wider"
-                      onClick={() => toggleLayer(layer.id)}
-                    >
-                      {/* Expand/collapse icon */}
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? 'rotate-90' : 'rotate-0'}`}
-                      >
-                        <polyline points="9 18 15 12 9 6" />
-                      </svg>
-                      
-                      {/* Layer name */}
-                      {isEditing ? (
-                        <input
-                          ref={layerNameInputRef}
-                          value={editingLayerName}
-                          onChange={(e) => setEditingLayerName(e.target.value)}
-                          onBlur={saveLayerName}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              saveLayerName();
-                            } else if (e.key === 'Escape') {
-                              cancelEditingLayerName();
-                            }
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex-1 bg-background border border-border rounded px-1 py-0.5 text-[11px] text-foreground font-semibold uppercase"
-                        />
-                      ) : (
-                        <span
-                          className="flex-1"
-                          onDoubleClick={(e) => {
-                            e.stopPropagation();
-                            startEditingLayerName(layer.id, layer.name || '');
-                          }}
-                        >
-                          {layer.name || `Layer ${layer.order + 1}`}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-        )}
-
-        {allElements.length === 0 ? (
-          <div className="text-xs p-2 italic text-muted-foreground">
-            No layers yet
-          </div>
-        ) : (
-          <div className="flex flex-col gap-0.5">
-            {allElements.map(({ element, layerId, isGroupChild, parentGroupId }, index) => {
+              <div className="flex flex-col gap-0.5">
+                {allElements.map(({ element, layerId, isGroupChild, parentGroupId }, index) => {
               const isSelected = selectedElementIds.has(element.id);
               const isLocked = (element.metadata as any)?.locked === true;
               const isDragging = draggedElementId === element.id;
@@ -672,6 +608,16 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                 elementName = elementType;
               }
 
+              const itemClasses = cn(
+                'group flex items-center gap-2 rounded-md border border-transparent px-3 py-2 text-xs transition-colors',
+                isGroupChild ? 'pl-6' : 'pl-3',
+                isSelected && 'border-primary/70 bg-primary/15 text-primary',
+                !isSelected && isDragOver && 'border-primary/50 border-dashed bg-primary/10',
+                !isSelected && !isDragOver && !isLocked && 'hover:bg-primary/10',
+                isLocked ? 'cursor-not-allowed text-muted-foreground/70' : 'cursor-pointer text-foreground',
+                isDragging && 'opacity-60'
+              );
+
               return (
                 <div
                   key={element.id}
@@ -682,93 +628,51 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                   onDrop={(e) => handleDrop(e, index)}
                   onDragEnd={handleDragEnd}
                   onClick={() => !isLocked && editor.selectElement(element.id, false)}
-                  style={{
-                    padding: '8px 12px',
-                    paddingLeft: isGroupChild ? '24px' : '12px',
-                    background: isSelected
-                      ? 'color-mix(in srgb, var(--editor-accent) 18%, transparent)'
-                      : isDragOver
-                      ? 'color-mix(in srgb, var(--editor-accent) 10%, transparent)'
-                      : 'transparent',
-                    border: isSelected
-                      ? `1px solid var(--editor-accent)`
-                      : isDragOver
-                      ? `1px dashed var(--editor-accent)`
-                      : `1px solid transparent`,
-                    borderRadius: '6px',
-                    cursor: isLocked ? 'not-allowed' : 'pointer',
-                    fontSize: '12px',
-                    color: isSelected
-                      ? 'var(--editor-accent)'
-                      : isLocked
-                      ? 'var(--editor-text-subtle)'
-                      : 'var(--editor-text)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    transition: 'all 0.18s ease',
-                    opacity: isDragging ? 0.5 : 1,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isSelected && !isLocked) {
-                      e.currentTarget.style.background = 'color-mix(in srgb, var(--editor-accent) 12%, transparent)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isSelected && !isDragOver) {
-                      e.currentTarget.style.background = 'transparent';
-                    }
-                  }}
+                  className={itemClasses}
                 >
                   {/* Expand/collapse icon for groups */}
                   {isGroup ? (
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      style={{
-                        width: '12px',
-                        height: '12px',
-                        transform: isGroupExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                        transition: 'transform 0.2s',
-                        cursor: 'pointer',
-                        flexShrink: 0,
-                      }}
+                    <button
+                      type="button"
+                      className={cn(
+                        'flex h-3 w-3 items-center justify-center text-muted-foreground transition hover:text-foreground',
+                        isGroupExpanded && 'rotate-90'
+                      )}
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleGroup(element.id);
                       }}
                     >
-                      <polyline points="9 18 15 12 9 6" />
-                    </svg>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3">
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </button>
                   ) : (
-                    <div style={{ width: '12px' }} /> // Spacer for alignment
+                    <span className="w-3" />
                   )}
 
                   {/* Drag handle / Lock icon */}
                   {isLocked ? (
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      style={{ width: '14px', height: '14px', flexShrink: 0, cursor: 'pointer' }}
+                    <button
+                      type="button"
+                      className="transition text-muted-foreground hover:text-foreground"
                       onClick={(e) => {
                         e.stopPropagation();
                         editor.toggleElementLock(element.id);
                       }}
                     >
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                    </svg>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                    </button>
                   ) : (
                     <svg
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="2"
-                      style={{ width: '14px', height: '14px', flexShrink: 0, cursor: isGroupChild ? 'default' : 'grab' }}
+                      className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground"
                     >
                       <circle cx="9" cy="5" r="1" />
                       <circle cx="9" cy="12" r="1" />
@@ -780,13 +684,12 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                   )}
                   
                   {/* Element indicator */}
-                  <div style={{
-                    width: '12px',
-                    height: '12px',
-                    borderRadius: '3px',
-                    background: isSelected ? 'var(--editor-accent)' : 'var(--editor-border)',
-                    flexShrink: 0,
-                  }} />
+                  <span
+                    className={cn(
+                      'h-3 w-3 flex-shrink-0 rounded-sm transition-colors',
+                      isSelected ? 'bg-primary' : 'bg-border/60'
+                    )}
+                  />
                   
                   {/* Element name - editable on double click */}
                   {editingLayerId === element.id ? (
@@ -803,25 +706,11 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                         }
                       }}
                       onClick={(e) => e.stopPropagation()}
-                      style={{
-                        flex: 1,
-                        background: 'var(--editor-surface)',
-                        border: `1px solid var(--editor-border)`,
-                        borderRadius: '4px',
-                        padding: '2px 4px',
-                        fontSize: '12px',
-                        color: 'var(--editor-text)',
-                        fontFamily: 'inherit',
-                      }}
+                      className="flex-1 rounded border border-border/60 bg-card/80 px-1 py-0.5 text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     />
                   ) : (
                     <span
-                      style={{
-                        flex: 1,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
+                      className="flex-1 truncate"
                       onDoubleClick={(e) => {
                         e.stopPropagation();
                         // Use the actual element.name if it exists, otherwise use the display name
@@ -836,24 +725,11 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                   {/* Lock/Unlock button */}
                   {!isLocked && (
                     <button
+                      type="button"
+                      className="transition opacity-60 hover:opacity-100"
                       onClick={(e) => {
                         e.stopPropagation();
                         editor.toggleElementLock(element.id);
-                      }}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        opacity: 0.5,
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.opacity = '1';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.opacity = '0.5';
                       }}
                       title="Lock element"
                     >
@@ -862,7 +738,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="2"
-                        style={{ width: '14px', height: '14px' }}
+                        className="h-3.5 w-3.5"
                       >
                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                         <path d="M7 11V7a5 5 0 0 1 10 0v4" />
@@ -871,10 +747,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                   )}
                   
                   {layerId && (
-                    <span style={{
-                      fontSize: '10px',
-                      opacity: 0.5,
-                    }}>
+                    <span className="text-[10px] text-muted-foreground/70">
                       L
                     </span>
                   )}
@@ -883,11 +756,9 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
             })}
           </div>
         )}
-              </div>
-            )}
-          </>
-        )}
       </div>
-    </div>
+        )}
+      </PanelBody>
+    </Panel>
   );
 }

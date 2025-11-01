@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import type { ImageLibraryItem } from "@/editor/types/imageLibrary";
 
 type ImageMode = "background" | "element";
 
@@ -18,6 +19,15 @@ interface ImageBackgroundModalProps {
     error?: string | null;
     success?: string | null;
   };
+  libraryItems?: ImageLibraryItem[];
+  onSelectFromLibrary?: (item: ImageLibraryItem, mode: ImageMode) => void;
+  onRefreshLibrary?: () => Promise<void> | void;
+  libraryStatus?: {
+    isLoading?: boolean;
+    isSyncing?: boolean;
+    error?: string | null;
+  };
+  initialTab?: 'generate' | 'upload' | 'library';
 }
 
 /**
@@ -29,10 +39,15 @@ export function ImageBackgroundModal({
   onGenerate,
   onUpload,
   status,
+  libraryItems = [],
+  onSelectFromLibrary,
+  onRefreshLibrary,
+  libraryStatus,
+  initialTab = 'generate',
 }: ImageBackgroundModalProps) {
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState<ImageMode>("background");
-  const [activeTab, setActiveTab] = useState<"generate" | "upload">("generate");
+  const [activeTab, setActiveTab] = useState<"generate" | "upload" | "library">("generate");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -44,7 +59,7 @@ export function ImageBackgroundModal({
     if (!open) {
       setPrompt("");
       setMode("background");
-      setActiveTab("generate");
+      setActiveTab(initialTab);
       return;
     }
 
@@ -56,7 +71,13 @@ export function ImageBackgroundModal({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, onClose]);
+  }, [open, onClose, initialTab]);
+
+  useEffect(() => {
+    if (open) {
+      setActiveTab(initialTab);
+    }
+  }, [open, initialTab]);
 
   const handleGenerateClick = useCallback(async () => {
     if (!prompt.trim()) {
@@ -64,6 +85,15 @@ export function ImageBackgroundModal({
     }
     await onGenerate(prompt.trim(), mode);
   }, [onGenerate, prompt, mode]);
+
+  const isLibraryTabEnabled = Boolean(onSelectFromLibrary);
+
+  const sortedLibraryItems = useMemo(() => {
+    if (!libraryItems?.length) {
+      return [] as ImageLibraryItem[];
+    }
+    return [...libraryItems].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  }, [libraryItems]);
 
   if (!open || !mounted) {
     return null;
@@ -123,6 +153,20 @@ export function ImageBackgroundModal({
             >
               Upload
             </button>
+            {isLibraryTabEnabled && (
+              <button
+                type="button"
+                onClick={() => setActiveTab("library")}
+                className={cn(
+                  "pb-3 px-1 text-sm font-medium border-b-2 transition-colors",
+                  activeTab === "library"
+                    ? "border-[var(--editor-accent)] text-[var(--editor-text-strong)]"
+                    : "border-transparent text-[var(--editor-text-muted)] hover:text-[var(--editor-text-strong)]"
+                )}
+              >
+                Library
+              </button>
+            )}
           </div>
         </div>
 
@@ -212,6 +256,129 @@ export function ImageBackgroundModal({
               </p>
             </div>
           </>
+        )}
+
+        {/* Library Tab */}
+        {activeTab === "library" && isLibraryTabEnabled && (
+          <div className="mt-6">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-[var(--editor-text-muted)]">
+                    Saved Images
+                  </span>
+                  <span className="text-xs text-[var(--editor-text-muted)]">
+                    {libraryItems.length > 0
+                      ? `${libraryItems.length} item${libraryItems.length === 1 ? "" : "s"} in your library`
+                      : "Images you upload or generate will appear here"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <SegmentedControl
+                    items={[
+                      { value: "background", label: "Background" },
+                      { value: "element", label: "Image Element" },
+                    ]}
+                    value={mode}
+                    onValueChange={(value) => setMode(value as ImageMode)}
+                  />
+                  {onRefreshLibrary && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        void onRefreshLibrary();
+                      }}
+                      disabled={libraryStatus?.isLoading || libraryStatus?.isSyncing}
+                    >
+                      Refresh
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {libraryStatus?.error && (
+                <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-100">
+                  {libraryStatus.error}
+                </div>
+              )}
+
+              {libraryStatus?.isSyncing && (
+                <div className="rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface)] px-3 py-2 text-xs text-[var(--editor-text-muted)]">
+                  Syncing library…
+                </div>
+              )}
+
+              {sortedLibraryItems.length === 0 && (
+                <div className="rounded-xl border border-dashed border-[var(--editor-border)] bg-[var(--editor-surface)]/60 p-8 text-center text-sm text-[var(--editor-text-muted)]">
+                  <p className="font-medium text-[var(--editor-text)]">No images saved yet</p>
+                  <p className="mt-2">
+                    Generate or upload an image to add it to your library. Saved images are available offline and sync when you reconnect.
+                  </p>
+                </div>
+              )}
+
+              {sortedLibraryItems.length > 0 && (
+                <div className="grid grid-cols-2 gap-3">
+                  {sortedLibraryItems.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => onSelectFromLibrary?.(item, mode)}
+                      className="group relative flex flex-col overflow-hidden rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)]/80 text-left shadow-sm transition hover:border-[var(--editor-accent)]/60"
+                    >
+                      <div className="relative aspect-video w-full overflow-hidden bg-black/40">
+                        <img
+                          src={item.thumbnailDataUrl || item.dataUrl}
+                          alt={item.metadata?.prompt || item.metadata?.originalFileName || 'Library image'}
+                          className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                          draggable={false}
+                        />
+                        <div className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-1 text-[10px] uppercase tracking-wide text-white/80">
+                          {item.origin === 'ai' ? 'Generated' : 'Uploaded'}
+                        </div>
+                      </div>
+                      <div className="flex flex-1 flex-col gap-1 p-3 text-xs text-[var(--editor-text-muted)]">
+                        {item.metadata?.prompt ? (
+                          <p className="line-clamp-2 text-[var(--editor-text)] font-medium" title={item.metadata.prompt}>
+                            {item.metadata.prompt}
+                          </p>
+                        ) : (
+                          <p className="text-[var(--editor-text)] font-medium">
+                            {item.metadata?.originalFileName || 'Image'}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-wide">
+                          <span className="rounded bg-[var(--editor-border)]/40 px-2 py-0.5">
+                            {item.metadata?.usage === 'element' ? 'Element' : 'Background'}
+                          </span>
+                          {item.metadata?.provider && (
+                            <span className="rounded bg-[var(--editor-border)]/40 px-2 py-0.5">
+                              {item.metadata.provider}
+                            </span>
+                          )}
+                          {item.metadata?.quality && (
+                            <span className="rounded bg-[var(--editor-border)]/40 px-2 py-0.5">
+                              {item.metadata.quality}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-auto flex items-center justify-between text-[10px] text-[var(--editor-text-muted)]/80">
+                          <span>
+                            {new Date(item.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          </span>
+                          {item.metadata?.sizeBytes && (
+                            <span>{Math.round(item.metadata.sizeBytes / 1024)} KB</span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>,

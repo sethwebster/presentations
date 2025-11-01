@@ -1,3 +1,21 @@
+import OpenAI from "openai";
+import { NextResponse } from "next/server";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+/**
+ * AI Background Image Generation API
+ * 
+ * Requires OPENAI_API_KEY to be set in .env.local:
+ *   OPENAI_API_KEY=sk-...
+ */
+type GenerateBackgroundRequest = {
+  prompt?: string;
+  width?: number;
+  height?: number;
+};
+
 function sanitizeSensitiveData<T>(value: T): T {
   const mask = (input: string) => input.replace(/sk-[a-zA-Z0-9-_]+/g, 'sk-************************');
 
@@ -16,23 +34,6 @@ function sanitizeSensitiveData<T>(value: T): T {
 
   return value;
 }
-
-import { NextResponse } from "next/server";
-
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-/**
- * AI Background Image Generation API
- * 
- * Requires OPENAI_API_KEY to be set in .env.local:
- *   OPENAI_API_KEY=sk-...
- */
-type GenerateBackgroundRequest = {
-  prompt?: string;
-  width?: number;
-  height?: number;
-};
 
 export async function POST(request: Request) {
   // Read from .env.local (Next.js automatically loads .env.local)
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
   let body: GenerateBackgroundRequest;
   try {
     body = await request.json();
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Invalid JSON payload." },
       { status: 400 }
@@ -91,7 +92,6 @@ export async function POST(request: Request) {
     aspectDescription = "portrait format";
   }
 
-  // DALL-E 3 has a 4000 character limit. Keep instructions concise but effective.
   // Focus on quality and creativity, prioritizing user intent.
   // Avoid production-oriented terms that cause staging equipment to appear.
   const baseInstructions = `Stunning high-quality ${aspectDescription} image (${width}x${height} dimensions), photorealistic or artistic masterpiece quality, dramatic lighting, creative composition, highly detailed, visually striking, no text, no logos, no watermarks, no cameras, no filming equipment, no production crew, no stage equipment unless explicitly requested in the prompt`;
@@ -104,6 +104,28 @@ export async function POST(request: Request) {
   
   // Prioritize user intent with quality enhancement
   const composedPrompt = `${truncatedUserPrompt}. ${baseInstructions}`;
+
+  // Map dimensions to supported sizes
+  // For image generation, gpt-image-1 supports: "256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"
+  let size: "256x256" | "512x512" | "1024x1024" | "1792x1024" | "1024x1792" = "1024x1024";
+  const sizeStr = `${width}x${height}`;
+  if (["256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"].includes(sizeStr)) {
+    size = sizeStr as typeof size;
+  } else {
+    // Default to closest supported size
+    if (width >= 1792 || height >= 1792) {
+      size = width > height ? "1792x1024" : "1024x1792";
+    } else if (width >= 1024 || height >= 1024) {
+      size = "1024x1024";
+    } else if (width >= 512 || height >= 512) {
+      size = "512x512";
+    } else {
+      size = "256x256";
+    }
+  }
+
+  // Initialize OpenAI client
+  const openai = new OpenAI({ apiKey });
 
   // Retry logic for transient server errors
   const maxRetries = 2;
@@ -119,81 +141,29 @@ export async function POST(request: Request) {
           await new Promise(resolve => setTimeout(resolve, delayMs));
         }
 
-        // Map dimensions to DALL-E 3 supported sizes
-        // DALL-E 3 supports: "1024x1024", "1792x1024", or "1024x1792"
-        let dallESize: string;
-        if (aspectRatio < 0.9) {
-          // Portrait
-          dallESize = "1024x1792";
-        } else if (aspectRatio > 1.5) {
-          // Landscape/widescreen
-          dallESize = "1792x1024";
-        } else {
-          // Square or near-square
-          dallESize = "1024x1024";
-        }
-
-        const response = await fetch("https://api.openai.com/v1/images/generations", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model: "dall-e-3",
-            prompt: composedPrompt,
-            size: dallESize,
-            quality: "hd",
-            style: "vivid",
-            n: 1,
-            response_format: "b64_json",
-          }),
+        const result = await openai.images.generate({
+          model: "gpt-image-1",
+          prompt: composedPrompt,
+          size,
+          n: 1,
+          style: "vivid",
+          quality: "high",
+          response_format: "b64_json",
         });
 
-        if (!response.ok) {
-          let rawDetail: unknown = null;
-          try {
-            rawDetail = await response.json();
-          } catch (jsonError) {
-            rawDetail = await response.text();
-          }
-
-          const sanitizedDetail = sanitizeSensitiveData(rawDetail);
-          lastError = { status: response.status, detail: sanitizedDetail };
-
-          // Retry on server errors (500, 502, 503, 504), but not on client errors (400, 401, 403, 429)
-          const isServerError = response.status >= 500;
-          const shouldRetry = isServerError && attempt < maxRetries;
-
-          if (shouldRetry) {
-            console.warn(`OpenAI server error (${response.status}), will retry:`, sanitizedDetail);
-            continue; // Retry
-          }
-
-          // Don't retry: either it's a client error or we've exhausted retries
-          console.error("OpenAI image generation failed:", response.status, sanitizedDetail);
-          
-          const errorMessage = isServerError
-            ? "OpenAI's servers are experiencing issues. Please try again in a moment."
-            : "Image generation failed. Please check your prompt and try again.";
-
+        if (!result.data || result.data.length === 0) {
+          console.error("OpenAI response missing image data:", result);
           return NextResponse.json(
-            {
-              error: errorMessage,
-              detail: sanitizedDetail,
-            },
-            { status: isServerError ? 502 : response.status }
+            { error: "Image generation returned no data." },
+            { status: 502 }
           );
         }
 
-        // Success - break out of retry loop
-        const payload = await response.json();
-        const imageBase64: string | undefined = payload?.data?.[0]?.b64_json;
-
+        const imageBase64 = result.data[0].b64_json;
         if (!imageBase64) {
-          console.error("OpenAI response missing image data:", payload);
+          console.error("OpenAI response missing base64 data:", result);
           return NextResponse.json(
-            { error: "Image generation returned no data." },
+            { error: "Image generation returned no base64 data." },
             { status: 502 }
           );
         }
@@ -204,21 +174,41 @@ export async function POST(request: Request) {
           image: dataUrl,
           meta: {
             provider: "openai",
-            model: "dall-e-3",
-            size: dallESize,
+            model: "gpt-image-1",
             requestedSize: `${width}x${height}`,
-            quality: "hd",
+            actualSize: size,
+            quality: "high",
+            revised_prompt: result.data[0].revised_prompt,
           },
         });
-      } catch (fetchError) {
-        // Network or other fetch errors
-        if (attempt < maxRetries) {
-          console.warn(`Fetch error on attempt ${attempt + 1}, will retry:`, fetchError);
-          lastError = { status: 0, detail: fetchError };
+      } catch (error: any) {
+        const sanitizedError = sanitizeSensitiveData(error);
+        
+        // Check if it's a retryable server error
+        const status = error?.status || error?.response?.status || 500;
+        const isServerError = status >= 500;
+        const shouldRetry = isServerError && attempt < maxRetries;
+
+        if (shouldRetry) {
+          console.warn(`OpenAI server error (${status}), will retry:`, sanitizedError);
+          lastError = { status, detail: sanitizedError };
           continue; // Retry
         }
-        // Exhausted retries - throw to outer catch
-        throw fetchError;
+
+        // Don't retry: either it's a client error or we've exhausted retries
+        console.error("OpenAI image generation failed:", status, sanitizedError);
+        
+        const errorMessage = isServerError
+          ? "OpenAI's servers are experiencing issues. Please try again in a moment."
+          : error?.message || "Image generation failed. Please check your prompt and try again.";
+
+        return NextResponse.json(
+          {
+            error: errorMessage,
+            detail: sanitizedError,
+          },
+          { status: isServerError ? 502 : status }
+        );
       }
     }
 
@@ -240,5 +230,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
-

@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { cn } from '@/lib/utils';
+import { ToolbarButton } from '@/components/ui/toolbar-button';
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { AlignmentTools } from './AlignmentTools';
 import { ImageBackgroundModal } from './ImageBackgroundModal';
+import { useImageLibrary } from '../hooks/useImageLibrary';
+import type { ImageLibraryItem } from '@/editor/types/imageLibrary';
 
 interface ToolbarProps {
   deckId: string;
@@ -14,6 +16,15 @@ interface ToolbarProps {
 export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
   const state = useEditor();
   const editor = useEditorInstance();
+
+  const {
+    items: imageLibraryItems,
+    addItem: addImageToLibrary,
+    sync: syncImageLibrary,
+    refreshFromServer: refreshImageLibrary,
+    isSyncing: isLibrarySyncing,
+    lastSyncError: imageLibraryError,
+  } = useImageLibrary();
 
   const showGrid = state.showGrid;
   const deck = state.deck;
@@ -32,6 +43,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
     { isGenerating: false, error: null, success: null }
   );
   const [uploadMode, setUploadMode] = useState<'background' | 'element'>('background');
+  const [isLibraryRefreshing, setIsLibraryRefreshing] = useState(false);
   
   // Close align menu when clicking outside
   useEffect(() => {
@@ -46,6 +58,12 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [showAlignMenu]);
+
+  useEffect(() => {
+    if (showBackgroundModal) {
+      void refreshImageLibrary();
+    }
+  }, [showBackgroundModal, refreshImageLibrary]);
 
   // Process image files
   const processImageFiles = useCallback((files: File[]) => {
@@ -174,6 +192,23 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
             const x = (1280 - displayWidth) / 2;
             const y = (720 - displayHeight) / 2;
             
+            const now = new Date().toISOString();
+            const libraryItem = addImageToLibrary({
+              dataUrl: compressedDataUrl,
+              thumbnailDataUrl: compressedDataUrl,
+              origin: 'upload',
+              metadata: {
+                usage: 'element',
+                originalFileName: file.name,
+                mimeType,
+                width: Math.round(storageWidth),
+                height: Math.round(storageHeight),
+                sizeBytes: file.size,
+                uploadedAt: now,
+                deckId,
+              },
+            });
+
             const imageElement = {
               id: `image-${Date.now()}`,
               type: 'image' as const,
@@ -181,6 +216,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
               alt: file.name,
               bounds: { x, y, width: displayWidth, height: displayHeight },
               objectFit: 'contain' as const,
+              libraryItemId: libraryItem.id,
             };
             
             editor.addElement(imageElement, currentSlideIndex);
@@ -249,7 +285,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       };
       reader.readAsDataURL(file);
     });
-  }, [editor, currentSlideIndex]);
+  }, [editor, currentSlideIndex, addImageToLibrary, deckId]);
 
   // Handle file input change
   const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -314,6 +350,18 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       success: partial.success ?? null,
     }));
   }, []);
+
+  const handleLibraryRefresh = useCallback(async () => {
+    setIsLibraryRefreshing(true);
+    try {
+      await refreshImageLibrary(true);
+      await syncImageLibrary(true);
+    } catch (error) {
+      console.error('Failed to refresh image library:', error);
+    } finally {
+      setIsLibraryRefreshing(false);
+    }
+  }, [refreshImageLibrary, syncImageLibrary]);
 
   const compressBackgroundFile = useCallback(async (file: File) => {
     const loadImage = () =>
@@ -400,6 +448,23 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       const processed = await compressBackgroundFile(file);
 
       if (mode === 'background') {
+        const now = new Date().toISOString();
+        const libraryItem = addImageToLibrary({
+          dataUrl: processed.dataUrl,
+          thumbnailDataUrl: processed.dataUrl,
+          origin: 'upload',
+          metadata: {
+            usage: 'background',
+            originalFileName: file.name,
+            mimeType: processed.mime,
+            width: processed.width,
+            height: processed.height,
+            sizeBytes: file.size,
+            uploadedAt: now,
+            deckId,
+          },
+        });
+
         editor.updateSlide(activeSlideId!, {
           background: {
             type: 'image',
@@ -416,6 +481,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
               offsetX: 0,
               offsetY: 0,
               scale: 100,
+              libraryItemId: libraryItem.id,
             },
             opacity: 1,
           },
@@ -426,6 +492,23 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
         const x = (1280 - 400) / 2;
         const y = (720 - 300) / 2;
         
+        const now = new Date().toISOString();
+        const libraryItem = addImageToLibrary({
+          dataUrl: processed.dataUrl,
+          thumbnailDataUrl: processed.dataUrl,
+          origin: 'upload',
+          metadata: {
+            usage: 'element',
+            originalFileName: file.name,
+            mimeType: processed.mime,
+            width: processed.width,
+            height: processed.height,
+            sizeBytes: file.size,
+            uploadedAt: now,
+            deckId,
+          },
+        });
+
         editor.addElement({
           id: `image-${Date.now()}`,
           type: 'image' as const,
@@ -433,8 +516,8 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
           alt: file.name,
           bounds: { x, y, width: 400, height: 300 },
           objectFit: 'contain' as const,
+          libraryItemId: libraryItem.id,
         }, currentSlideIndex);
-
         setBackgroundFeedback({ isGenerating: false, success: 'Image element added from upload.' });
       }
 
@@ -446,7 +529,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
         error: error instanceof Error ? error.message : 'Failed to process image upload.',
       });
     }
-  }, [activeSlideId, uploadMode, compressBackgroundFile, editor, setBackgroundFeedback, currentSlideIndex]);
+  }, [activeSlideId, uploadMode, compressBackgroundFile, editor, setBackgroundFeedback, currentSlideIndex, addImageToLibrary, deckId]);
 
   const triggerBackgroundUpload = useCallback((mode: 'background' | 'element') => {
     if (mode === 'background') {
@@ -505,7 +588,25 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
         throw new Error('No image returned by generator.');
       }
 
+      const generatedAt = new Date().toISOString();
+
       if (mode === 'background') {
+        const libraryItem = addImageToLibrary({
+          dataUrl: imageData,
+          thumbnailDataUrl: imageData,
+          origin: 'ai',
+          metadata: {
+            usage: 'background',
+            prompt,
+            provider: meta?.provider ?? 'openai',
+            quality: meta?.quality ?? 'hd',
+            generatedAt,
+            width: slideWidth,
+            height: slideHeight,
+            deckId,
+          },
+        });
+
         editor.updateSlide(activeSlideId!, {
           background: {
             type: 'image',
@@ -515,10 +616,11 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
               offsetY: 0,
               scale: 100,
               prompt,
-              generatedAt: new Date().toISOString(),
+              generatedAt,
               source: 'ai',
               provider: meta?.provider ?? 'openai',
               quality: meta?.quality ?? 'hd',
+              libraryItemId: libraryItem.id,
             },
             opacity: 1,
           },
@@ -529,7 +631,21 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
         // Add as image element
         const x = (1280 - 400) / 2;
         const y = (720 - 300) / 2;
-        
+
+        const libraryItem = addImageToLibrary({
+          dataUrl: imageData,
+          thumbnailDataUrl: imageData,
+          origin: 'ai',
+          metadata: {
+            usage: 'element',
+            prompt,
+            provider: meta?.provider ?? 'openai',
+            quality: meta?.quality ?? 'hd',
+            generatedAt,
+            deckId,
+          },
+        });
+
         editor.addElement({
           id: `image-${Date.now()}`,
           type: 'image' as const,
@@ -537,6 +653,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
           alt: prompt.substring(0, 50),
           bounds: { x, y, width: 400, height: 300 },
           objectFit: 'contain' as const,
+          libraryItemId: libraryItem.id,
         }, currentSlideIndex);
 
         setBackgroundFeedback({ isGenerating: false, success: 'AI image element added to slide.' });
@@ -550,11 +667,67 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
         error: error instanceof Error ? error.message : 'Image generation failed.',
       });
     }
-  }, [activeSlideId, editor, setBackgroundFeedback, currentSlideIndex]);
+  }, [activeSlideId, editor, setBackgroundFeedback, currentSlideIndex, addImageToLibrary, deckId]);
+
+  const handleSelectLibraryImage = useCallback((item: ImageLibraryItem, mode: 'background' | 'element') => {
+    if (mode === 'background') {
+      if (!activeSlideId) {
+        setBackgroundFeedback({ error: 'Select a slide before applying a background.' });
+        return;
+      }
+
+      editor.updateSlide(activeSlideId, {
+        background: {
+          type: 'image',
+          value: {
+            src: item.dataUrl,
+            offsetX: 0,
+            offsetY: 0,
+            scale: 100,
+            prompt: item.metadata?.prompt,
+            generatedAt: item.metadata?.generatedAt ?? item.metadata?.uploadedAt ?? new Date().toISOString(),
+            source: item.origin === 'ai' ? 'ai' : 'upload',
+            provider: item.metadata?.provider,
+            quality: item.metadata?.quality,
+            name: item.metadata?.originalFileName,
+            libraryItemId: item.id,
+          },
+          opacity: 1,
+        },
+      });
+
+      setBackgroundFeedback({ isGenerating: false, success: 'Background applied from library.' });
+      setTimeout(() => setShowBackgroundModal(false), 200);
+      return;
+    }
+
+    const rawWidth = item.metadata?.width && item.metadata.width > 0 ? item.metadata.width : 400;
+    const rawHeight = item.metadata?.height && item.metadata.height > 0 ? item.metadata.height : 300;
+    const maxWidth = 640;
+    const maxHeight = 480;
+    const ratio = Math.min(maxWidth / rawWidth, maxHeight / rawHeight, 1);
+    const elementWidth = Math.round(rawWidth * ratio);
+    const elementHeight = Math.round(rawHeight * ratio);
+    const x = (1280 - elementWidth) / 2;
+    const y = (720 - elementHeight) / 2;
+
+    editor.addElement({
+      id: `image-${Date.now()}`,
+      type: 'image' as const,
+      src: item.dataUrl,
+      alt: item.metadata?.prompt || item.metadata?.originalFileName || 'Library image',
+      bounds: { x, y, width: elementWidth, height: elementHeight },
+      objectFit: 'contain' as const,
+      libraryItemId: item.id,
+    }, currentSlideIndex);
+
+    setBackgroundFeedback({ isGenerating: false, success: 'Image element added from library.' });
+    setTimeout(() => setShowBackgroundModal(false), 200);
+  }, [activeSlideId, currentSlideIndex, editor, setBackgroundFeedback]);
   return (
-    <div className="editor-toolbar editor-panel-muted flex items-center gap-3 px-4 h-14 border-b border-[var(--editor-border-strong)] shadow-[0_18px_40px_-30px_var(--editor-shadow)]">
+    <div className="flex h-14 items-center gap-3 border-b border-border/70 bg-card/80 px-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/60">
       {/* Insert Tools */}
-      <div className="flex items-center gap-2 pr-4 mr-2 border-r border-[var(--editor-border)]">
+      <div className="flex items-center gap-2 pr-4 mr-2 border-r border-border/60">
         <ToolbarButton 
           title="Insert Text" 
           onClick={() => {
@@ -582,6 +755,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
           title="Insert Image" 
           onClick={() => {
             setBackgroundStatus({ isGenerating: false, error: null, success: null });
+            setUploadMode('element');
             setShowBackgroundModal(true);
           }}
           disabled={!activeSlideId}
@@ -655,7 +829,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
 
       {/* Format Tools */}
       {selectedElementIds.size > 0 && (
-        <div className="flex items-center gap-2 pr-4 mr-2 border-r border-[var(--editor-border)]">
+        <div className="flex items-center gap-2 pr-4 mr-2 border-r border-border/60">
           <ToolbarButton title="Bold" onClick={() => {
             const deck = state.deck;
             const currentSlide = deck?.slides[currentSlideIndex];
@@ -705,7 +879,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       
       {/* Text Alignment Tools */}
       {selectedElementIds.size > 0 && (
-        <div className="flex items-center gap-2 pr-4 mr-2 border-r border-[var(--editor-border)]">
+        <div className="flex items-center gap-2 pr-4 mr-2 border-r border-border/60">
           <ToolbarButton title="Align Left" onClick={() => {
           const deck = state.deck;
           const currentSlide = deck?.slides[currentSlideIndex];
@@ -736,7 +910,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       )}
 
       {/* Layout Tools */}
-      <div style={{ display: 'flex', gap: '4px', paddingRight: '16px', borderRight: '1px solid rgba(236, 236, 236, 0.1)' }}>
+      <div className="mr-2 flex items-center gap-1.5 border-r border-border/60 pr-4">
         <ToolbarButton 
           title="Group (Cmd/Ctrl+G)" 
           onClick={() => {
@@ -757,7 +931,8 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
           <ToolbarButton 
             title="Align" 
             onClick={() => setShowAlignMenu(!showAlignMenu)}
-            isActive={showAlignMenu}
+            pressed={showAlignMenu}
+            aria-pressed={showAlignMenu}
             disabled={selectedElementIds.size < 2}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
@@ -776,7 +951,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
 
       {/* Layer Ordering Tools */}
       {selectedElementIds.size > 0 && (
-        <div className="flex items-center gap-2 pr-4 mr-2 border-r border-[var(--editor-border)]">
+        <div className="flex items-center gap-2 pr-4 mr-2 border-r border-border/60">
           <ToolbarButton 
             title="Bring to Front" 
             onClick={() => {
@@ -830,7 +1005,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       )}
 
       {/* Right Side Actions */}
-      <div className="flex items-center gap-2 ml-auto pr-4 border-r border-[var(--editor-border)]">
+      <div className="flex items-center gap-2 ml-auto pr-4 border-r border-border/60">
         {/* Play Button - Before Autosave */}
         <ToolbarButton 
           title="Play Presentation" 
@@ -897,7 +1072,8 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
         <ToolbarButton
           title={autosaveEnabled ? "Autosave ON - Click to disable (Cmd/Ctrl+S to save)" : "Autosave OFF - Click to enable (Cmd/Ctrl+S to save)"}
           onClick={() => editor.toggleAutosave()}
-          isActive={autosaveEnabled}
+          pressed={autosaveEnabled}
+          aria-pressed={autosaveEnabled}
         >
           {autosaveEnabled ? (
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
@@ -922,7 +1098,8 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
         <ToolbarButton 
           title="Toggle Grid" 
           onClick={() => editor.toggleGrid()}
-          isActive={showGrid}
+          pressed={showGrid}
+          aria-pressed={showGrid}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
             <rect x="3" y="3" width="7" height="7" />
@@ -950,35 +1127,15 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
           triggerBackgroundUpload(mode);
         }}
         status={backgroundStatus}
+        libraryItems={imageLibraryItems}
+        onSelectFromLibrary={handleSelectLibraryImage}
+        onRefreshLibrary={handleLibraryRefresh}
+        libraryStatus={{
+          isLoading: isLibraryRefreshing,
+          isSyncing: isLibrarySyncing,
+          error: imageLibraryError,
+        }}
       />
     </div>
   );
 }
-
-function ToolbarButton({
-  children,
-  title,
-  onClick,
-  isActive = false,
-  disabled = false,
-}: {
-  children: React.ReactNode;
-  title: string;
-  onClick: () => void;
-  isActive?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={isActive}
-      onClick={onClick}
-      title={title}
-      disabled={disabled}
-      className={cn('editor-toolbar-button', { 'is-active': isActive, 'is-disabled': disabled })}
-    >
-      {children}
-    </button>
-  );
-}
-
