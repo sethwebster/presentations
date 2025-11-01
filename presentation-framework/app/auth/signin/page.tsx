@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
+import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import Link from 'next/link';
@@ -28,13 +29,13 @@ export default function SignInPage() {
     setError(null);
     try {
       await signIn('github', { callbackUrl });
-    } catch (err) {
+    } catch {
       setIsLoading(false);
       setError('GitHub sign-in failed. Please try again.');
     }
   };
 
-  const handleMagicLink = async (e: React.FormEvent) => {
+  const handleMagicLink = async (e: FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setSuccessMessage(null);
@@ -52,7 +53,7 @@ export default function SignInPage() {
 
       setSuccessMessage('Magic link sent! Check your inbox to continue.');
       setEmail('');
-    } catch (err) {
+    } catch {
       setError('Unable to send magic link right now. Please try again.');
     } finally {
       setIsLoading(false);
@@ -66,10 +67,21 @@ export default function SignInPage() {
         <div className="absolute bottom-0 right-0 h-[32rem] w-[32rem] rounded-full bg-[rgba(200,75,210,0.2)] blur-[160px]" />
       </div>
 
-      <div className="relative flex flex-col lg:flex-row min-h-screen">
-        <div className="hidden lg:flex lg:w-1/2 flex-col justify-between px-16 py-20 text-white/90">
-          <Link href="/" className="text-sm uppercase tracking-[0.4em] text-[var(--lume-primary)]/80">
-            Lume
+      <div className="relative flex flex-col min-h-screen lg:flex-row">
+        <div className="flex-col justify-between hidden px-16 py-20 lg:flex lg:w-1/2 text-white/90">
+          <Link href="/" className="flex items-center gap-3">
+            <span className="relative inline-flex items-center justify-center">
+              <span className="absolute inset-0 bg-[var(--lume-primary)]/35 blur-xl rounded-full" />
+              <Image
+                src="/assets/logo-small.png"
+                alt="Lume logo"
+                width={44}
+                height={44}
+                className="relative h-11 w-11"
+                priority
+              />
+            </span>
+            <span className="text-sm uppercase tracking-[0.4em] text-[var(--lume-primary)]/80">Lume</span>
           </Link>
 
           <div className="space-y-8">
@@ -88,9 +100,21 @@ export default function SignInPage() {
           </div>
         </div>
 
-        <div className="flex flex-1 items-center justify-center px-6 py-12">
+        <div className="flex items-center justify-center flex-1 px-6 py-12">
           <Card className="w-full max-w-md border border-white/10 bg-white/[0.04] backdrop-blur-xl shadow-[0_25px_60px_rgba(15,15,30,0.35)]">
-            <CardContent className="p-8 sm:p-10 space-y-8">
+            <CardContent className="p-8 space-y-8 sm:p-10">
+              <div className="flex justify-center">
+                <Link href="/" aria-label="Lume home" className="relative inline-flex items-center justify-center">
+                  <span className="absolute inset-0 bg-[var(--lume-primary)]/35 blur-xl rounded-full" />
+                  <Image
+                    src="/assets/logo-small.png"
+                    alt="Lume logo"
+                    width={56}
+                    height={56}
+                    className="relative h-14 w-14"
+                  />
+                </Link>
+              </div>
               <div className="space-y-3">
                 <h2 className="text-3xl font-light text-white">Sign in to Lume</h2>
                 <p className="text-sm text-[var(--lume-mist)]/70">
@@ -157,7 +181,7 @@ export default function SignInPage() {
               )}
 
               {error && (
-                <div className="rounded-lg border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                <div className="px-4 py-3 text-sm text-red-300 border rounded-lg border-red-400/40 bg-red-500/10">
                   {error}
                 </div>
               )}

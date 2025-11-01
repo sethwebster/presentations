@@ -532,8 +532,32 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
         : elementStyle.opacity)
     : 1;
 
-  // Extract style properties, excluding opacity (we handle it separately)
-  const { opacity, ...otherStyles } = (element.style || {}) as any;
+  const {
+    opacity,
+    transform,
+    transformOrigin,
+    filter,
+    ...visualStyles
+  } = (element.style || {}) as any;
+
+  const outerStyle: React.CSSProperties = {
+    left: `${bounds.x}px`,
+    top: `${bounds.y}px`,
+    width: `${bounds.width}px`,
+    height: `${bounds.height}px`,
+    boxSizing: 'border-box',
+  };
+
+  if (transform !== undefined) outerStyle.transform = transform;
+  if (transformOrigin !== undefined) outerStyle.transformOrigin = transformOrigin;
+  if (filter !== undefined) outerStyle.filter = filter;
+
+  const contentStyle: React.CSSProperties = {
+    width: '100%',
+    height: '100%',
+    opacity: opacityValue,
+    ...visualStyles,
+  };
 
   // Check if element fills the entire canvas (expanded to fill)
   const fillsCanvas = bounds.x === 0 && bounds.y === 0 && 
@@ -551,37 +575,31 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
         ${isSelected ? 'border-2 border-lume-primary' : fillsCanvas ? 'border-0' : 'border-2 border-transparent'}
         ${isDragging ? 'cursor-grabbing' : isLocked ? 'cursor-not-allowed' : 'cursor-grab'}
       `}
-      style={{
-        left: `${bounds.x}px`,
-        top: `${bounds.y}px`,
-        width: `${bounds.width}px`,
-        height: `${bounds.height}px`,
-        opacity: opacityValue,
-        boxSizing: 'border-box',
-        ...otherStyles,
-      }}
+      style={outerStyle}
       onMouseDown={handleMouseDown}
     >
-      {/* Render element content based on type */}
-      {element.type === 'text' && (
-        isEditingText ? (
-          <EditableTextElement 
-            element={element as any} 
-            onBlur={() => setIsEditingText(false)} 
-          />
-        ) : (
-          <TextElementContent element={element} />
-        )
-      )}
-      {element.type === 'shape' && (
-        <ShapeElementContent element={element} />
-      )}
-      {element.type === 'image' && (
-        <ImageElementContent element={element} />
-      )}
-      {element.type === 'group' && (
-        <GroupElementContent element={element} />
-      )}
+      <div className="w-full h-full" style={contentStyle}>
+        {/* Render element content based on type */}
+        {element.type === 'text' && (
+          isEditingText ? (
+            <EditableTextElement 
+              element={element as any} 
+              onBlur={() => setIsEditingText(false)} 
+            />
+          ) : (
+            <TextElementContent element={element} />
+          )
+        )}
+        {element.type === 'shape' && (
+          <ShapeElementContent element={element} />
+        )}
+        {element.type === 'image' && (
+          <ImageElementContent element={element} />
+        )}
+        {element.type === 'group' && (
+          <GroupElementContent element={element} />
+        )}
+      </div>
 
       {/* Selection handles */}
       {isSelected && (

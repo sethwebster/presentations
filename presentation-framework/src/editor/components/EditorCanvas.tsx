@@ -5,6 +5,8 @@ import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { ElementRenderer } from './ElementRenderer';
 import { AlignmentGuides } from './AlignmentGuides';
 import { SelectionBoundingBox } from './SelectionBoundingBox';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface EditorCanvasProps {
   deckId: string;
@@ -324,16 +326,10 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
   return (
     <div
       ref={canvasRef}
-      className="editor-canvas"
-      style={{
-        flex: 1,
-        overflow: 'hidden',
-        position: 'relative',
-        background: 'var(--lume-midnight)',
-        cursor: isPanning ? 'grabbing' : 'default',
-        userSelect: 'none',
-        WebkitUserSelect: 'none',
-      }}
+      className={cn(
+        'editor-canvas relative flex-1 select-none overflow-hidden bg-[radial-gradient(circle_at_15%_15%,rgba(56,189,248,0.08),transparent_60%),radial-gradient(circle_at_85%_12%,rgba(129,140,248,0.08),transparent_55%),linear-gradient(180deg,hsla(var(--background),0.96)_0%,hsla(var(--background),0.9)_100%)] text-foreground transition-colors',
+        isPanning ? 'cursor-grabbing' : 'cursor-default'
+      )}
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -376,7 +372,7 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
             transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             width: `${CANVAS_WIDTH}px`,
             height: `${CANVAS_HEIGHT}px`,
-            background: '#ffffff',
+            background: 'hsl(var(--background))',
             boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4)',
           }}
         >
@@ -471,8 +467,8 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
                 right: 0,
                 bottom: 0,
                 backgroundImage: `
-                  linear-gradient(rgba(236, 236, 236, 0.1) 1px, transparent 1px),
-                  linear-gradient(90deg, rgba(236, 236, 236, 0.1) 1px, transparent 1px)
+                  linear-gradient(rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(148, 163, 184, 0.12) 1px, transparent 1px)
                 `,
                 backgroundSize: '20px 20px',
                 pointerEvents: 'none',
@@ -565,11 +561,11 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
                 top: `${Math.min(selectionBoxStart.y, selectionBoxEnd.y)}px`,
                 width: `${Math.abs(selectionBoxEnd.x - selectionBoxStart.x)}px`,
                 height: `${Math.abs(selectionBoxEnd.y - selectionBoxStart.y)}px`,
-                border: '2px solid var(--lume-primary)',
-                background: 'rgba(22, 194, 199, 0.15)',
+                border: '2px solid rgba(22, 194, 199, 0.9)',
+                background: 'rgba(22, 194, 199, 0.18)',
                 pointerEvents: 'none',
                 zIndex: 1001,
-                boxShadow: '0 0 0 1px rgba(22, 194, 199, 0.3), inset 0 0 0 1px rgba(22, 194, 199, 0.2)',
+                boxShadow: '0 0 0 1px rgba(22, 194, 199, 0.4), inset 0 0 0 1px rgba(22, 194, 199, 0.25)',
                 borderRadius: '2px',
               }}
             />
@@ -607,7 +603,7 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
               top: '50%',
               left: '50%',
               transform: 'translate(-50%, -50%)',
-              color: '#999',
+              color: 'rgba(148, 163, 184, 0.8)',
               fontSize: '14px',
             }}>
               No slide selected
@@ -648,106 +644,46 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
       </div>
 
       {/* Zoom Controls */}
-      <div style={{
-        position: 'absolute',
-        bottom: '16px',
-        right: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '4px',
-        background: 'rgba(11, 16, 34, 0.9)',
-        backdropFilter: 'blur(10px)',
-        padding: '8px',
-        borderRadius: '8px',
-        border: '1px solid rgba(236, 236, 236, 0.1)',
-      }}>
-        <button
+      <div className="absolute bottom-4 right-4 flex flex-col items-center gap-1 rounded-lg border border-border/60 bg-card/80 p-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/60">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-base"
           onClick={() => editor.setZoom(Math.min(2, zoom + 0.1))}
-          style={{
-            width: '32px',
-            height: '24px',
-            border: 'none',
-            background: 'transparent',
-            color: 'var(--lume-mist)',
-            cursor: 'pointer',
-            fontSize: '18px',
-            transition: 'color 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = 'var(--lume-primary)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = 'var(--lume-mist)';
-          }}
+          aria-label="Zoom in"
         >
           +
-        </button>
-        <div style={{
-          width: '32px',
-          textAlign: 'center',
-          fontSize: '12px',
-          color: 'var(--lume-mist)',
-          opacity: 0.8,
-        }}>
-          {Math.round(zoom * 100)}%
-        </div>
-        <button
+        </Button>
+        <span className="px-2 text-[11px] text-muted-foreground">{Math.round(zoom * 100)}%</span>
+        <Button
+          variant="ghost"
+          className="h-7 px-3 text-[11px] font-semibold"
           onClick={() => {
             if (!canvasRef.current) return;
             const containerRect = canvasRef.current.getBoundingClientRect();
             const containerWidth = containerRect.width;
             const containerHeight = containerRect.height;
-            
-            // Calculate zoom level needed to fit the canvas within the container
+
             const scaleX = containerWidth / CANVAS_WIDTH;
             const scaleY = containerHeight / CANVAS_HEIGHT;
-            const fitZoom = Math.min(scaleX, scaleY, 2); // Cap at 200% max
-            
+            const fitZoom = Math.min(scaleX, scaleY, 2);
+
             editor.setZoom(fitZoom);
-            editor.setPan({ x: 0, y: 0 }); // Reset pan when fitting
-          }}
-          style={{
-            width: '32px',
-            height: '24px',
-            border: 'none',
-            background: 'transparent',
-            color: 'var(--lume-mist)',
-            cursor: 'pointer',
-            fontSize: '11px',
-            fontWeight: '600',
-            transition: 'color 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = 'var(--lume-primary)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = 'var(--lume-mist)';
+            editor.setPan({ x: 0, y: 0 });
           }}
           title="Fit to window"
         >
           Fit
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-base"
           onClick={() => editor.setZoom(Math.max(0.25, zoom - 0.1))}
-          style={{
-            width: '32px',
-            height: '24px',
-            border: 'none',
-            background: 'transparent',
-            color: 'var(--lume-mist)',
-            cursor: 'pointer',
-            fontSize: '18px',
-            transition: 'color 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = 'var(--lume-primary)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = 'var(--lume-mist)';
-          }}
+          aria-label="Zoom out"
         >
           −
-        </button>
+        </Button>
       </div>
     </div>
   );

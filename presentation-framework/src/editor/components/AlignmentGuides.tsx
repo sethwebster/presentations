@@ -115,7 +115,16 @@ export function AlignmentGuides({ draggingElementId, draggingBounds }: Alignment
       detectedGuides.push({ type: 'horizontal', position: CANVAS_HEIGHT });
     }
 
-    setGuides(detectedGuides);
+    setGuides(prev => {
+      if (prev.length === detectedGuides.length) {
+        const prevKey = prev.map(guide => `${guide.type}-${guide.position}-${guide.isCenter ? 1 : 0}`).join('|');
+        const nextKey = detectedGuides.map(guide => `${guide.type}-${guide.position}-${guide.isCenter ? 1 : 0}`).join('|');
+        if (prevKey === nextKey) {
+          return prev;
+        }
+      }
+      return detectedGuides;
+    });
   }, [draggingElementId, draggingBounds, deck, currentSlideIndex]);
 
   if (guides.length === 0) return null;

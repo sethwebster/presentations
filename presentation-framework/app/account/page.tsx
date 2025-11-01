@@ -28,13 +28,6 @@ export default function AccountPage() {
     console.log('[Account Page] Session status:', { status, hasSession: !!session, user: session?.user });
   }, [status, session]);
 
-  // Redirect to sign in if not authenticated
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin?callbackUrl=/account');
-    }
-  }, [status, router]);
-
   // Load editor-created decks
   useEffect(() => {
     const loadEditorDecks = async () => {

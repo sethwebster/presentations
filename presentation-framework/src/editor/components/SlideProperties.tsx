@@ -10,17 +10,32 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Button } from '@/components/ui/button';
 import { ImageBackgroundModal } from './ImageBackgroundModal';
 import { cn } from '@/lib/utils';
+import { useImageLibrary } from '../hooks/useImageLibrary';
+import type { ImageLibraryItem } from '@/editor/types/imageLibrary';
+
+const SECTION_HEADING = "text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground";
 
 export function SlideProperties() {
   const state = useEditor();
   const editor = useEditorInstance();
 
+  const {
+    items: imageLibraryItems,
+    addItem: addImageToLibrary,
+    updateItem: updateLibraryItem,
+    sync: syncImageLibrary,
+    refreshFromServer: refreshImageLibrary,
+    isSyncing: isLibrarySyncing,
+    lastSyncError: imageLibraryError,
+  } = useImageLibrary();
+
   const deck = state.deck;
   const selectedSlideId = state.selectedSlideId;
+  const deckId = state.deckId ?? deck?.meta?.id ?? null;
   
   if (!deck || !selectedSlideId) {
     return (
-      <div className="text-sm text-[var(--editor-text-muted)] italic">
+      <div className="text-sm italic text-muted-foreground">
         No slide selected
       </div>
     );
@@ -29,7 +44,7 @@ export function SlideProperties() {
   const slide = deck.slides.find(s => s.id === selectedSlideId);
   if (!slide) {
     return (
-      <div className="text-sm text-[var(--editor-text-muted)] italic">
+      <div className="text-sm italic text-muted-foreground">
         Slide not found
       </div>
     );
@@ -64,11 +79,25 @@ export function SlideProperties() {
   const [showRefineModal, setShowRefineModal] = useState(false);
   const [refineRequest, setRefineRequest] = useState('');
   const [mounted, setMounted] = useState(false);
+  const [imageModalInitialTab, setImageModalInitialTab] = useState<'generate' | 'upload' | 'library'>('generate');
+  const [isLibraryRefreshing, setIsLibraryRefreshing] = useState(false);
   const [imageStatus, setImageStatus] = useState<{ isGenerating: boolean; error: string | null; success: string | null }>({
     isGenerating: false,
     error: null,
     success: null,
   });
+
+  const handleLibraryRefresh = useCallback(async () => {
+    setIsLibraryRefreshing(true);
+    try {
+      await refreshImageLibrary(true);
+      await syncImageLibrary(true);
+    } catch (error) {
+      console.error('Failed to refresh image library:', error);
+    } finally {
+      setIsLibraryRefreshing(false);
+    }
+  }, [refreshImageLibrary, syncImageLibrary]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imagePreviewRef = useRef<HTMLDivElement>(null);
   const isDraggingImageRef = useRef(false);
@@ -84,6 +113,12 @@ export function SlideProperties() {
     setMounted(true);
     return () => setMounted(false);
   }, []);
+
+  useEffect(() => {
+    if (showImageModal) {
+      void refreshImageLibrary();
+    }
+  }, [showImageModal, refreshImageLibrary]);
 
   // Sync backgroundType when slide changes and update cache
   useEffect(() => {
@@ -187,6 +222,20 @@ export function SlideProperties() {
     });
 
     const dataUrl = await readAsDataURL(file);
+    const uploadedAt = new Date().toISOString();
+    const libraryItem = addImageToLibrary({
+      dataUrl,
+      thumbnailDataUrl: dataUrl,
+      origin: 'upload',
+      metadata: {
+        usage: 'background',
+        originalFileName: file.name,
+        sizeBytes: file.size,
+        uploadedAt,
+        deckId: deckId ?? undefined,
+      },
+    });
+
     updateImageBackground({
       src: dataUrl,
       offsetX: 0,
@@ -194,12 +243,13 @@ export function SlideProperties() {
       scale: 100,
       source: 'upload',
       name: file.name,
-      uploadedAt: new Date().toISOString(),
+      uploadedAt,
+      libraryItemId: libraryItem.id,
     });
     setBackgroundType('image');
     setImageStatus({ isGenerating: false, error: null, success: 'Image uploaded successfully.' });
     setTimeout(() => setImageStatus({ isGenerating: false, error: null, success: null }), 2000);
-  }, [updateImageBackground]);
+  }, [updateImageBackground, addImageToLibrary, deckId]);
 
   const handleFileInputChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -269,17 +319,35 @@ export function SlideProperties() {
         throw new Error('No image returned by generator.');
       }
 
+      const generatedAt = new Date().toISOString();
+      const libraryItem = addImageToLibrary({
+        dataUrl: imageDataResponse,
+        thumbnailDataUrl: imageDataResponse,
+        origin: 'ai',
+        metadata: {
+          usage: 'background',
+          prompt,
+          provider: meta?.provider ?? 'openai',
+          quality: meta?.quality ?? 'hd',
+          generatedAt,
+          width: slideWidth,
+          height: slideHeight,
+          deckId: deckId ?? undefined,
+        },
+      });
+
       setBackgroundType('image');
       updateImageBackground({
         src: imageDataResponse,
         offsetX: 0,
         offsetY: 0,
         scale: 100,
-        generatedAt: new Date().toISOString(),
+        generatedAt,
         source: 'ai',
         provider: meta?.provider ?? 'openai',
         quality: meta?.quality ?? 'hd',
         prompt,
+        libraryItemId: libraryItem.id,
       });
 
       setImageStatus({ isGenerating: false, error: null, success: 'Generated background applied.' });
@@ -292,7 +360,7 @@ export function SlideProperties() {
         success: null,
       });
     }
-  }, [updateImageBackground]);
+  }, [updateImageBackground, addImageToLibrary, deckId]);
 
   const handleRefineImage = useCallback(async () => {
     if (!refineRequest.trim() || !imageData.src) {
@@ -354,17 +422,62 @@ export function SlideProperties() {
 
       // Update with refined image, preserving original prompt and refinement history
       const refinedPrompt = `${originalPrompt}, ${refineRequest.trim()}`;
+      const generatedAt = new Date().toISOString();
+      const refinementEntry = {
+        id: `ref-${Date.now()}`,
+        prompt: refineRequest.trim(),
+        createdAt: generatedAt,
+      };
+
+      let libraryItemId = typeof (imageData.meta as any)?.libraryItemId === 'string'
+        ? (imageData.meta as any).libraryItemId as string
+        : undefined;
+
+      if (libraryItemId) {
+        updateLibraryItem(libraryItemId, (existing) => ({
+          ...existing,
+          dataUrl: imageDataResponse,
+          thumbnailDataUrl: imageDataResponse,
+          updatedAt: generatedAt,
+          metadata: {
+            ...existing.metadata,
+            prompt: refinedPrompt,
+            provider: meta?.provider ?? existing.metadata?.provider,
+            quality: meta?.quality ?? existing.metadata?.quality,
+            generatedAt,
+            refinementHistory: [...(existing.metadata?.refinementHistory ?? []), refinementEntry],
+          },
+        }));
+      } else {
+        const newItem = addImageToLibrary({
+          dataUrl: imageDataResponse,
+          thumbnailDataUrl: imageDataResponse,
+          origin: 'ai',
+          metadata: {
+            usage: 'background',
+            prompt: refinedPrompt,
+            provider: meta?.provider ?? 'openai',
+            quality: meta?.quality ?? 'hd',
+            generatedAt,
+            deckId: deckId ?? undefined,
+            refinementHistory: [refinementEntry],
+          },
+        });
+        libraryItemId = newItem.id;
+      }
+
       updateImageBackground({
         src: imageDataResponse,
         offsetX: imageData.offsetX,
         offsetY: imageData.offsetY,
         scale: imageData.scale,
-        generatedAt: new Date().toISOString(),
+        generatedAt,
         source: 'ai',
         provider: meta?.provider ?? 'openai',
         quality: meta?.quality ?? 'hd',
         prompt: refinedPrompt,
         refinement: refineRequest.trim(),
+        libraryItemId,
       });
 
       setImageStatus({ isGenerating: false, error: null, success: 'Image refined successfully.' });
@@ -381,7 +494,7 @@ export function SlideProperties() {
       });
       // Keep modal open so user can see the error and try again
     }
-  }, [refineRequest, imageData, deck, updateImageBackground]);
+  }, [refineRequest, imageData, deck, updateImageBackground, updateLibraryItem, addImageToLibrary, deckId]);
 
   const handleImageDragStart = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (!imageData.src) return;
@@ -426,6 +539,35 @@ export function SlideProperties() {
     updateImageBackground({ scale: clamped });
   }, [updateImageBackground]);
 
+  const handleSelectLibraryImage = useCallback((item: ImageLibraryItem, mode: 'background' | 'element') => {
+    if (mode !== 'background') {
+      setImageStatus({ isGenerating: false, error: 'Image elements must be added from the toolbar.', success: null });
+      return;
+    }
+
+    const generatedAt = item.metadata?.generatedAt ?? item.metadata?.uploadedAt ?? new Date().toISOString();
+
+    updateImageBackground({
+      src: item.dataUrl,
+      offsetX: 0,
+      offsetY: 0,
+      scale: 100,
+      prompt: item.metadata?.prompt,
+      generatedAt,
+      source: item.origin === 'ai' ? 'ai' : 'upload',
+      provider: item.metadata?.provider,
+      quality: item.metadata?.quality,
+      name: item.metadata?.originalFileName,
+      uploadedAt: item.metadata?.uploadedAt,
+      libraryItemId: item.id,
+    });
+
+    setBackgroundType('image');
+    setImageStatus({ isGenerating: false, error: null, success: 'Background applied from library.' });
+    setTimeout(() => setImageStatus({ isGenerating: false, error: null, success: null }), 2000);
+    setShowImageModal(false);
+  }, [setBackgroundType, setImageStatus, updateImageBackground]);
+
   const imageButtons = (
     <div className="flex flex-wrap gap-2">
       <Button
@@ -433,6 +575,7 @@ export function SlideProperties() {
         onClick={() => {
           setBackgroundType('image');
           setImageStatus({ isGenerating: false, error: null, success: null });
+          setImageModalInitialTab('generate');
           setShowImageModal(true);
         }}
         className="inline-flex items-center gap-2"
@@ -457,8 +600,10 @@ export function SlideProperties() {
         type="button"
         variant="ghost"
         onClick={() => {
-          setImageStatus({ isGenerating: false, error: 'Image library is coming soon.', success: null });
-          setTimeout(() => setImageStatus({ isGenerating: false, error: null, success: null }), 2000);
+          setBackgroundType('image');
+          setImageStatus({ isGenerating: false, error: null, success: null });
+          setImageModalInitialTab('library');
+          setShowImageModal(true);
         }}
         className="inline-flex items-center gap-2"
       >
@@ -472,18 +617,18 @@ export function SlideProperties() {
     <div className="flex flex-col gap-6 text-foreground">
       {/* Slide Title */}
       <div className="space-y-2">
-        <Label className="editor-section-heading">Title</Label>
+        <Label className={SECTION_HEADING}>Title</Label>
         <Input
           value={slide.title || ''}
           onChange={(e) => editor.updateSlide(selectedSlideId, { title: e.target.value })}
           placeholder="Untitled slide"
-          className="editor-input"
+          className="h-9"
         />
       </div>
 
       {/* Background */}
       <div className="space-y-3">
-        <Label className="editor-section-heading">Background</Label>
+        <Label className={SECTION_HEADING}>Background</Label>
         
         <SegmentedControl
           items={[
@@ -588,7 +733,7 @@ export function SlideProperties() {
               )}
 
               <div className="space-y-2">
-                <Label className="text-sm text-[var(--editor-text-muted)]">Image URL</Label>
+                <Label className="text-sm text-muted-foreground">Image URL</Label>
                 <Input
                   value={imageData.src}
                   onChange={(e) => {
@@ -600,7 +745,7 @@ export function SlideProperties() {
                     });
                   }}
                   placeholder="data:image/... or https://..."
-                  className="editor-input"
+                  className="h-9"
                 />
               </div>
               
@@ -628,7 +773,7 @@ export function SlideProperties() {
                   <>
                     <div
                       ref={imagePreviewRef}
-                      className="relative w-full overflow-hidden rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)]"
+                      className="relative w-full overflow-hidden rounded-xl border border-border/60 bg-muted/40"
                       style={previewStyle}
                       onMouseDown={handleImageDragStart}
                     >
@@ -666,7 +811,7 @@ export function SlideProperties() {
                   )}
 
                   <div className="space-y-2">
-                    <Label className="text-sm text-[var(--editor-text-muted)]">Horizontal Offset</Label>
+                    <Label className="text-sm text-muted-foreground">Horizontal Offset</Label>
                     <Input
                       type="number"
                       value={imageData.offsetX}
@@ -675,13 +820,13 @@ export function SlideProperties() {
                           offsetX: parseInt(e.target.value) || 0,
                         });
                       }}
-                      className="editor-input"
+                      className="h-9"
                       step="1"
                     />
                   </div>
                   
                   <div className="space-y-2">
-                    <Label className="text-sm text-[var(--editor-text-muted)]">Vertical Offset</Label>
+                    <Label className="text-sm text-muted-foreground">Vertical Offset</Label>
                     <Input
                       type="number"
                       value={imageData.offsetY}
@@ -690,13 +835,13 @@ export function SlideProperties() {
                           offsetY: parseInt(e.target.value) || 0,
                         });
                       }}
-                      className="editor-input"
+                      className="h-9"
                       step="1"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm text-[var(--editor-text-muted)]">Scale</Label>
+                    <Label className="text-sm text-muted-foreground">Scale</Label>
                     <input
                       type="range"
                       min={50}
@@ -710,11 +855,11 @@ export function SlideProperties() {
                         type="number"
                         value={imageData.scale}
                         onChange={(e) => handleScaleChange(parseInt(e.target.value) || 100)}
-                        className="editor-input"
+                        className="h-9"
                         min={10}
                         max={400}
                       />
-                      <span className="text-xs text-[var(--editor-text-muted)]">%</span>
+                      <span className="text-xs text-muted-foreground">%</span>
                     </div>
                   </div>
                   </>
@@ -754,7 +899,7 @@ export function SlideProperties() {
 
       {/* Slide Number */}
       <div className="space-y-2">
-        <Label className="editor-section-heading">Slide Number</Label>
+        <Label className={SECTION_HEADING}>Slide Number</Label>
         <Input
           type="text"
           value={slide.customSlideNumber || ''}
@@ -762,18 +907,18 @@ export function SlideProperties() {
             customSlideNumber: e.target.value || undefined 
           })}
           placeholder="Auto"
-          className="editor-input"
+          className="h-9"
         />
       </div>
 
       {/* Hidden */}
       <div className="space-y-2">
-        <label className="flex items-center gap-3 text-sm text-[var(--editor-text-muted)]">
+        <label className="flex items-center gap-3 text-sm text-muted-foreground">
           <input
             type="checkbox"
             checked={slide.hidden || false}
             onChange={(e) => editor.updateSlide(selectedSlideId, { hidden: e.target.checked })}
-            className="editor-checkbox"
+            className="h-4 w-4 rounded border border-input bg-background text-primary focus:ring-primary focus:ring-offset-0"
           />
           Hide slide in presentation
         </label>
@@ -782,7 +927,7 @@ export function SlideProperties() {
       {/* Duration (for auto-advance) */}
       {deck?.settings?.presentation?.autoAdvance && (
         <div className="space-y-2">
-          <Label className="editor-section-heading">Duration (seconds)</Label>
+          <Label className={SECTION_HEADING}>Duration (seconds)</Label>
           <Input
             type="number"
             min={1}
@@ -791,7 +936,7 @@ export function SlideProperties() {
             onChange={(e) => editor.updateSlide(selectedSlideId, { 
               duration: parseInt(e.target.value) || undefined 
             })}
-            className="editor-input"
+            className="h-9"
           />
         </div>
       )}
@@ -808,6 +953,7 @@ export function SlideProperties() {
         open={showImageModal}
         onClose={() => {
           setShowImageModal(false);
+          setImageModalInitialTab('generate');
           setImageStatus({ isGenerating: false, error: null, success: null });
         }}
         onGenerate={(prompt, mode) => handleGenerateImage(prompt, mode)}
@@ -821,6 +967,15 @@ export function SlideProperties() {
           }
         }}
         status={imageStatus}
+        initialTab={imageModalInitialTab}
+        libraryItems={imageLibraryItems}
+        onSelectFromLibrary={handleSelectLibraryImage}
+        onRefreshLibrary={handleLibraryRefresh}
+        libraryStatus={{
+          isLoading: isLibraryRefreshing,
+          isSyncing: isLibrarySyncing,
+          error: imageLibraryError,
+        }}
       />
 
       {/* Refine Image Modal */}
@@ -837,11 +992,11 @@ export function SlideProperties() {
           }}
         >
           <div
-            className="w-full max-w-xl rounded-2xl border border-black/10 bg-white/95 p-6 text-[var(--editor-text-strong)] shadow-[0_30px_90px_-30px_rgba(0,0,0,0.55)]"
+          className="w-full max-w-xl rounded-2xl border border-border/60 bg-card/95 p-6 text-foreground shadow-2xl backdrop-blur supports-[backdrop-filter]:bg-card/80"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4 mb-6">
-              <h2 className="text-lg font-semibold text-[var(--editor-text-strong)]">
+              <h2 className="text-lg font-semibold text-foreground">
                 Refine Image
               </h2>
               <button
@@ -849,7 +1004,7 @@ export function SlideProperties() {
                   setShowRefineModal(false);
                   setRefineRequest('');
                 }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--editor-text-muted)] transition hover:bg-white/5 hover:text-[var(--editor-text-strong)]"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted/40 hover:text-foreground"
                 aria-label="Close refine image dialog"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
@@ -861,7 +1016,7 @@ export function SlideProperties() {
 
             <div className="space-y-4">
               <div>
-                <Label className="text-sm font-medium text-[var(--editor-text-muted)] mb-2 block">
+                <Label className="mb-2 block text-sm font-medium text-muted-foreground">
                   How would you like to refine this image?
                 </Label>
                 <textarea
@@ -869,8 +1024,8 @@ export function SlideProperties() {
                   onChange={(e) => setRefineRequest(e.target.value)}
                   placeholder="e.g., make it more vibrant, change the lighting, add more detail..."
                   className={cn(
-                    "w-full rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-3 text-sm text-[var(--editor-text)]",
-                    "focus:border-[var(--editor-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--editor-accent)]/40"
+                    "w-full rounded-xl border border-border/60 bg-card/80 p-3 text-sm text-foreground",
+                    "focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
                   )}
                   rows={4}
                   autoFocus

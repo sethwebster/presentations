@@ -46,7 +46,7 @@ export function EditorLayout({ deckId }: EditorLayoutProps) {
   useKeyboardShortcuts();
 
   return (
-    <div className="editor-shell flex flex-col h-screen w-screen overflow-hidden font-sans">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_12%_12%,hsl(var(--primary))/10,transparent_55%),radial-gradient(circle_at_85%_8%,hsl(var(--accent))/8,transparent_55%),linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--background))_100%)] text-foreground">
       {/* Top Toolbar */}
       <Toolbar deckId={deckId} onToggleTimeline={() => setShowTimeline(!showTimeline)} />
 
@@ -66,7 +66,7 @@ export function EditorLayout({ deckId }: EditorLayoutProps) {
 
       {/* Bottom - Timeline Editor (conditional) */}
       {showTimeline && (
-        <div className="h-[200px] border-t border-lume-mist/10">
+        <div className="h-[200px] border-t border-border/60 bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/60">
           <TimelineEditor deckId={deckId} />
         </div>
       )}
