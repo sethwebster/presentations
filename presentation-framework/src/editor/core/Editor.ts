@@ -153,12 +153,37 @@ export class Editor {
       }
       const deck = await response.json() as DeckDefinition;
       console.log('Deck loaded:', deckId, { slides: deck.slides.length, title: deck.meta.title });
-      const firstSlide = deck.slides[0];
+      
+      // Try to restore last selected slide from localStorage
+      let selectedSlideId: string | null = null;
+      let currentSlideIndex = 0;
+      
+      try {
+        const savedSlideId = localStorage.getItem(`editor:${deckId}:lastSelectedSlideId`);
+        if (savedSlideId) {
+          // Check if the saved slide ID exists in the deck
+          const slideIndex = deck.slides.findIndex(slide => slide.id === savedSlideId);
+          if (slideIndex >= 0) {
+            selectedSlideId = savedSlideId;
+            currentSlideIndex = slideIndex;
+          }
+        }
+      } catch (e) {
+        // Ignore localStorage errors (e.g., private browsing mode)
+        console.warn('Failed to load last selected slide from localStorage:', e);
+      }
+      
+      // Fallback to first slide if no saved selection found
+      if (!selectedSlideId && deck.slides.length > 0) {
+        selectedSlideId = deck.slides[0]?.id || null;
+        currentSlideIndex = 0;
+      }
+      
       this.setState({
         deck,
         deckId,
-        currentSlideIndex: 0,
-        selectedSlideId: firstSlide?.id || null,
+        currentSlideIndex,
+        selectedSlideId,
         selectedElementIds: new Set(),
         isLoading: false,
       });
@@ -409,17 +434,41 @@ export class Editor {
 
   // Slide operations
   setCurrentSlide(index: number): void {
-    const { deck } = this.state;
+    const { deck, deckId } = this.state;
     if (!deck || index < 0 || index >= deck.slides.length) return;
     const slide = deck.slides[index];
+    const slideId = slide?.id || null;
+    
+    // Save last selected slide to localStorage
+    if (deckId && slideId) {
+      try {
+        localStorage.setItem(`editor:${deckId}:lastSelectedSlideId`, slideId);
+      } catch (e) {
+        // Ignore localStorage errors (e.g., quota exceeded, private browsing)
+        console.warn('Failed to save last selected slide to localStorage:', e);
+      }
+    }
+    
     this.setState({ 
       currentSlideIndex: index, 
       selectedElementIds: new Set(),
-      selectedSlideId: slide?.id || null,
+      selectedSlideId: slideId,
     });
   }
 
   setSelectedSlide(slideId: string | null): void {
+    const { deckId } = this.state;
+    
+    // Save last selected slide to localStorage
+    if (deckId && slideId) {
+      try {
+        localStorage.setItem(`editor:${deckId}:lastSelectedSlideId`, slideId);
+      } catch (e) {
+        // Ignore localStorage errors (e.g., quota exceeded, private browsing)
+        console.warn('Failed to save last selected slide to localStorage:', e);
+      }
+    }
+    
     this.setState({ 
       selectedSlideId: slideId,
       selectedElementIds: new Set(), // Clear element selection when selecting a slide
@@ -935,6 +984,163 @@ export class Editor {
         previousElement: previousElement ? JSON.parse(JSON.stringify(previousElement)) : undefined,
       },
       timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Batch update multiple elements in a single setState call.
+   * This is much more efficient than calling updateElement multiple times,
+   * especially during drag operations.
+   */
+  batchUpdateElements(updates: Map<string, Partial<ElementDefinition>>): void {
+    const { deck, currentSlideIndex, openedGroupId } = this.state;
+    if (!deck || updates.size === 0) return;
+
+    const currentSlide = deck.slides[currentSlideIndex];
+    if (!currentSlide) return;
+
+    // Build a map of all elements for quick lookup
+    const allElements = [
+      ...(currentSlide.elements || []),
+      ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+    ];
+
+    // Collect all elements that need updating, preserving previous state for undo
+    const previousElements = new Map<string, ElementDefinition>();
+    updates.forEach((_, elementId) => {
+      const element = allElements.find(el => el.id === elementId);
+      if (element) {
+        previousElements.set(elementId, element);
+      }
+    });
+
+    // Process updates based on opened group state
+    let updatedDeck: DeckDefinition;
+
+    if (openedGroupId) {
+      // Handle group children updates
+      const groupElement = allElements.find(el => el.id === openedGroupId);
+      if (groupElement && groupElement.type === 'group') {
+        const group = groupElement as GroupElementDefinition;
+        const updatedChildren = group.children?.map(child => {
+          const elementUpdates = updates.get(child.id);
+          return elementUpdates ? { ...child, ...elementUpdates } as ElementDefinition : child;
+        }) || [];
+
+        // Recalculate group bounds
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const child of updatedChildren) {
+          if (child.bounds) {
+            const x = child.bounds.x || 0;
+            const y = child.bounds.y || 0;
+            const w = child.bounds.width || 0;
+            const h = child.bounds.height || 0;
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x + w);
+            maxY = Math.max(maxY, y + h);
+          }
+        }
+
+        const updatedGroup: GroupElementDefinition = {
+          ...group,
+          children: updatedChildren,
+          bounds: minX !== Infinity ? {
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY,
+          } : group.bounds,
+        };
+
+        updatedDeck = {
+          ...deck,
+          slides: deck.slides.map((slide, i) => {
+            if (i !== currentSlideIndex) return slide;
+            
+            const elements = slide.elements || [];
+            const groupIndex = elements.findIndex(el => el.id === openedGroupId);
+            
+            if (groupIndex !== -1) {
+              return {
+                ...slide,
+                elements: elements.map((el, idx) => idx === groupIndex ? updatedGroup : el) as ElementDefinition[],
+              };
+            }
+
+            if (slide.layers) {
+              const updatedLayers = slide.layers.map(layer => {
+                const layerGroupIndex = layer.elements.findIndex(el => el.id === openedGroupId);
+                if (layerGroupIndex !== -1) {
+                  return {
+                    ...layer,
+                    elements: layer.elements.map((el, idx) => idx === layerGroupIndex ? updatedGroup : el) as ElementDefinition[],
+                  };
+                }
+                return layer;
+              });
+              
+              if (updatedLayers.some((layer, idx) => layer !== slide.layers![idx])) {
+                return { ...slide, layers: updatedLayers };
+              }
+            }
+            
+            return slide;
+          }),
+        };
+      } else {
+        // Fallback to regular update if group not found
+        updatedDeck = deck;
+      }
+    } else {
+      // Regular element updates (not in group)
+      updatedDeck = {
+        ...deck,
+        slides: deck.slides.map((slide, i) => {
+          if (i !== currentSlideIndex) return slide;
+
+          // Update elements array
+          const updatedElements = (slide.elements || []).map(el => {
+            const elementUpdates = updates.get(el.id);
+            return elementUpdates ? { ...el, ...elementUpdates } as ElementDefinition : el;
+          });
+
+          // Update layers
+          let updatedLayers = slide.layers;
+          if (slide.layers) {
+            updatedLayers = slide.layers.map(layer => ({
+              ...layer,
+              elements: layer.elements.map(el => {
+                const elementUpdates = updates.get(el.id);
+                return elementUpdates ? { ...el, ...elementUpdates } as ElementDefinition : el;
+              }),
+            }));
+          }
+
+          return {
+            ...slide,
+            elements: updatedElements,
+            layers: updatedLayers,
+          };
+        }),
+      };
+    }
+
+    // Single setState call for all updates
+    this.setState({ deck: updatedDeck });
+
+    // Execute commands for undo/redo (one per element)
+    updates.forEach((updatesForElement, elementId) => {
+      const previousElement = previousElements.get(elementId);
+      this.executeCommand({
+        type: 'updateElement',
+        target: elementId,
+        params: {
+          updates: updatesForElement,
+          previousElement: previousElement ? JSON.parse(JSON.stringify(previousElement)) : undefined,
+        },
+        timestamp: Date.now(),
+      });
     });
   }
 

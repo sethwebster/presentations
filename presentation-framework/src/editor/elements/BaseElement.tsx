@@ -7,6 +7,7 @@ import { EditableTextElement } from './EditableTextElement';
 import { ElementContextMenu } from '../components/ElementContextMenu';
 import { getTransformService } from '../services/TransformService';
 import { getSnapService } from '../services/SnapService';
+import { getDragResizeService } from '../services/DragResizeService';
 
 const SNAP_THRESHOLD = 5; // pixels - same as GUIDE_THRESHOLD
 
@@ -196,21 +197,47 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
           });
         }
       });
+      
+      // CRITICAL: For the primary element being dragged, use its CURRENT bounds from props
+      // This ensures we're using the exact position where the element is rendered
+      if (initialBounds.has(element.id)) {
+        initialBounds.set(element.id, {
+          x: bounds.x || 0,
+          y: bounds.y || 0,
+          width: bounds.width || 100,
+          height: bounds.height || 50,
+        });
+      }
+      
       setSelectedElementsInitialBounds(initialBounds);
       // Capture selected IDs at drag start to avoid reading state during drag
       setDraggedSelectedIds(new Set(currentState.selectedElementIds));
-    }
+      
+      // Use DragResizeService for drag operations
+      const dragService = getDragResizeService();
+      dragService.initialize(editor);
 
-    // Convert screen coordinates to canvas coordinates
-    const transformService = getTransformService();
-    const canvasPos = transformService.screenToCanvas(e.clientX, e.clientY, zoom, pan);
-    
-    setIsDragging(true);
-    // Store the initial mouse position in canvas coordinates
-    setDragStart({
-      x: canvasPos.x,
-      y: canvasPos.y,
-    });
+      // Convert screen coordinates to canvas coordinates
+      const transformService = getTransformService();
+      const canvasPos = transformService.screenToCanvas(e.clientX, e.clientY, zoom, pan);
+      
+      // Start drag operation in service - use the bounds we just captured
+      dragService.startDrag(
+        element.id,
+        initialBounds, // Use local variable, not state (which might be stale)
+        new Set(currentState.selectedElementIds),
+        { x: e.clientX, y: e.clientY },
+        zoom,
+        pan
+      );
+      
+      setIsDragging(true);
+      // Store the initial mouse position in canvas coordinates (still needed for some UI state)
+      setDragStart({
+        x: canvasPos.x,
+        y: canvasPos.y,
+      });
+    }
   };
 
   useEffect(() => {
@@ -226,160 +253,24 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
     document.body.style.webkitUserSelect = 'none';
     document.body.style.cursor = 'grabbing';
 
-    // Throttle drag updates to prevent excessive re-renders and memory issues
-    let rafId: number | null = null;
-    let pendingUpdates: Map<string, { x: number; y: number; width: number; height: number }> | null = null;
-    let pendingDraggingElement: { id: string; bounds: { x: number; y: number; width: number; height: number } } | null = null;
+    // Service handles RAF throttling - no local state needed
 
     const handleMouseMove = (e: MouseEvent) => {
       e.preventDefault();
       
-      // Convert screen coordinates to canvas coordinates
-      const transformService = getTransformService();
-      const canvasPos = transformService.screenToCanvas(e.clientX, e.clientY, zoom, pan);
+      // Use service to calculate drag - it handles all logic and RAF throttling
+      const dragService = getDragResizeService();
+      dragService.updateDrag(e.clientX, e.clientY, true); // snap enabled
       
-      // Calculate delta from initial mouse position
-      const deltaX = canvasPos.x - dragStart.x;
-      const deltaY = canvasPos.y - dragStart.y;
-      
-      // Get the initial bounds of the primary element being dragged
-      const primaryInitialBounds = selectedElementsInitialBounds.get(element.id);
-      if (!primaryInitialBounds) return;
-      
-      // Calculate the offset of the mouse from the primary element's initial position
-      const initialMouseOffsetX = dragStart.x - primaryInitialBounds.x;
-      const initialMouseOffsetY = dragStart.y - primaryInitialBounds.y;
-      
-      // Calculate where the primary element should be (follows cursor)
-      let primaryNewX = canvasPos.x - initialMouseOffsetX;
-      let primaryNewY = canvasPos.y - initialMouseOffsetY;
-      
-      // Get current state ONLY for snap points (read once, don't use for updates)
-      // Use captured selected IDs from drag start instead of reading from state
-      const currentState = editor.getState();
-      const currentDeck = currentState.deck;
-      const currentSlide = currentDeck?.slides[currentState.currentSlideIndex];
-      
-      // Build list of elements for snap points (excluding the dragged element and other selected elements)
-      // Use draggedSelectedIds captured at drag start instead of currentState.selectedElementIds
-      let snapPoints = { snapX: null as number | null, snapY: null as number | null };
-      if (currentSlide) {
-        const allElements = [
-          ...(currentSlide.elements || []),
-          ...(currentSlide.layers?.flatMap(l => l.elements) || []),
-        ];
-        
-        const elementsForSnap = allElements.filter(el => {
-          if (el.id === element.id) return false;
-          if (draggedSelectedIds.has(el.id)) return false;
-          return true;
-        });
-        
-        // Check for snap points
-        const snapService = getSnapService();
-        const tempBounds = {
-          x: primaryNewX,
-          y: primaryNewY,
-          width: primaryInitialBounds.width,
-          height: primaryInitialBounds.height,
-        };
-        snapPoints = snapService.findSnapPoints(
-          tempBounds,
-          elementsForSnap,
-          Array.from(draggedSelectedIds)
-        );
-      }
-      
-      // Apply snapping if within threshold
-      const snapService = getSnapService();
-      if (snapPoints.snapX !== null) {
-        primaryNewX = snapService.applySnap(primaryNewX, snapPoints.snapX, SNAP_THRESHOLD);
-      }
-      if (snapPoints.snapY !== null) {
-        primaryNewY = snapService.applySnap(primaryNewY, snapPoints.snapY, SNAP_THRESHOLD);
-      }
-      
-      // Calculate the delta of the primary element
-      const primaryDeltaX = primaryNewX - primaryInitialBounds.x;
-      const primaryDeltaY = primaryNewY - primaryInitialBounds.y;
-      
-      // Store pending updates for all selected elements
-      // Use selectedElementsInitialBounds Map keys instead of reading from state
-      const updates = new Map<string, { x: number; y: number; width: number; height: number }>();
-      
-      // Iterate over the initial bounds map instead of selectedElementIds from state
-      selectedElementsInitialBounds.forEach((initialBounds, id) => {
-        // Calculate new absolute position (no bounds constraints)
-        const newX = initialBounds.x + primaryDeltaX;
-        const newY = initialBounds.y + primaryDeltaY;
-        
-        const newBounds = {
-          x: newX,
-          y: newY,
-          width: initialBounds.width,
-          height: initialBounds.height,
-        };
-
-        updates.set(id, newBounds);
-
-        // Store dragging state for alignment guides (only for the primary dragged element)
-        if (id === element.id) {
-          pendingDraggingElement = { id, bounds: newBounds };
-        }
-      });
-
-      pendingUpdates = updates;
-
-      // Throttle updates using requestAnimationFrame
-      if (rafId === null) {
-        rafId = requestAnimationFrame(() => {
-          if (pendingUpdates) {
-            // Update all selected elements
-            pendingUpdates.forEach((newBounds, id) => {
-              editor.updateElement(id, {
-                bounds: newBounds,
-              });
-            });
-            pendingUpdates = null;
-          }
-
-          // Update dragging state for alignment guides
-          if (pendingDraggingElement) {
-            editor.setDraggingElement(pendingDraggingElement.id, pendingDraggingElement.bounds);
-            pendingDraggingElement = null;
-          }
-
-          rafId = null;
-        });
-      }
+      // Service handles all calculation, batching, and state updates internally
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
       
-      // Apply any pending updates immediately on mouse up
-      if (pendingUpdates) {
-        pendingUpdates.forEach((newBounds, id) => {
-          editor.updateElement(id, {
-            bounds: newBounds,
-          });
-        });
-        pendingUpdates = null;
-      }
-
-      // Update dragging state one final time
-      if (pendingDraggingElement) {
-        editor.setDraggingElement(pendingDraggingElement.id, pendingDraggingElement.bounds);
-        pendingDraggingElement = null;
-      }
-
-      editor.setDraggingElement(null, null); // Clear dragging state
-      
-      // Cancel any pending animation frame
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
+      // End drag operation in service - it handles cleanup and final updates
+      const dragService = getDragResizeService();
+      dragService.endDrag();
       
       // Restore text selection
       document.body.style.userSelect = '';
@@ -394,25 +285,21 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
     window.addEventListener('dragstart', preventSelection);
     document.addEventListener('contextmenu', preventSelection);
 
-    return () => {
+      return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
       window.removeEventListener('selectstart', preventSelection);
       window.removeEventListener('dragstart', preventSelection);
       document.removeEventListener('contextmenu', preventSelection);
       
-      // Clean up animation frame
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
+      // Service handles cleanup
       
       // Restore in case component unmounts during drag
       document.body.style.userSelect = '';
       document.body.style.webkitUserSelect = '';
       document.body.style.cursor = '';
     };
-  }, [isDragging, dragStart, element.id, zoom, pan, selectedElementsInitialBounds, draggedSelectedIds, editor]);
+  }, [isDragging, element.id, editor]); // Reduced dependencies - service handles zoom/pan/bounds
 
   // Extract opacity from style and convert from 0-100 to 0-1
   const elementStyle = element.style as any;
@@ -617,6 +504,7 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
   const pan = state.pan;
   const [isResizing, setIsResizing] = useState<string | false>(false);
   const [isAltPressedDuringResize, setIsAltPressedDuringResize] = useState(false);
+  const [isShiftPressedDuringResize, setIsShiftPressedDuringResize] = useState(false);
   const [resizeStart, setResizeStart] = useState<{ 
     mouseX: number; 
     mouseY: number; 
@@ -638,14 +526,9 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
     e.stopPropagation();
     setIsResizing(handle);
     
-    // Set draggingElementId to block autosave during resize
-    editor.setDraggingElement(element.id, bounds);
-    
-    // Store initial mouse position in canvas coordinates
-    const transformService = getTransformService();
-    const initialMouseCanvas = transformService.screenToCanvas(e.clientX, e.clientY, zoom, pan);
-    
-    // Store initial bounds
+    const resizeService = getDragResizeService();
+    // Ensure service is initialized with editor instance
+    resizeService.initialize(editor);
     const initialBounds = {
       x: bounds.x || 0,
       y: bounds.y || 0,
@@ -654,14 +537,29 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
     };
     
     // Calculate initial aspect ratio for images
-    const initialAspectRatio = initialBounds.width / initialBounds.height;
+    const aspectRatio = element.type === 'image' 
+      ? initialBounds.width / initialBounds.height 
+      : undefined;
     
+    // Start resize operation in service
+    resizeService.startResize(
+      element.id,
+      element.type,
+      handle,
+      initialBounds,
+      { x: e.clientX, y: e.clientY },
+      zoom,
+      pan,
+      aspectRatio
+    );
+    
+    // Store for UI state tracking (still needed for some component state)
     setResizeStart({
-      mouseX: initialMouseCanvas.x,
-      mouseY: initialMouseCanvas.y,
+      mouseX: 0, // Not used anymore - service handles this
+      mouseY: 0,
       initialBounds: {
         ...initialBounds,
-        aspectRatio: initialAspectRatio, // Store aspect ratio for images
+        aspectRatio: aspectRatio,
       },
     });
   };
@@ -684,383 +582,40 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
     const handleMouseMove = (e: MouseEvent) => {
       e.preventDefault();
       
-      // Check if Alt key is pressed (allows free resizing for images)
+      // Check modifier keys
       const isAltPressed = e.altKey;
       setIsAltPressedDuringResize(isAltPressed);
       
-      // Check if this is an image element
-      const isImage = element.type === 'image';
+      const isShiftPressed = e.shiftKey;
+      setIsShiftPressedDuringResize(isShiftPressed);
       
-      // Convert current mouse position to canvas coordinates
-      const transformService = getTransformService();
-      const currentMouseCanvas = transformService.screenToCanvas(e.clientX, e.clientY, zoom, pan);
+      // Use service to calculate resize
+      const resizeService = getDragResizeService();
+      const result = resizeService.updateResize(
+        e.clientX,
+        e.clientY,
+        isAltPressed,
+        isShiftPressed,
+        true // snap enabled
+      );
       
-      // Calculate delta in canvas coordinates
-      const deltaX = currentMouseCanvas.x - resizeStart.mouseX;
-      const deltaY = currentMouseCanvas.y - resizeStart.mouseY;
-
-      // Start with initial bounds
-      let newWidth = resizeStart.initialBounds.width;
-      let newHeight = resizeStart.initialBounds.height;
-      let newX = resizeStart.initialBounds.x;
-      let newY = resizeStart.initialBounds.y;
-
-      // Handle corner handles first (they affect both X and Y)
-      // Each corner drags with its opposite corner as the origin (fixed point)
-      if (isResizing.includes('nw')) {
-        // Northwest corner: SE corner stays fixed (opposite corner)
-        // Calculate new size based on distance from SE corner
-        const seCornerX = resizeStart.initialBounds.x + resizeStart.initialBounds.width;
-        const seCornerY = resizeStart.initialBounds.y + resizeStart.initialBounds.height;
-        const newSeCornerX = seCornerX; // SE corner X stays fixed
-        const newSeCornerY = seCornerY; // SE corner Y stays fixed
-        
-        // New NW corner position is current mouse position
-        const newNwCornerX = resizeStart.initialBounds.x + deltaX;
-        const newNwCornerY = resizeStart.initialBounds.y + deltaY;
-        
-        // Calculate new width and height from fixed SE corner to new NW corner
-        newWidth = Math.max(20, newSeCornerX - newNwCornerX);
-        newHeight = Math.max(20, newSeCornerY - newNwCornerY);
-        newX = newNwCornerX;
-        newY = newNwCornerY;
-      } else if (isResizing.includes('ne')) {
-        // Northeast corner: SW corner stays fixed (opposite corner)
-        const swCornerX = resizeStart.initialBounds.x;
-        const swCornerY = resizeStart.initialBounds.y + resizeStart.initialBounds.height;
-        const newSwCornerX = swCornerX; // SW corner X stays fixed
-        const newSwCornerY = swCornerY; // SW corner Y stays fixed
-        
-        // New NE corner position
-        const newNeCornerX = resizeStart.initialBounds.x + resizeStart.initialBounds.width + deltaX;
-        const newNeCornerY = resizeStart.initialBounds.y + deltaY;
-        
-        // Calculate new width and height from fixed SW corner to new NE corner
-        newWidth = Math.max(20, newNeCornerX - newSwCornerX);
-        newHeight = Math.max(20, newSwCornerY - newNeCornerY);
-        newX = newSwCornerX; // X stays at SW corner
-        newY = newNeCornerY; // Y moves to new NE corner
-      } else if (isResizing.includes('sw')) {
-        // Southwest corner: NE corner stays fixed (opposite corner)
-        const neCornerX = resizeStart.initialBounds.x + resizeStart.initialBounds.width;
-        const neCornerY = resizeStart.initialBounds.y;
-        const newNeCornerX = neCornerX; // NE corner X stays fixed
-        const newNeCornerY = neCornerY; // NE corner Y stays fixed
-        
-        // New SW corner position
-        const newSwCornerX = resizeStart.initialBounds.x + deltaX;
-        const newSwCornerY = resizeStart.initialBounds.y + resizeStart.initialBounds.height + deltaY;
-        
-        // Calculate new width and height from fixed NE corner to new SW corner
-        newWidth = Math.max(20, newNeCornerX - newSwCornerX);
-        newHeight = Math.max(20, newSwCornerY - newNeCornerY);
-        newX = newSwCornerX; // X moves to new SW corner
-        newY = newNeCornerY; // Y stays at NE corner
-      } else if (isResizing.includes('se')) {
-        // Southeast corner: NW corner stays fixed (opposite corner)
-        const nwCornerX = resizeStart.initialBounds.x;
-        const nwCornerY = resizeStart.initialBounds.y;
-        const newNwCornerX = nwCornerX; // NW corner X stays fixed
-        const newNwCornerY = nwCornerY; // NW corner Y stays fixed
-        
-        // New SE corner position
-        const newSeCornerX = resizeStart.initialBounds.x + resizeStart.initialBounds.width + deltaX;
-        const newSeCornerY = resizeStart.initialBounds.y + resizeStart.initialBounds.height + deltaY;
-        
-        // Calculate new width and height from fixed NW corner to new SE corner
-        newWidth = Math.max(20, newSeCornerX - newNwCornerX);
-        newHeight = Math.max(20, newSeCornerY - newNwCornerY);
-        newX = newNwCornerX; // X stays at NW corner
-        newY = newNwCornerY; // Y stays at NW corner
-      } else {
-        // Edge handles - opposite edge stays fixed
-        if (isResizing.includes('e')) {
-          // East handle: West edge stays fixed
-          const fixedX = resizeStart.initialBounds.x;
-          const newEastX = resizeStart.initialBounds.x + resizeStart.initialBounds.width + deltaX;
-          newWidth = Math.max(20, newEastX - fixedX);
-          newX = fixedX; // X stays at fixed west edge
-          // Height stays the same (no Y change for horizontal edges)
-          newHeight = resizeStart.initialBounds.height;
-          newY = resizeStart.initialBounds.y;
-        }
-        if (isResizing.includes('w')) {
-          // West handle: East edge stays fixed
-          const fixedEastX = resizeStart.initialBounds.x + resizeStart.initialBounds.width;
-          const newWestX = resizeStart.initialBounds.x + deltaX;
-          newWidth = Math.max(20, fixedEastX - newWestX);
-          newX = newWestX; // X moves to new west position
-          // Height stays the same (no Y change for horizontal edges)
-          newHeight = resizeStart.initialBounds.height;
-          newY = resizeStart.initialBounds.y;
-        }
-        if (isResizing.includes('s')) {
-          // South handle: North edge stays fixed
-          const fixedY = resizeStart.initialBounds.y;
-          const newSouthY = resizeStart.initialBounds.y + resizeStart.initialBounds.height + deltaY;
-          newHeight = Math.max(20, newSouthY - fixedY);
-          newY = fixedY; // Y stays at fixed north edge
-          // Width stays the same (no X change for vertical edges)
-          newWidth = resizeStart.initialBounds.width;
-          newX = resizeStart.initialBounds.x;
-        }
-        if (isResizing.includes('n')) {
-          // North handle: South edge stays fixed
-          const fixedSouthY = resizeStart.initialBounds.y + resizeStart.initialBounds.height;
-          const newNorthY = resizeStart.initialBounds.y + deltaY;
-          newHeight = Math.max(20, fixedSouthY - newNorthY);
-          newY = newNorthY; // Y moves to new north position
-          // Width stays the same (no X change for vertical edges)
-          newWidth = resizeStart.initialBounds.width;
-          newX = resizeStart.initialBounds.x;
-        }
-      }
-
-      // For images, maintain aspect ratio unless Alt is pressed
-      if (isImage && resizeStart.initialBounds.aspectRatio) {
-        const aspectRatio = resizeStart.initialBounds.aspectRatio;
-        const initialWidth = resizeStart.initialBounds.width;
-        const initialHeight = resizeStart.initialBounds.height;
-        const initialX = resizeStart.initialBounds.x;
-        const initialY = resizeStart.initialBounds.y;
-        
-        const isAltPressed = isAltPressedDuringResize;
-        
-        if (isAltPressed) {
-          // Alt pressed: Freeform resize - only resize along the dragged axis
-          // Keep opposite edge fixed, but don't maintain aspect ratio
-          // For images, we need to update objectFit to 'fill' so the image stretches
-          // We'll update this when the resize completes (in handleMouseUp)
-        } else {
-          // No Alt: Maintain aspect ratio and keep opposite edge fixed
-          // Determine which dimension changed and maintain aspect ratio
-          if (isResizing.includes('e') || isResizing.includes('w')) {
-            // Width changed - adjust height to maintain aspect ratio
-            newHeight = newWidth / aspectRatio;
-            
-            // Keep opposite edge fixed
-            if (isResizing.includes('e')) {
-              // East handle: West edge stays fixed, adjust Y to keep South edge fixed
-              const fixedSouthY = initialY + initialHeight;
-              newY = fixedSouthY - newHeight;
-            } else {
-              // West handle: East edge stays fixed, adjust Y to keep South edge fixed
-              const fixedEastX = initialX + initialWidth;
-              const fixedSouthY = initialY + initialHeight;
-              newX = fixedEastX - newWidth;
-              newY = fixedSouthY - newHeight;
-            }
-          } else if (isResizing.includes('s') || isResizing.includes('n')) {
-            // Height changed - adjust width to maintain aspect ratio
-            newWidth = newHeight * aspectRatio;
-            
-            // Keep opposite edge fixed AND keep center X fixed (expand equally left/right)
-            if (isResizing.includes('s')) {
-              // South handle: North edge stays fixed, keep center X fixed
-              const centerX = initialX + initialWidth / 2;
-              newX = centerX - newWidth / 2;
-              // Y stays at North edge (already set above)
-            } else {
-              // North handle: South edge stays fixed, keep center X fixed
-              const fixedSouthY = initialY + initialHeight;
-              const centerX = initialX + initialWidth / 2;
-              newX = centerX - newWidth / 2;
-              newY = fixedSouthY - newHeight;
-            }
-          } else if (isResizing.includes('nw') || isResizing.includes('ne') || 
-                   isResizing.includes('sw') || isResizing.includes('se')) {
-            // Corner handle - maintain aspect ratio with opposite corner as origin
-            // Determine which dimension changed more, then adjust the other
-            const absDeltaX = Math.abs(deltaX);
-            const absDeltaY = Math.abs(deltaY);
-            
-            // Everyone corner has an opposite corner that stays fixed
-            let fixedCornerX: number;
-            let fixedCornerY: number;
-            
-            if (isResizing.includes('nw')) {
-              // NW corner: SE corner is fixed
-              fixedCornerX = initialX + initialWidth;
-              fixedCornerY = initialY + initialHeight;
-            } else if (isResizing.includes('ne')) {
-              // NE corner: SW corner is fixed
-              fixedCornerX = initialX;
-              fixedCornerY = initialY + initialHeight;
-            } else if (isResizing.includes('sw')) {
-              // SW corner: NE corner is fixed
-              fixedCornerX = initialX + initialWidth;
-              fixedCornerY = initialY;
-            } else {
-              // SE corner: NW corner is fixed
-              fixedCornerX = initialX;
-              fixedCornerY = initialY;
-            }
-            
-            if (absDeltaX > absDeltaY) {
-              // Width change is dominant - adjust height based on new width
-              newHeight = newWidth / aspectRatio;
-              
-              // Recalculate position to keep opposite corner fixed
-              if (isResizing.includes('nw')) {
-                // NW corner: calculate from fixed SE corner
-                newX = fixedCornerX - newWidth;
-                newY = fixedCornerY - newHeight;
-              } else if (isResizing.includes('ne')) {
-                // NE corner: calculate from fixed SW corner
-                newX = fixedCornerX;
-                newY = fixedCornerY - newHeight;
-              } else if (isResizing.includes('sw')) {
-                // SW corner: calculate from fixed NE corner
-                newX = fixedCornerX - newWidth;
-                newY = fixedCornerY;
-              } else {
-                // SE corner: calculate from fixed NW corner
-                newX = fixedCornerX;
-                newY = fixedCornerY;
-              }
-            } else {
-              // Height change is dominant - adjust width based on new height
-              newWidth = newHeight * aspectRatio;
-              
-              // Recalculate position to keep opposite corner fixed
-              if (isResizing.includes('nw')) {
-                // NW corner: calculate from fixed SE corner
-                newX = fixedCornerX - newWidth;
-                newY = fixedCornerY - newHeight;
-              } else if (isResizing.includes('ne')) {
-                // NE corner: calculate from fixed SW corner
-                newX = fixedCornerX;
-                newY = fixedCornerY - newHeight;
-              } else if (isResizing.includes('sw')) {
-                // SW corner: calculate from fixed NE corner
-                newX = fixedCornerX - newWidth;
-                newY = fixedCornerY;
-              } else {
-                // SE corner: calculate from fixed NW corner
-                newX = fixedCornerX;
-                newY = fixedCornerY;
-              }
-            }
-          }
-        }
-        
-        // Ensure minimum size while maintaining aspect ratio
-        // Recalculate position from fixed corner when enforcing minimums
-        if (newWidth < 20 || newHeight < 20) {
-          if (newWidth < 20) {
-            newWidth = 20;
-            newHeight = newWidth / aspectRatio;
-          } else {
-            newHeight = 20;
-            newWidth = newHeight * aspectRatio;
-          }
-          
-          // Recalculate position from fixed corner
-          if (isResizing.includes('nw') || isResizing.includes('ne') || 
-              isResizing.includes('sw') || isResizing.includes('se')) {
-            // Corner handles - use opposite corner as fixed point
-            let fixedCornerX: number;
-            let fixedCornerY: number;
-            
-            if (isResizing.includes('nw')) {
-              fixedCornerX = initialX + initialWidth;
-              fixedCornerY = initialY + initialHeight;
-              newX = fixedCornerX - newWidth;
-              newY = fixedCornerY - newHeight;
-            } else if (isResizing.includes('ne')) {
-              fixedCornerX = initialX;
-              fixedCornerY = initialY + initialHeight;
-              newX = fixedCornerX;
-              newY = fixedCornerY - newHeight;
-            } else if (isResizing.includes('sw')) {
-              fixedCornerX = initialX + initialWidth;
-              fixedCornerY = initialY;
-              newX = fixedCornerX - newWidth;
-              newY = fixedCornerY;
-            } else {
-              fixedCornerX = initialX;
-              fixedCornerY = initialY;
-              newX = fixedCornerX;
-              newY = fixedCornerY;
-            }
-          } else {
-            // Edge handles - keep opposite edge fixed
-            if (isResizing.includes('e')) {
-              // East handle: West edge fixed, South edge fixed
-              const fixedSouthY = initialY + initialHeight;
-              newY = fixedSouthY - newHeight;
-            } else if (isResizing.includes('w')) {
-              // West handle: East edge fixed, South edge fixed
-              const fixedEastX = initialX + initialWidth;
-              const fixedSouthY = initialY + initialHeight;
-              newX = fixedEastX - newWidth;
-              newY = fixedSouthY - newHeight;
-            } else if (isResizing.includes('s')) {
-              // South handle: North edge fixed, East edge fixed
-              const fixedEastX = initialX + initialWidth;
-              newX = fixedEastX - newWidth;
-            } else if (isResizing.includes('n')) {
-              // North handle: South edge fixed, East edge fixed
-              const fixedEastX = initialX + initialWidth;
-              const fixedSouthY = initialY + initialHeight;
-              newX = fixedEastX - newWidth;
-              newY = fixedSouthY - newHeight;
-            }
-          }
-        }
-      }
-
-      // Store pending update
-      pendingUpdate = {
-        x: newX,
-        y: newY,
-        width: newWidth,
-        height: newHeight,
-      };
-
-      // Throttle updates using requestAnimationFrame
-      if (rafId === null) {
-        rafId = requestAnimationFrame(() => {
-          if (pendingUpdate) {
-            editor.updateElement(element.id, {
-              bounds: pendingUpdate,
-            });
-            pendingUpdate = null;
-          }
-          rafId = null;
-        });
-      }
+      // Service handles the calculation and updates via RAF throttling
+      // We don't need to do anything else here - the service manages the state
     };
 
     const handleMouseUp = () => {
       setIsResizing(false);
       
-      // Clear draggingElementId to allow autosave after resize completes
-      editor.setDraggingElement(null, null);
+      const resizeService = getDragResizeService();
       
-      // Apply any pending update immediately on mouse up
-      if (pendingUpdate) {
-        const updateData: any = {
-          bounds: pendingUpdate,
-        };
-        
-        // If this is an image and Alt was pressed during resize, set objectFit to 'fill' for freeform stretching
-        if (element.type === 'image' && isAltPressedDuringResize) {
-          updateData.objectFit = 'fill';
-        }
-        
-        editor.updateElement(element.id, updateData);
-        pendingUpdate = null;
-      }
+      // End resize operation in service - it handles cleanup and final update
+      // Check if Alt was pressed to set objectFit for images
+      const setObjectFitFill = element.type === 'image' && isAltPressedDuringResize;
+      resizeService.endResize(setObjectFitFill);
       
-      // Cancel any pending animation frame
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
-      
-      // Reset Alt key state
+      // Reset state
       setIsAltPressedDuringResize(false);
+      setIsShiftPressedDuringResize(false);
       
       document.body.style.userSelect = '';
       document.body.style.webkitUserSelect = '';
@@ -1077,16 +632,12 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
       window.removeEventListener('selectstart', preventSelection);
       window.removeEventListener('dragstart', preventSelection);
       
-      // Clean up animation frame
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
+      // Service handles cleanup
       
       document.body.style.userSelect = '';
       document.body.style.webkitUserSelect = '';
     };
-  }, [isResizing, resizeStart, element.id, element.type, isAltPressedDuringResize, zoom, pan, editor]);
+  }, [isResizing, element.id, element.type, isAltPressedDuringResize, zoom, pan, editor]);
 
   // Don't show handles if locked (must be after hooks)
   if (isLocked) {
@@ -1134,4 +685,3 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
     </>
   );
 }
-
