@@ -274,10 +274,10 @@ export function EditorCanvas({ deckId: _deckId }: EditorCanvasProps) {
       const containerWidth = containerRect.width;
       const containerHeight = containerRect.height;
       
-      // Calculate scale needed to fit the canvas (at current zoom) within the container
-      const scaleX = containerWidth / (CANVAS_WIDTH * zoom);
-      const scaleY = containerHeight / (CANVAS_HEIGHT * zoom);
-      const newFitScale = Math.min(scaleX, scaleY, 1); // Don't scale up beyond 1
+      // Calculate scale needed to fit the canvas within the container (independent of zoom)
+      const scaleX = containerWidth / CANVAS_WIDTH;
+      const scaleY = containerHeight / CANVAS_HEIGHT;
+      const newFitScale = Math.min(scaleX, scaleY, 1); // Don't upscale beyond 1
       
       setFitScale(newFitScale);
     };
@@ -288,7 +288,7 @@ export function EditorCanvas({ deckId: _deckId }: EditorCanvasProps) {
     // Recalculate on window resize
     window.addEventListener('resize', calculateFitScale);
     
-    // Also recalculate when zoom changes
+    // Also recalculate when zoom changes (in case layout shifts)
     calculateFitScale();
 
     return () => {
@@ -618,31 +618,24 @@ export function EditorCanvas({ deckId: _deckId }: EditorCanvasProps) {
       </div>
 
       {/* Zoom Controls */}
-      <div className="absolute bottom-4 right-4 flex flex-col items-center gap-1 rounded-lg border bg-card/80 p-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/60" style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}>
+      <div
+        className="absolute bottom-4 right-4 flex flex-col items-center gap-1 rounded-[18px] border border-white/12 bg-[rgba(12,17,30,0.82)] p-2 text-white shadow-[0_14px_40px_rgba(8,12,24,0.48)] backdrop-blur-xl"
+      >
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 text-base"
+          className="h-7 w-7 text-base text-white transition hover:bg-white/10"
           onClick={() => editor.setZoom(Math.min(2, zoom + 0.1))}
           aria-label="Zoom in"
         >
           +
         </Button>
-        <span className="px-2 text-[11px] text-muted-foreground">{Math.round(zoom * 100)}%</span>
+        <span className="px-2 text-[11px] font-medium text-white/90">{Math.round(zoom * 100)}%</span>
         <Button
           variant="ghost"
-          className="h-7 px-3 text-[11px] font-semibold"
+          className="h-7 px-3 text-[11px] font-semibold text-white transition hover:bg-white/10"
           onClick={() => {
-            if (!canvasRef.current) return;
-            const containerRect = canvasRef.current.getBoundingClientRect();
-            const containerWidth = containerRect.width;
-            const containerHeight = containerRect.height;
-
-            const scaleX = containerWidth / CANVAS_WIDTH;
-            const scaleY = containerHeight / CANVAS_HEIGHT;
-            const fitZoom = Math.min(scaleX, scaleY, 2);
-
-            editor.setZoom(fitZoom);
+            editor.setZoom(1);
             editor.setPan({ x: 0, y: 0 });
           }}
           title="Fit to window"
@@ -652,7 +645,7 @@ export function EditorCanvas({ deckId: _deckId }: EditorCanvasProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 text-base"
+          className="h-7 w-7 text-base text-white transition hover:bg-white/10"
           onClick={() => editor.setZoom(Math.max(0.25, zoom - 0.1))}
           aria-label="Zoom out"
         >
