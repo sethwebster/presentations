@@ -550,7 +550,10 @@ export class Editor {
             const newSelection = addToSelection 
               ? new Set([...this.state.selectedElementIds, elementId])
               : new Set([elementId]);
-            this.setState({ selectedElementIds: newSelection });
+            this.setState({ 
+              selectedElementIds: newSelection,
+              selectedSlideId: slide.id, // Select the slide when an element is selected
+            });
             return;
           }
         }
@@ -567,7 +570,10 @@ export class Editor {
           const newSelection = addToSelection 
             ? new Set([...this.state.selectedElementIds, containingGroup.id])
             : new Set([containingGroup.id]);
-          this.setState({ selectedElementIds: newSelection });
+          this.setState({ 
+            selectedElementIds: newSelection,
+            selectedSlideId: slide.id, // Select the slide when an element is selected
+          });
           return;
         }
       }
@@ -577,16 +583,27 @@ export class Editor {
     const newSelection = addToSelection 
       ? new Set([...this.state.selectedElementIds, elementId])
       : new Set([elementId]);
+    
+    // When an element is selected, also select the slide it belongs to
+    const currentSlide = deck?.slides[currentSlideIndex];
+    const selectedSlideId = currentSlide?.id ?? null;
+    
     this.setState({ 
       selectedElementIds: newSelection,
-      selectedSlideId: null, // Clear slide selection when selecting an element
+      selectedSlideId, // Select the slide when an element is selected
     });
   }
 
   selectElements(elementIds: string[]): void {
+    const { deck, currentSlideIndex } = this.state;
+    
+    // When elements are selected, also select the slide they belong to
+    const currentSlide = deck?.slides[currentSlideIndex];
+    const selectedSlideId = currentSlide?.id ?? null;
+    
     this.setState({ 
       selectedElementIds: new Set(elementIds),
-      selectedSlideId: null, // Clear slide selection when selecting elements
+      selectedSlideId, // Select the slide when elements are selected
     });
   }
 

@@ -37,17 +37,23 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
   const [isEditingText, setIsEditingText] = useState(false);
 
   const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    
-    // Don't allow selection of background-like elements (images that fill canvas)
+    // Handle background-like elements (images that fill canvas) - select slide and let event bubble
     const fillsCanvas = bounds.x === 0 && bounds.y === 0 && 
       bounds.width >= 1279 && bounds.height >= 719;
     const isBackgroundLike = fillsCanvas && element.type === 'image';
     
     if (isBackgroundLike) {
+      // Select the slide immediately, don't stop propagation so canvas can handle it too
+      const currentState = editor.getState();
+      const currentSlide = currentState.deck?.slides[currentState.currentSlideIndex];
+      if (currentSlide) {
+        editor.setSelectedSlide(currentSlide.id);
+      }
+      // Don't stop propagation - let canvas handle it for immediate feedback
       return;
     }
     
+    e.stopPropagation();
     editor.selectElement(element.id, e.shiftKey);
   };
 
@@ -123,8 +129,8 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
     const isBackgroundLike = fillsCanvas && element.type === 'image';
     
     if (isBackgroundLike) {
-      e.preventDefault();
-      e.stopPropagation();
+      // Don't prevent default or stop propagation - let clicks bubble to canvas for slide selection
+      // Only prevent dragging
       return;
     }
     
@@ -411,6 +417,20 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
 function TextElementContent({ element }: { element: ElementDefinition }) {
   if (element.type !== 'text') return null;
   const textElement = element as any;
+  const textAlign: React.CSSProperties['textAlign'] = (textElement.style?.textAlign || 'left') as React.CSSProperties['textAlign'];
+
+  const justifyContent = (() => {
+    switch (textAlign) {
+      case 'center':
+        return 'center';
+      case 'right':
+        return 'flex-end';
+      case 'justify':
+        return 'space-between';
+      default:
+        return 'flex-start';
+    }
+  })();
   
   return (
     <div
@@ -421,7 +441,8 @@ function TextElementContent({ element }: { element: ElementDefinition }) {
         color: textElement.style?.color || '#000000',
         fontWeight: textElement.style?.fontWeight || 'normal',
         fontStyle: textElement.style?.fontStyle || 'normal',
-        textAlign: textElement.style?.textAlign || 'left',
+        textAlign,
+        justifyContent,
       }}
     >
       {textElement.content || 'Text'}

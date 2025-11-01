@@ -27,54 +27,29 @@ export function SlideProperties() {
     refreshFromServer: refreshImageLibrary,
     isSyncing: isLibrarySyncing,
     lastSyncError: imageLibraryError,
-  } = useImageLibrary();
+  } = useImageLibrary({ autoHydrate: false }); // Don't hydrate on mount - only when image modal opens
 
   const deck = state.deck;
   const selectedSlideId = state.selectedSlideId;
   const deckId = state.deckId ?? deck?.meta?.id ?? null;
+  const slide = deck?.slides.find(s => s.id === selectedSlideId);
   
-  if (!deck || !selectedSlideId) {
-    return (
-      <div className="text-sm italic text-muted-foreground">
-        No slide selected
-      </div>
-    );
-  }
-
-  const slide = deck.slides.find(s => s.id === selectedSlideId);
-  if (!slide) {
-    return (
-      <div className="text-sm italic text-muted-foreground">
-        Slide not found
-      </div>
-    );
-  }
-
-  // Helper to convert gradient object to CSS string
-  const gradientToCSS = (grad: any): string => {
-    if (!grad || typeof grad !== 'object') return '#ffffff';
-    if (grad.type === 'linear') {
-      const stops = grad.stops?.map((s: any) => `${s.color} ${s.position}%`).join(', ') || '';
-      return `linear-gradient(${grad.angle || 0}deg, ${stops})`;
-    }
-    if (grad.type === 'radial') {
-      const stops = grad.stops?.map((s: any) => `${s.color} ${s.position}%`).join(', ') || '';
-      return `radial-gradient(${stops})`;
-    }
-    return '#ffffff';
-  };
-
-  // Determine current background type
-  const getBackgroundType = (): 'color' | 'gradient' | 'image' => {
-    if (slide.background) {
-      if (typeof slide.background === 'string') return 'color';
-      if (slide.background.type === 'image') return 'image';
-      if (slide.background.type === 'gradient') return 'gradient';
+  // Helper function defined before hooks (used in useEffect)
+  // Gradients are handled via the Color tab, so we map gradient -> color
+  const getBackgroundType = (slideToCheck: typeof slide): 'color' | 'image' => {
+    if (slideToCheck?.background) {
+      if (typeof slideToCheck.background === 'string') return 'color';
+      if (slideToCheck.background.type === 'image') return 'image';
+      if (slideToCheck.background.type === 'gradient') return 'color'; // Gradients shown in Color tab
     }
     return 'color';
   };
-
-  const [backgroundType, setBackgroundType] = useState<'color' | 'gradient' | 'image'>(getBackgroundType());
+  
+  // ALL HOOKS MUST BE DECLARED BEFORE ANY EARLY RETURNS
+  // This ensures hooks are always called in the same order
+  
+  // Use default value - will be updated in useEffect when slide is available
+  const [backgroundType, setBackgroundType] = useState<'color' | 'image'>('color');
   const [showImageModal, setShowImageModal] = useState(false);
   const [showRefineModal, setShowRefineModal] = useState(false);
   const [refineRequest, setRefineRequest] = useState('');
@@ -122,7 +97,8 @@ export function SlideProperties() {
 
   // Sync backgroundType when slide changes and update cache
   useEffect(() => {
-    const currentType = getBackgroundType();
+    if (!slide) return;
+    const currentType = getBackgroundType(slide);
     setBackgroundType(currentType);
     
     // Update cache with current background value
@@ -134,39 +110,15 @@ export function SlideProperties() {
         } else if (typeof currentBg === 'object' && currentBg.type === 'color') {
           backgroundCacheRef.current.color = currentBg;
         }
-      } else if (currentType === 'gradient' && typeof currentBg === 'object' && currentBg.type === 'gradient') {
-        backgroundCacheRef.current.gradient = currentBg;
       } else if (currentType === 'image' && typeof currentBg === 'object' && currentBg.type === 'image') {
         backgroundCacheRef.current.image = currentBg;
       }
     }
-  }, [selectedSlideId, slide.background]);
+  }, [selectedSlideId, slide?.background]);
 
-  // Get current background value for ColorPicker
-  const getBackgroundValue = (): string | object => {
-    if (slide.background) {
-      if (typeof slide.background === 'string') return slide.background;
-      if (slide.background.type === 'color') return slide.background.value as string;
-      if (slide.background.type === 'gradient') {
-        // Return the gradient object for ColorPicker
-        return slide.background.value as object;
-      }
-    }
-    if (slide.style?.background) {
-      const bg = slide.style.background;
-      if (typeof bg === 'string') return bg;
-      if (bg && typeof bg === 'object') return bg;
-    }
-    const defaultBg = deck?.settings?.defaultBackground;
-    if (!defaultBg) return '#ffffff';
-    if (typeof defaultBg === 'string') return defaultBg;
-    if (defaultBg && typeof defaultBg === 'object') return defaultBg;
-    return '#ffffff';
-  };
-
-  // Get image background data
-  const getImageBackground = () => {
-    if (slide.background && typeof slide.background === 'object' && slide.background.type === 'image') {
+  // Helper functions used in hooks - defined before hooks that use them
+  const getImageBackgroundSafe = () => {
+    if (slide?.background && typeof slide.background === 'object' && slide.background.type === 'image') {
       const value = slide.background.value;
       if (typeof value === 'object' && value !== null) {
         return {
@@ -184,9 +136,11 @@ export function SlideProperties() {
     return { src: '', offsetX: 0, offsetY: 0, scale: 100, meta: {} };
   };
 
-  const imageData = useMemo(() => getImageBackground(), [slide.background]);
+  // ALL hooks must be declared before any early returns
+  const imageData = useMemo(() => getImageBackgroundSafe(), [slide?.background]);
 
   const updateImageBackground = useCallback((updates: Record<string, unknown>) => {
+    if (!selectedSlideId || !slide) return;
     const currentValue = slide.background && typeof slide.background === 'object' && slide.background.type === 'image'
       ? (typeof slide.background.value === 'object' && slide.background.value !== null
         ? slide.background.value as Record<string, unknown>
@@ -205,7 +159,7 @@ export function SlideProperties() {
         opacity: slide.background && typeof slide.background === 'object' ? (slide.background.opacity ?? 1) : 1,
       },
     });
-  }, [editor, selectedSlideId, slide.background]);
+  }, [editor, selectedSlideId, slide?.background]);
 
   const handleImageFileRead = useCallback(async (file: File) => {
     const readAsDataURL = (inputFile: File) => new Promise<string>((resolve, reject) => {
@@ -249,7 +203,7 @@ export function SlideProperties() {
     setBackgroundType('image');
     setImageStatus({ isGenerating: false, error: null, success: 'Image uploaded successfully.' });
     setTimeout(() => setImageStatus({ isGenerating: false, error: null, success: null }), 2000);
-  }, [updateImageBackground, addImageToLibrary, deckId]);
+  }, [updateImageBackground, addImageToLibrary, deckId, slide]);
 
   const handleFileInputChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -360,7 +314,7 @@ export function SlideProperties() {
         success: null,
       });
     }
-  }, [updateImageBackground, addImageToLibrary, deckId]);
+  }, [updateImageBackground, addImageToLibrary, deckId, deck, slide]);
 
   const handleRefineImage = useCallback(async () => {
     if (!refineRequest.trim() || !imageData.src) {
@@ -494,7 +448,7 @@ export function SlideProperties() {
       });
       // Keep modal open so user can see the error and try again
     }
-  }, [refineRequest, imageData, deck, updateImageBackground, updateLibraryItem, addImageToLibrary, deckId]);
+  }, [refineRequest, imageData, deck, updateImageBackground, updateLibraryItem, addImageToLibrary, deckId, slide]);
 
   const handleImageDragStart = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (!imageData.src) return;
@@ -566,7 +520,52 @@ export function SlideProperties() {
     setImageStatus({ isGenerating: false, error: null, success: 'Background applied from library.' });
     setTimeout(() => setImageStatus({ isGenerating: false, error: null, success: null }), 2000);
     setShowImageModal(false);
-  }, [setBackgroundType, setImageStatus, updateImageBackground]);
+  }, [updateImageBackground, slide]);
+
+  // Early returns AFTER all hooks are declared
+  if (!deck || !selectedSlideId || !slide) {
+    return (
+      <div className="text-sm italic text-muted-foreground">
+        {!deck || !selectedSlideId ? 'No slide selected' : 'Slide not found'}
+      </div>
+    );
+  }
+
+  // Helper to convert gradient object to CSS string
+  const gradientToCSS = (grad: any): string => {
+    if (!grad || typeof grad !== 'object') return '#ffffff';
+    if (grad.type === 'linear') {
+      const stops = grad.stops?.map((s: any) => `${s.color} ${s.position}%`).join(', ') || '';
+      return `linear-gradient(${grad.angle || 0}deg, ${stops})`;
+    }
+    if (grad.type === 'radial') {
+      const stops = grad.stops?.map((s: any) => `${s.color} ${s.position}%`).join(', ') || '';
+      return `radial-gradient(${stops})`;
+    }
+    return '#ffffff';
+  };
+
+  // Get current background value for ColorPicker
+  const getBackgroundValue = (): string | object => {
+    if (slide.background) {
+      if (typeof slide.background === 'string') return slide.background;
+      if (slide.background.type === 'color') return slide.background.value as string;
+      if (slide.background.type === 'gradient') {
+        // Return the gradient object for ColorPicker
+        return slide.background.value as object;
+      }
+    }
+    if (slide.style?.background) {
+      const bg = slide.style.background;
+      if (typeof bg === 'string') return bg;
+      if (bg && typeof bg === 'object') return bg;
+    }
+    const defaultBg = deck?.settings?.defaultBackground;
+    if (!defaultBg) return '#ffffff';
+    if (typeof defaultBg === 'string') return defaultBg;
+    if (defaultBg && typeof defaultBg === 'object') return defaultBg;
+    return '#ffffff';
+  };
 
   const imageButtons = (
     <div className="flex flex-wrap gap-2">
@@ -655,19 +654,21 @@ export function SlideProperties() {
 
       {/* Background */}
       <div className="space-y-3">
-        <Label className={SECTION_HEADING}>Background</Label>
-        
-        <SegmentedControl
-          items={[
-            { value: 'color', label: 'Color' },
-            { value: 'gradient', label: 'Gradient' },
-            { value: 'image', label: 'Image' },
-          ]}
-          value={backgroundType}
-          onValueChange={(value) => {
-            const newType = value as 'color' | 'gradient' | 'image';
+        <div>
+          <Label className={SECTION_HEADING}>Background</Label>
+        </div>
+        <div className="w-full">
+          <SegmentedControl
+            items={[
+              { value: 'color', label: 'Color' },
+              { value: 'image', label: 'Image' },
+            ]}
+            value={backgroundType}
+            className="w-full"
+            onValueChange={(value) => {
+            const newType = value as 'color' | 'image';
             const currentBg = slide.background;
-            const currentType = getBackgroundType();
+            const currentType = getBackgroundType(slide);
             
             // Save current background to cache before switching
             if (currentBg) {
@@ -676,9 +677,10 @@ export function SlideProperties() {
                   backgroundCacheRef.current.color = currentBg;
                 } else if (typeof currentBg === 'object' && currentBg.type === 'color') {
                   backgroundCacheRef.current.color = currentBg;
+                } else if (typeof currentBg === 'object' && currentBg.type === 'gradient') {
+                  // Also cache gradients under color since they're handled in Color tab
+                  backgroundCacheRef.current.color = currentBg;
                 }
-              } else if (currentType === 'gradient' && typeof currentBg === 'object' && currentBg.type === 'gradient') {
-                backgroundCacheRef.current.gradient = currentBg;
               } else if (currentType === 'image' && typeof currentBg === 'object' && currentBg.type === 'image') {
                 backgroundCacheRef.current.image = currentBg;
               }
@@ -693,10 +695,6 @@ export function SlideProperties() {
                 editor.updateSlide(selectedSlideId, {
                   background: typeof cachedColor === 'string' ? cachedColor : cachedColor,
                 });
-              } else if (newType === 'gradient' && backgroundCacheRef.current.gradient) {
-                editor.updateSlide(selectedSlideId, {
-                  background: backgroundCacheRef.current.gradient,
-                });
               } else if (newType === 'image' && backgroundCacheRef.current.image) {
                 editor.updateSlide(selectedSlideId, {
                   background: backgroundCacheRef.current.image,
@@ -707,20 +705,6 @@ export function SlideProperties() {
                   if (newType === 'color') {
                     editor.updateSlide(selectedSlideId, {
                       background: '#ffffff',
-                    });
-                  } else if (newType === 'gradient') {
-                    editor.updateSlide(selectedSlideId, {
-                      background: {
-                        type: 'gradient',
-                        value: {
-                          type: 'linear',
-                          angle: 0,
-                          stops: [
-                            { color: '#16C2C7', position: 0 },
-                            { color: '#C84BD2', position: 100 },
-                          ],
-                        },
-                      },
                     });
                   } else if (newType === 'image') {
                     editor.updateSlide(selectedSlideId, {
@@ -742,6 +726,7 @@ export function SlideProperties() {
           }}
           variant="editor"
         />
+        </div>
 
         {backgroundType === 'image' && (() => {
           return (
@@ -759,22 +744,24 @@ export function SlideProperties() {
                 </div>
               )}
 
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">Image URL</Label>
-                <Input
-                  value={imageData.src}
-                  onChange={(e) => {
-                    updateImageBackground({
-                      src: e.target.value,
-                      offsetX: imageData.offsetX,
-                      offsetY: imageData.offsetY,
-                      scale: imageData.scale,
-                    });
-                  }}
-                  placeholder="data:image/... or https://..."
-                  className="h-9"
-                />
-              </div>
+              {!imageData.src.startsWith('data:') && (
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">Image URL</Label>
+                  <Input
+                    value={imageData.src}
+                    onChange={(e) => {
+                      updateImageBackground({
+                        src: e.target.value,
+                        offsetX: imageData.offsetX,
+                        offsetY: imageData.offsetY,
+                        scale: imageData.scale,
+                      });
+                    }}
+                    placeholder="https://..."
+                    className="h-9"
+                  />
+                </div>
+              )}
               
               {imageData.src && (() => {
                 // Get slide dimensions and calculate aspect ratio for preview
@@ -812,6 +799,35 @@ export function SlideProperties() {
                         Drag to reposition
                       </span>
                     </div>
+                    
+                    {/* Remove image button - top right corner */}
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Remove image background - set to default white
+                        editor.updateSlide(selectedSlideId, {
+                          background: '#ffffff',
+                        });
+                        setBackgroundType('color');
+                      }}
+                      className="absolute right-2 top-2 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
+                      aria-label="Remove background image"
+                      title="Remove background image"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-3.5 w-3.5"
+                      >
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
                   </div>
 
                   {/* Refine Image Button - Only show for AI-generated images */}
@@ -899,7 +915,7 @@ export function SlideProperties() {
           );
         })()}
 
-        {(backgroundType === 'color' || backgroundType === 'gradient') && (
+        {backgroundType === 'color' && (
           <ColorPicker
             value={getBackgroundValue()}
             onChange={(value) => {
@@ -927,19 +943,6 @@ export function SlideProperties() {
         )}
       </div>
 
-      {/* Slide Number */}
-      <div className="space-y-2">
-        <Label className={SECTION_HEADING}>Slide Number</Label>
-        <Input
-          type="text"
-          value={slide.customSlideNumber || ''}
-          onChange={(e) => editor.updateSlide(selectedSlideId, { 
-            customSlideNumber: e.target.value || undefined 
-          })}
-          placeholder="Auto"
-          className="h-9"
-        />
-      </div>
 
       {/* Hidden */}
       <div className="space-y-2">

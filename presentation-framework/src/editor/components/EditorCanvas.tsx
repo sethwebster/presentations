@@ -175,9 +175,15 @@ export function EditorCanvas({ deckId: _deckId }: EditorCanvasProps) {
               ...(currentSlide.layers?.flatMap(l => l.elements) || []),
             ];
             
-            // Check if click point intersects with any element
+            // Check if click point intersects with any element (excluding background-like images)
             const clickedElement = allElements.find(el => {
               if (!el.bounds) return false;
+              // Skip background-like images (they handle selection themselves)
+              const fillsCanvas = el.bounds.x === 0 && el.bounds.y === 0 && 
+                el.bounds.width >= 1279 && el.bounds.height >= 719;
+              const isBackgroundLike = fillsCanvas && el.type === 'image';
+              if (isBackgroundLike) return false;
+              
               const bounds = el.bounds;
               return selectionBoxStart.x >= bounds.x &&
                      selectionBoxStart.x <= bounds.x + bounds.width &&
@@ -186,7 +192,7 @@ export function EditorCanvas({ deckId: _deckId }: EditorCanvasProps) {
             });
             
             if (!clickedElement) {
-              // Clicked on background - select the slide
+              // Clicked on background - select the slide immediately
               editor.setSelectedSlide(currentSlide.id);
             } else {
               // Clicked on an element (element selection is handled by BaseElement)

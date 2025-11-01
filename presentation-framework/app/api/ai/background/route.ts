@@ -146,9 +146,7 @@ export async function POST(request: Request) {
           prompt: composedPrompt,
           size,
           n: 1,
-          style: "vivid",
           quality: "high",
-          response_format: "b64_json",
         });
 
         if (!result.data || result.data.length === 0) {
@@ -159,11 +157,29 @@ export async function POST(request: Request) {
           );
         }
 
-        const imageBase64 = result.data[0].b64_json;
-        if (!imageBase64) {
-          console.error("OpenAI response missing base64 data:", result);
+        // gpt-image-1 returns b64_json in the response even without response_format parameter
+        const imageData = result.data[0];
+        let imageBase64: string;
+
+        if (imageData.b64_json) {
+          // Use base64 data directly if available
+          imageBase64 = imageData.b64_json;
+        } else if (imageData.url) {
+          // Fallback: fetch from URL if b64_json not available
+          const imageResponse = await fetch(imageData.url);
+          if (!imageResponse.ok) {
+            console.error("Failed to fetch generated image:", imageResponse.statusText);
+            return NextResponse.json(
+              { error: "Failed to fetch generated image." },
+              { status: 502 }
+            );
+          }
+          const imageBuffer = await imageResponse.arrayBuffer();
+          imageBase64 = Buffer.from(imageBuffer).toString('base64');
+        } else {
+          console.error("OpenAI response missing image data (no b64_json or url):", result);
           return NextResponse.json(
-            { error: "Image generation returned no base64 data." },
+            { error: "Image generation returned no image data." },
             { status: 502 }
           );
         }

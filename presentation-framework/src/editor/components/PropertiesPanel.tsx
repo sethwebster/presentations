@@ -604,11 +604,13 @@ export function PropertiesPanel() {
   );
 
   return (
-    <Panel 
-      className="w-[300px] border-l rounded-none"
-      style={{ 
-        borderLeftColor: 'rgba(148, 163, 184, 0.2)',
+    <Panel
+      className="w-[300px] rounded-none"
+      style={{
+        borderLeft: 'none',
         borderTop: 'none',
+        borderRight: 'none',
+        borderBottom: 'none',
       }}
     >
       <PanelHeader className="px-5 py-4">
@@ -747,8 +749,14 @@ export function PropertiesPanel() {
 
             {/* Text Properties */}
             {selectedElement.type === 'text' && (
-              <div className="rounded-2xl border border-border/25 bg-card/96 shadow-[0_12px_28px_rgba(11,16,34,0.08)] backdrop-blur-sm supports-[backdrop-filter]:bg-card/88">
-                <div className="flex items-center justify-between border-b border-border/25 px-4 py-3">
+              <div 
+                className="rounded-2xl bg-card/96 shadow-[0_12px_28px_rgba(11,16,34,0.08)] backdrop-blur-sm supports-[backdrop-filter]:bg-card/88"
+                style={{ border: 'none' }}
+              >
+                <div 
+                  className="flex items-center justify-between px-4 py-3"
+                  style={{ borderBottom: 'none' }}
+                >
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                       Text
@@ -829,7 +837,8 @@ export function PropertiesPanel() {
                         pressed={boldAll}
                         data-indeterminate={boldSome && !boldAll ? true : undefined}
                         onPressedChange={() => toggleBold()}
-                        className="h-9 rounded-lg border border-border/25 text-sm font-semibold"
+                        className="h-9 rounded-lg text-sm font-semibold"
+                        style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}
                       >
                         B
                       </Toggle>
@@ -838,7 +847,8 @@ export function PropertiesPanel() {
                         pressed={italicAll}
                         data-indeterminate={italicSome && !italicAll ? true : undefined}
                         onPressedChange={() => toggleItalic()}
-                        className="h-9 rounded-lg border border-border/25 text-sm italic"
+                        className="h-9 rounded-lg text-sm italic"
+                        style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}
                       >
                         I
                       </Toggle>
@@ -847,7 +857,8 @@ export function PropertiesPanel() {
                         pressed={underlineAll}
                         data-indeterminate={underlineSome && !underlineAll ? true : undefined}
                         onPressedChange={() => toggleDecoration('underline')}
-                        className="h-9 rounded-lg border border-border/25 text-sm"
+                        className="h-9 rounded-lg text-sm"
+                        style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}
                       >
                         <span className="underline">U</span>
                       </Toggle>
@@ -856,7 +867,8 @@ export function PropertiesPanel() {
                         pressed={strikethroughAll}
                         data-indeterminate={strikethroughSome && !strikethroughAll ? true : undefined}
                         onPressedChange={() => toggleDecoration('line-through')}
-                        className="h-9 rounded-lg border border-border/25 text-sm"
+                        className="h-9 rounded-lg text-sm"
+                        style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}
                       >
                         <span style={{ textDecoration: 'line-through' }}>S</span>
                       </Toggle>
@@ -930,7 +942,10 @@ export function PropertiesPanel() {
                   <Separator className="bg-border/20" />
 
                   <section className="space-y-4">
-                    <div className="space-y-3 rounded-xl border border-border/25 bg-card/96 p-3 shadow-[0_10px_26px_rgba(11,16,34,0.07)] backdrop-blur-sm supports-[backdrop-filter]:bg-card/88">
+                    <div 
+                      className="space-y-3 rounded-xl bg-card/96 p-3 shadow-[0_10px_26px_rgba(11,16,34,0.07)] backdrop-blur-sm supports-[backdrop-filter]:bg-card/88"
+                      style={{ border: 'none' }}
+                    >
                       <div className="flex items-center justify-between">
                         <div>
                           <Label className={SECTION_HEADING}>
@@ -999,7 +1014,10 @@ export function PropertiesPanel() {
                       )}
                     </div>
 
-                    <div className="space-y-3 rounded-xl border border-border/25 bg-card/96 p-3 shadow-[0_10px_26px_rgba(11,16,34,0.07)] backdrop-blur-sm supports-[backdrop-filter]:bg-card/88">
+                    <div 
+                      className="space-y-3 rounded-xl bg-card/96 p-3 shadow-[0_10px_26px_rgba(11,16,34,0.07)] backdrop-blur-sm supports-[backdrop-filter]:bg-card/88"
+                      style={{ border: 'none' }}
+                    >
                       <div className="flex items-center justify-between">
                         <div>
                           <Label className={SECTION_HEADING}>
@@ -1159,10 +1177,16 @@ export function PropertiesPanel() {
               </div>
             )}
           </div>
-        ) : selectedSlideId ? (
-          <SlideProperties />
         ) : (
-          <DocumentProperties />
+          <>
+            {/* Keep both components mounted to avoid expensive remounts - just hide/show */}
+            <div style={{ display: selectedSlideId ? 'block' : 'none' }}>
+              <SlideProperties />
+            </div>
+            <div style={{ display: !selectedSlideId ? 'block' : 'none' }}>
+              <DocumentProperties />
+            </div>
+          </>
         )}
       </PanelBody>
     </Panel>

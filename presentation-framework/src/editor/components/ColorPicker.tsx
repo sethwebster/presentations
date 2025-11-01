@@ -609,7 +609,7 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
             width: '24px',
             height: '24px',
             borderRadius: '4px',
-            border: '1px solid rgba(0, 0, 0, 0.2)',
+            border: '1px solid rgba(148, 163, 184, 0.3)',
             background: typeof value === 'string' 
               ? (value === 'transparent' 
                   ? 'repeating-conic-gradient(#808080 0% 25%, transparent 0% 50%) 50% / 20% 20%'
