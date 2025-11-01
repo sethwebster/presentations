@@ -25,7 +25,7 @@ export class SaveManager {
   private pendingSaveHash = '';
   private isDragging = false;
   private autosaveEnabled = true;
-  private editorInstance: { saveDeck: () => Promise<void> } | null = null;
+  private editorInstance: { saveDeck: () => Promise<void>; abortSave?: () => void } | null = null;
 
   constructor() {
     // No React dependencies - pure TypeScript service
@@ -34,7 +34,7 @@ export class SaveManager {
   /**
    * Initialize the save manager with editor instance and settings
    */
-  initialize(editor: { saveDeck: () => Promise<void> }, autosaveEnabled: boolean = true): void {
+  initialize(editor: { saveDeck: () => Promise<void>; abortSave?: () => void }, autosaveEnabled: boolean = true): void {
     this.editorInstance = editor;
     this.autosaveEnabled = autosaveEnabled;
   }
@@ -71,6 +71,11 @@ export class SaveManager {
   setDragging(isDragging: boolean): void {
     const wasDragging = this.isDragging;
     this.isDragging = isDragging;
+
+    // If dragging starts, abort any in-flight saves
+    if (!wasDragging && isDragging) {
+      this.abortCurrentSave();
+    }
 
     // If drag just completed and we have pending changes, save them
     if (wasDragging && !isDragging && this.pendingSaveHash && this.pendingSaveHash !== this.previousDeckHash) {
@@ -158,12 +163,30 @@ export class SaveManager {
   }
 
   /**
-   * Cancel any pending save
+   * Cancel any pending save (debounced timeout)
    */
   private cancelPendingSave(): void {
     if (this.saveTimeout !== null) {
       clearTimeout(this.saveTimeout);
       this.saveTimeout = null;
+    }
+  }
+
+  /**
+   * Abort the current in-flight save operation
+   */
+  private abortCurrentSave(): void {
+    // Cancel pending debounced save
+    this.cancelPendingSave();
+    
+    // Abort in-flight save if editor supports it
+    if (this.editorInstance?.abortSave) {
+      this.editorInstance.abortSave();
+    }
+    
+    // Reset state to unsaved if we aborted
+    if (this.state.status === 'saving') {
+      this.setState({ status: 'unsaved', lastSaved: this.state.lastSaved });
     }
   }
 

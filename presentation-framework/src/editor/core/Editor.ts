@@ -44,6 +44,8 @@ export class Editor {
   private listeners: Set<EditorStateListener> = new Set();
   private saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private isSaving: boolean = false;
+  private saveAbortController: AbortController | null = null;
+  private savedDeckSnapshot: DeckDefinition | null = null;
 
   constructor() {
     this.state = {
@@ -176,7 +178,13 @@ export class Editor {
       return Promise.reject(new Error('Missing deck or deckId'));
     }
 
-    // If already saving, queue this save for after the current one completes
+    // Abort any in-flight save
+    if (this.saveAbortController) {
+      this.saveAbortController.abort();
+      this.saveAbortController = null;
+    }
+
+    // If already saving (but not aborted), queue this save for after the current one completes
     if (this.isSaving) {
       console.log('Save already in progress, queuing save...');
       return new Promise<void>((resolve) => {
@@ -194,16 +202,29 @@ export class Editor {
       this.saveDebounceTimer = null;
     }
 
+    // Create new AbortController for this save
+    const abortController = new AbortController();
+    this.saveAbortController = abortController;
+
+    // Capture the deck snapshot we're about to save
+    const deckSnapshot = deck;
+
     return new Promise<void>((resolve, reject) => {
       this.saveDebounceTimer = setTimeout(async () => {
+        // Check if save was aborted before starting
+        if (abortController.signal.aborted) {
+          resolve(); // Resolve silently if aborted
+          return;
+        }
+
         this.isSaving = true;
         this.saveDebounceTimer = null;
         
         try {
           const deckToSave: DeckDefinition = {
-            ...deck,
+            ...deckSnapshot,
             meta: {
-              ...deck.meta,
+              ...deckSnapshot.meta,
               updatedAt: new Date().toISOString(),
             },
           };
@@ -214,7 +235,17 @@ export class Editor {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(deckToSave),
+            signal: abortController.signal, // Make fetch abortable
           });
+          
+          // Check if aborted during fetch
+          if (abortController.signal.aborted) {
+            console.log('Save aborted during fetch');
+            this.isSaving = false;
+            this.saveAbortController = null;
+            resolve(); // Resolve silently if aborted
+            return;
+          }
           
           if (!response.ok) {
             const errorText = await response.text();
@@ -224,14 +255,51 @@ export class Editor {
           const result = await response.json();
           console.log('Save successful:', result);
           
-          // Update deck and notify subscribers (needed for StatusBar to see the update)
-          // The deck reference changes, but this is necessary for change detection
-          this.setState({ deck: deckToSave });
+          // Only update deck state if:
+          // 1. Save wasn't aborted
+          // 2. We're not currently dragging (saveManager will check this)
+          // 3. The deck we saved is still the current deck (not a newer version)
+          if (!abortController.signal.aborted) {
+            const currentState = this.getState();
+            
+            // Check if deck has changed since we started saving
+            // We compare by creating a hash of content (excluding timestamp)
+            const currentDeckHash = this.createDeckContentHash(currentState.deck);
+            const savedDeckHash = this.createDeckContentHash(deckSnapshot);
+            
+            // Only update state if the deck we saved is still current (not been modified)
+            if (currentDeckHash === savedDeckHash && currentState.draggingElementId === null) {
+              this.savedDeckSnapshot = deckToSave;
+              // Only update meta/timestamp, don't replace the entire deck which might overwrite newer changes
+              if (currentState.deck) {
+                this.setState({
+                  deck: {
+                    ...currentState.deck,
+                    meta: deckToSave.meta,
+                  },
+                });
+              }
+            } else {
+              console.log('Save completed but deck has changed, not updating state');
+            }
+          }
+          
           this.isSaving = false;
+          this.saveAbortController = null;
           resolve();
         } catch (error) {
+          // Don't treat abort as an error
+          if (abortController.signal.aborted) {
+            console.log('Save aborted');
+            this.isSaving = false;
+            this.saveAbortController = null;
+            resolve();
+            return;
+          }
+          
           console.error('Error saving deck:', error);
           this.isSaving = false;
+          this.saveAbortController = null;
           this.setState({
             error: error instanceof Error ? error.message : 'Failed to save deck',
           });
@@ -239,6 +307,33 @@ export class Editor {
         }
       }, 300); // Small debounce to batch rapid saves
     });
+  }
+
+  /**
+   * Create a hash of deck content (excluding timestamp) for comparison
+   */
+  private createDeckContentHash(deck: DeckDefinition | null): string {
+    if (!deck) return '';
+    const deckForHash = {
+      ...deck,
+      meta: deck.meta ? { ...deck.meta, updatedAt: undefined } : undefined,
+    };
+    return JSON.stringify(deckForHash);
+  }
+
+  /**
+   * Abort any in-flight save operation
+   */
+  abortSave(): void {
+    if (this.saveAbortController) {
+      this.saveAbortController.abort();
+      this.saveAbortController = null;
+    }
+    if (this.saveDebounceTimer) {
+      clearTimeout(this.saveDebounceTimer);
+      this.saveDebounceTimer = null;
+    }
+    this.isSaving = false;
   }
 
   setDeck(deck: DeckDefinition): void {
@@ -1795,6 +1890,178 @@ export class Editor {
     this.executeCommand({
       type: 'updateSlide',
       params: { slideId, updates },
+      timestamp: Date.now(),
+    });
+  }
+
+  // Timeline operations
+  updateSlideTimeline(slideId: string, timeline: import('@/rsc/types').TimelineDefinition): void {
+    const { deck } = this.state;
+    if (!deck) return;
+
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      slides: deck.slides.map(slide =>
+        slide.id === slideId ? { ...slide, timeline } : slide
+      ),
+    };
+
+    this.setState({ deck: updatedDeck });
+    this.executeCommand({
+      type: 'updateTimeline',
+      target: slideId,
+      params: { timeline },
+      timestamp: Date.now(),
+    });
+  }
+
+  addTimelineSegment(slideId: string, trackId: string, segment: import('@/rsc/types').TimelineSegmentDefinition): void {
+    const { deck } = this.state;
+    if (!deck) return;
+
+    const slide = deck.slides.find(s => s.id === slideId);
+    if (!slide) return;
+
+    const timeline = slide.timeline || { tracks: [] };
+    const track = timeline.tracks.find(t => t.id === trackId) || {
+      id: trackId,
+      trackType: 'animation' as const,
+      segments: [],
+    };
+
+    const updatedTrack = {
+      ...track,
+      segments: [...track.segments, segment],
+    };
+
+    const updatedTracks = timeline.tracks.some(t => t.id === trackId)
+      ? timeline.tracks.map(t => t.id === trackId ? updatedTrack : t)
+      : [...timeline.tracks, updatedTrack];
+
+    this.updateSlideTimeline(slideId, { tracks: updatedTracks });
+  }
+
+  removeTimelineSegment(slideId: string, trackId: string, segmentId: string): void {
+    const { deck } = this.state;
+    if (!deck) return;
+
+    const slide = deck.slides.find(s => s.id === slideId);
+    if (!slide?.timeline) return;
+
+    const updatedTracks = slide.timeline.tracks.map(track => {
+      if (track.id === trackId) {
+        return {
+          ...track,
+          segments: track.segments.filter(s => s.id !== segmentId),
+        };
+      }
+      return track;
+    });
+
+    this.updateSlideTimeline(slideId, { tracks: updatedTracks });
+  }
+
+  // Master slide operations
+  addMasterSlide(masterSlide: import('@/rsc/types').MasterSlide): void {
+    const { deck } = this.state;
+    if (!deck) return;
+
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      settings: {
+        ...deck.settings,
+        theme: {
+          ...deck.settings?.theme,
+          masterSlides: [...(deck.settings?.theme?.masterSlides || []), masterSlide],
+        },
+      },
+    };
+
+    this.setState({ deck: updatedDeck });
+    this.executeCommand({
+      type: 'addMasterSlide',
+      target: masterSlide.id,
+      params: { masterSlide },
+      timestamp: Date.now(),
+    });
+  }
+
+  updateMasterSlide(masterSlideId: string, updates: Partial<import('@/rsc/types').MasterSlide>): void {
+    const { deck } = this.state;
+    if (!deck?.settings?.theme?.masterSlides) return;
+
+    const updatedMasterSlides = deck.settings.theme.masterSlides.map(ms =>
+      ms.id === masterSlideId ? { ...ms, ...updates } : ms
+    );
+
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      settings: {
+        ...deck.settings,
+        theme: {
+          ...deck.settings.theme,
+          masterSlides: updatedMasterSlides,
+        },
+      },
+    };
+
+    this.setState({ deck: updatedDeck });
+    this.executeCommand({
+      type: 'updateMasterSlide',
+      target: masterSlideId,
+      params: { updates },
+      timestamp: Date.now(),
+    });
+  }
+
+  deleteMasterSlide(masterSlideId: string): void {
+    const { deck } = this.state;
+    if (!deck?.settings?.theme?.masterSlides) return;
+
+    const updatedMasterSlides = deck.settings.theme.masterSlides.filter(ms => ms.id !== masterSlideId);
+    
+    // Remove master slide reference from slides using it
+    const updatedSlides = deck.slides.map(slide =>
+      slide.masterSlideId === masterSlideId ? { ...slide, masterSlideId: undefined } : slide
+    );
+
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      settings: {
+        ...deck.settings,
+        theme: {
+          ...deck.settings.theme,
+          masterSlides: updatedMasterSlides,
+        },
+      },
+      slides: updatedSlides,
+    };
+
+    this.setState({ deck: updatedDeck });
+    this.executeCommand({
+      type: 'deleteMasterSlide',
+      target: masterSlideId,
+      params: {},
+      timestamp: Date.now(),
+    });
+  }
+
+  applyMasterSlideToSlide(slideId: string, masterSlideId: string | null): void {
+    const { deck } = this.state;
+    if (!deck) return;
+
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      slides: deck.slides.map(slide =>
+        slide.id === slideId ? { ...slide, masterSlideId: masterSlideId || undefined } : slide
+      ),
+    };
+
+    this.setState({ deck: updatedDeck });
+    this.executeCommand({
+      type: 'applyMasterSlide',
+      target: slideId,
+      params: { masterSlideId },
       timestamp: Date.now(),
     });
   }

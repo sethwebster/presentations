@@ -1,18 +1,21 @@
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { ElementRenderer } from './ElementRenderer';
 import { AlignmentGuides } from './AlignmentGuides';
 import { SelectionBoundingBox } from './SelectionBoundingBox';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { getTransformService } from '../services/TransformService';
+import { getSelectionService } from '../services/SelectionService';
 
 interface EditorCanvasProps {
   deckId: string;
 }
 
-export function EditorCanvas({ deckId }: EditorCanvasProps) {
+// eslint-disable-next-line no-unused-vars
+export function EditorCanvas({ deckId: _deckId }: EditorCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   // Use Editor class instead of Zustand store
   const state = useEditor();
@@ -38,22 +41,6 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
   // Canvas dimensions (matching presentation format)
   const CANVAS_WIDTH = 1280;
   const CANVAS_HEIGHT = 720;
-
-  // Convert screen coordinates to canvas coordinates
-  const screenToCanvas = (screenX: number, screenY: number): { x: number; y: number } => {
-    const canvasContainer = document.querySelector('[data-canvas-container]') as HTMLElement;
-    if (!canvasContainer) {
-      return { x: screenX, y: screenY };
-    }
-
-    const rect = canvasContainer.getBoundingClientRect();
-    // Account for both transforms: outer wrapper scale(fitScale) and inner scale(zoom)
-    // The rect already reflects both transforms, so we need to account for the effective scale
-    const effectiveScale = zoom * fitScale;
-    const canvasX = (screenX - rect.left) / effectiveScale;
-    const canvasY = (screenY - rect.top) / effectiveScale;
-    return { x: canvasX, y: canvasY };
-  };
 
   const handleWheel = (e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
@@ -86,7 +73,8 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
     // Start selection box on left click on canvas background
     if (e.button === 0 && (e.target === e.currentTarget || target.closest('.editor-canvas') === e.currentTarget)) {
       e.preventDefault();
-      const canvasPos = screenToCanvas(e.clientX, e.clientY);
+      const transformService = getTransformService();
+      const canvasPos = transformService.screenToCanvas(e.clientX, e.clientY, zoom, pan);
       setIsSelecting(true);
       setSelectionBoxStart(canvasPos);
       setSelectionBoxEnd(canvasPos);
@@ -130,10 +118,8 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
 
       // Calculate which elements would be selected with current box
       if (selectionBoxStart) {
-        const minX = Math.min(selectionBoxStart.x, canvasX);
-        const minY = Math.min(selectionBoxStart.y, canvasY);
-        const maxX = Math.max(selectionBoxStart.x, canvasX);
-        const maxY = Math.max(selectionBoxStart.y, canvasY);
+        const selectionService = getSelectionService();
+        const selectionBox = selectionService.calculateSelectionBox(selectionBoxStart, { x: canvasX, y: canvasY });
 
         const currentSlide = deck?.slides[currentSlideIndex];
         if (currentSlide) {
@@ -142,58 +128,12 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
             ...(currentSlide.layers?.flatMap(l => l.elements) || []),
           ];
 
-          const previewIds = new Set<string>();
-          const openedGroupId = editor.getState().openedGroupId;
-
-          // Check each element for intersection with selection box
-          for (const element of allElements) {
-            if (!element.bounds) continue;
-
-            // If this is an opened group, check its children with absolute bounds
-            if (element.type === 'group' && openedGroupId === element.id) {
-              const group = element as any;
-              const groupX = element.bounds.x || 0;
-              const groupY = element.bounds.y || 0;
-              
-              // Check group children with absolute positions
-              if (group.children) {
-                for (const child of group.children) {
-                  if (!child.bounds) continue;
-                  
-                  const childAbsX = (child.bounds.x || 0) + groupX;
-                  const childAbsY = (child.bounds.y || 0) + groupY;
-                  const childWidth = child.bounds.width || 0;
-                  const childHeight = child.bounds.height || 0;
-
-                  // Check if selection box intersects with child bounds
-                  if (
-                    minX < childAbsX + childWidth &&
-                    maxX > childAbsX &&
-                    minY < childAbsY + childHeight &&
-                    maxY > childAbsY
-                  ) {
-                    previewIds.add(child.id);
-                  }
-                }
-              }
-            } else {
-              // Regular element or closed group - check element bounds
-              const elX = element.bounds.x || 0;
-              const elY = element.bounds.y || 0;
-              const elWidth = element.bounds.width || 0;
-              const elHeight = element.bounds.height || 0;
-
-              // Check if selection box intersects with element bounds
-              if (
-                minX < elX + elWidth &&
-                maxX > elX &&
-                minY < elY + elHeight &&
-                maxY > elY
-              ) {
-                previewIds.add(element.id);
-              }
-            }
-          }
+          // Use SelectionService to calculate preview
+          const previewIds = selectionService.calculatePreviewSelection(
+            selectionBox,
+            allElements,
+            []
+          );
 
           setPreviewSelectedIds(previewIds);
         }
@@ -202,16 +142,13 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
 
     const handleGlobalMouseUp = () => {
       if (isSelecting && selectionBoxStart && selectionBoxEnd) {
+        const selectionService = getSelectionService();
+        
         // Calculate selection box bounds
-        const minX = Math.min(selectionBoxStart.x, selectionBoxEnd.x);
-        const minY = Math.min(selectionBoxStart.y, selectionBoxEnd.y);
-        const maxX = Math.max(selectionBoxStart.x, selectionBoxEnd.x);
-        const maxY = Math.max(selectionBoxStart.y, selectionBoxEnd.y);
-        const boxWidth = maxX - minX;
-        const boxHeight = maxY - minY;
+        const selectionBox = selectionService.calculateSelectionBox(selectionBoxStart, selectionBoxEnd);
 
         // If selection box is too small, treat it as a click and clear selection
-        if (boxWidth < 5 && boxHeight < 5) {
+        if (!selectionService.isValidSelectionBox(selectionBox)) {
           editor.clearSelection();
         } else {
           // Find all elements that intersect with the selection box
@@ -222,27 +159,12 @@ export function EditorCanvas({ deckId }: EditorCanvasProps) {
               ...(currentSlide.layers?.flatMap(l => l.elements) || []),
             ];
 
-            const selectedIds = new Set<string>();
-
-            // Check each element for intersection with selection box
-            for (const element of allElements) {
-              if (!element.bounds) continue;
-
-              const elX = element.bounds.x || 0;
-              const elY = element.bounds.y || 0;
-              const elWidth = element.bounds.width || 0;
-              const elHeight = element.bounds.height || 0;
-
-              // Check if selection box intersects with element bounds
-              if (
-                minX < elX + elWidth &&
-                maxX > elX &&
-                minY < elY + elHeight &&
-                maxY > elY
-              ) {
-                selectedIds.add(element.id);
-              }
-            }
+            // Use SelectionService to find intersecting elements
+            const selectedIds = selectionService.findIntersectingElements(
+              selectionBox,
+              allElements,
+              []
+            );
 
             // Update selection
             if (selectedIds.size > 0) {

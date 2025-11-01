@@ -5,150 +5,10 @@ import type { ElementDefinition, GroupElementDefinition } from '@/rsc/types';
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { EditableTextElement } from './EditableTextElement';
 import { ElementContextMenu } from '../components/ElementContextMenu';
+import { getTransformService } from '../services/TransformService';
+import { getSnapService } from '../services/SnapService';
 
-const CANVAS_WIDTH = 1280;
-const CANVAS_HEIGHT = 720;
 const SNAP_THRESHOLD = 5; // pixels - same as GUIDE_THRESHOLD
-
-// Convert screen coordinates to canvas coordinates
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function screenToCanvas(screenX: number, screenY: number, _zoom: number, _pan: { x: number; y: number }): { x: number; y: number } {
-  // Get canvas container (centered on screen)
-  const canvasContainer = document.querySelector('[data-canvas-container]') as HTMLElement;
-  if (!canvasContainer) {
-    return { x: screenX, y: screenY };
-  }
-
-  const rect = canvasContainer.getBoundingClientRect();
-  
-  // The canvas container has nested transforms:
-  // Outer wrapper: scale(fitScale)
-  // Inner container: translate(calc(-50% + pan.x), calc(-50% + pan.y)) scale(zoom)
-  // The bounding rect already reflects both transforms
-  // Calculate effective scale from actual rendered size vs canvas dimensions
-  const CANVAS_WIDTH = 1280;
-  const effectiveScale = rect.width / CANVAS_WIDTH; // rect already accounts for all transforms
-  
-  // Canvas top-left in screen space
-  const canvasTopLeftScreenX = rect.left;
-  const canvasTopLeftScreenY = rect.top;
-  
-  // Convert screen coordinates to canvas coordinates
-  // Divide by effective scale (which includes both zoom and fitScale)
-  const canvasX = (screenX - canvasTopLeftScreenX) / effectiveScale;
-  const canvasY = (screenY - canvasTopLeftScreenY) / effectiveScale;
-
-  return { x: canvasX, y: canvasY };
-}
-
-// Helper to find snap points for an element at a given position
-function findSnapPoints(
-  elementBounds: { x: number; y: number; width: number; height: number },
-  allElements: Array<{ bounds?: { x?: number; y?: number; width?: number; height?: number } }>,
-  excludeElementId?: string
-): { snapX: number | null; snapY: number | null } {
-  const snapPointsX: number[] = [];
-  const snapPointsY: number[] = [];
-  
-  const elementCenterX = elementBounds.x + elementBounds.width / 2;
-  const elementCenterY = elementBounds.y + elementBounds.height / 2;
-  const elementLeft = elementBounds.x;
-  const elementRight = elementBounds.x + elementBounds.width;
-  const elementTop = elementBounds.y;
-  const elementBottom = elementBounds.y + elementBounds.height;
-
-  // Check alignment with other elements
-  for (const el of allElements) {
-    if (!el.bounds) continue;
-    
-    const bounds = el.bounds;
-    const otherLeft = bounds.x || 0;
-    const otherRight = (bounds.x || 0) + (bounds.width || 0);
-    const otherTop = bounds.y || 0;
-    const otherBottom = (bounds.y || 0) + (bounds.height || 0);
-    const otherCenterX = (bounds.x || 0) + (bounds.width || 0) / 2;
-    const otherCenterY = (bounds.y || 0) + (bounds.height || 0) / 2;
-
-    // Left edge alignment
-    if (Math.abs(elementLeft - otherLeft) < SNAP_THRESHOLD) {
-      snapPointsX.push(otherLeft);
-    }
-    // Right edge alignment
-    if (Math.abs(elementRight - otherRight) < SNAP_THRESHOLD) {
-      snapPointsX.push(otherRight - elementBounds.width);
-    }
-    // Center X alignment
-    if (Math.abs(elementCenterX - otherCenterX) < SNAP_THRESHOLD) {
-      snapPointsX.push(otherCenterX - elementBounds.width / 2);
-    }
-
-    // Top edge alignment
-    if (Math.abs(elementTop - otherTop) < SNAP_THRESHOLD) {
-      snapPointsY.push(otherTop);
-    }
-    // Bottom edge alignment
-    if (Math.abs(elementBottom - otherBottom) < SNAP_THRESHOLD) {
-      snapPointsY.push(otherBottom - elementBounds.height);
-    }
-    // Center Y alignment
-    if (Math.abs(elementCenterY - otherCenterY) < SNAP_THRESHOLD) {
-      snapPointsY.push(otherCenterY - elementBounds.height / 2);
-    }
-  }
-
-  // Check alignment with canvas center and edges
-  // Canvas center - check center, left edge, and right edge for vertical center
-  const canvasCenterX = CANVAS_WIDTH / 2;
-  const canvasCenterY = CANVAS_HEIGHT / 2;
-  
-  // Vertical center alignment (element center, left edge, or right edge aligns with canvas center)
-  if (
-    Math.abs(elementCenterX - canvasCenterX) < SNAP_THRESHOLD ||
-    Math.abs(elementLeft - canvasCenterX) < SNAP_THRESHOLD ||
-    Math.abs(elementRight - canvasCenterX) < SNAP_THRESHOLD
-  ) {
-    // Snap element center to canvas center
-    snapPointsX.push(canvasCenterX - elementBounds.width / 2);
-  }
-  
-  // Horizontal center alignment (element center, top edge, or bottom edge aligns with canvas center)
-  if (
-    Math.abs(elementCenterY - canvasCenterY) < SNAP_THRESHOLD ||
-    Math.abs(elementTop - canvasCenterY) < SNAP_THRESHOLD ||
-    Math.abs(elementBottom - canvasCenterY) < SNAP_THRESHOLD
-  ) {
-    // Snap element center to canvas center
-    snapPointsY.push(canvasCenterY - elementBounds.height / 2);
-  }
-  // Canvas edges
-  if (Math.abs(elementLeft) < SNAP_THRESHOLD) {
-    snapPointsX.push(0);
-  }
-  if (Math.abs(elementRight - CANVAS_WIDTH) < SNAP_THRESHOLD) {
-    snapPointsX.push(CANVAS_WIDTH - elementBounds.width);
-  }
-  if (Math.abs(elementTop) < SNAP_THRESHOLD) {
-    snapPointsY.push(0);
-  }
-  if (Math.abs(elementBottom - CANVAS_HEIGHT) < SNAP_THRESHOLD) {
-    snapPointsY.push(CANVAS_HEIGHT - elementBounds.height);
-  }
-
-  // Return the closest snap point (or null if none within threshold)
-  const snapX = snapPointsX.length > 0 
-    ? snapPointsX.reduce((closest, point) => 
-        Math.abs(point - elementBounds.x) < Math.abs(closest - elementBounds.x) ? point : closest
-      )
-    : null;
-  
-  const snapY = snapPointsY.length > 0
-    ? snapPointsY.reduce((closest, point) => 
-        Math.abs(point - elementBounds.y) < Math.abs(closest - elementBounds.y) ? point : closest
-      )
-    : null;
-
-  return { snapX, snapY };
-}
 
 interface BaseElementProps {
   element: ElementDefinition;
@@ -177,6 +37,16 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    
+    // Don't allow selection of background-like elements (images that fill canvas)
+    const fillsCanvas = bounds.x === 0 && bounds.y === 0 && 
+      bounds.width >= 1279 && bounds.height >= 719;
+    const isBackgroundLike = fillsCanvas && element.type === 'image';
+    
+    if (isBackgroundLike) {
+      return;
+    }
+    
     editor.selectElement(element.id, e.shiftKey);
   };
 
@@ -242,6 +112,18 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
       setTimeout(() => {
         document.body.style.cursor = '';
       }, 300);
+      return;
+    }
+    
+    // Prevent dragging of background-like elements (images that fill the canvas)
+    // Background images should never be draggable - they're CSS properties, not elements
+    const fillsCanvas = bounds.x === 0 && bounds.y === 0 && 
+      bounds.width >= 1279 && bounds.height >= 719;
+    const isBackgroundLike = fillsCanvas && element.type === 'image';
+    
+    if (isBackgroundLike) {
+      e.preventDefault();
+      e.stopPropagation();
       return;
     }
     
@@ -320,7 +202,8 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
     }
 
     // Convert screen coordinates to canvas coordinates
-    const canvasPos = screenToCanvas(e.clientX, e.clientY, zoom, pan);
+    const transformService = getTransformService();
+    const canvasPos = transformService.screenToCanvas(e.clientX, e.clientY, zoom, pan);
     
     setIsDragging(true);
     // Store the initial mouse position in canvas coordinates
@@ -352,7 +235,8 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
       e.preventDefault();
       
       // Convert screen coordinates to canvas coordinates
-      const canvasPos = screenToCanvas(e.clientX, e.clientY, zoom, pan);
+      const transformService = getTransformService();
+      const canvasPos = transformService.screenToCanvas(e.clientX, e.clientY, zoom, pan);
       
       // Calculate delta from initial mouse position
       const deltaX = canvasPos.x - dragStart.x;
@@ -392,21 +276,27 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
         });
         
         // Check for snap points
+        const snapService = getSnapService();
         const tempBounds = {
           x: primaryNewX,
           y: primaryNewY,
           width: primaryInitialBounds.width,
           height: primaryInitialBounds.height,
         };
-        snapPoints = findSnapPoints(tempBounds, elementsForSnap);
+        snapPoints = snapService.findSnapPoints(
+          tempBounds,
+          elementsForSnap,
+          Array.from(draggedSelectedIds)
+        );
       }
       
       // Apply snapping if within threshold
-      if (snapPoints.snapX !== null && Math.abs(snapPoints.snapX - primaryNewX) < SNAP_THRESHOLD) {
-        primaryNewX = snapPoints.snapX;
+      const snapService = getSnapService();
+      if (snapPoints.snapX !== null) {
+        primaryNewX = snapService.applySnap(primaryNewX, snapPoints.snapX, SNAP_THRESHOLD);
       }
-      if (snapPoints.snapY !== null && Math.abs(snapPoints.snapY - primaryNewY) < SNAP_THRESHOLD) {
-        primaryNewY = snapPoints.snapY;
+      if (snapPoints.snapY !== null) {
+        primaryNewY = snapService.applySnap(primaryNewY, snapPoints.snapY, SNAP_THRESHOLD);
       }
       
       // Calculate the delta of the primary element
@@ -563,6 +453,11 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
   const fillsCanvas = bounds.x === 0 && bounds.y === 0 && 
     bounds.width >= 1279 && bounds.height >= 719; // Allow for small rounding differences
   
+  // If an element fills the canvas and is an image, it's likely a background
+  // Background images should never be draggable - they're CSS properties, not elements
+  // Prevent dragging if element fills canvas (treated as background-like)
+  const isBackgroundLike = fillsCanvas && element.type === 'image';
+  
   return (
     <div
       ref={elementRef}
@@ -573,7 +468,7 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
       className={`
         absolute outline-none select-none
         ${isSelected ? 'border-2 border-lume-primary' : fillsCanvas ? 'border-0' : 'border-2 border-transparent'}
-        ${isDragging ? 'cursor-grabbing' : isLocked ? 'cursor-not-allowed' : 'cursor-grab'}
+        ${isDragging ? 'cursor-grabbing' : isLocked ? 'cursor-not-allowed' : isBackgroundLike ? 'cursor-default' : 'cursor-grab'}
       `}
       style={outerStyle}
       onMouseDown={handleMouseDown}
@@ -601,8 +496,8 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
         )}
       </div>
 
-      {/* Selection handles */}
-      {isSelected && (
+      {/* Selection handles - don't show for background-like elements */}
+      {isSelected && !isBackgroundLike && (
         <SelectionHandles element={element} />
       )}
 
@@ -747,7 +642,8 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
     editor.setDraggingElement(element.id, bounds);
     
     // Store initial mouse position in canvas coordinates
-    const initialMouseCanvas = screenToCanvas(e.clientX, e.clientY, zoom, pan);
+    const transformService = getTransformService();
+    const initialMouseCanvas = transformService.screenToCanvas(e.clientX, e.clientY, zoom, pan);
     
     // Store initial bounds
     const initialBounds = {
@@ -796,7 +692,8 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
       const isImage = element.type === 'image';
       
       // Convert current mouse position to canvas coordinates
-      const currentMouseCanvas = screenToCanvas(e.clientX, e.clientY, zoom, pan);
+      const transformService = getTransformService();
+      const currentMouseCanvas = transformService.screenToCanvas(e.clientX, e.clientY, zoom, pan);
       
       // Calculate delta in canvas coordinates
       const deltaX = currentMouseCanvas.x - resizeStart.mouseX;

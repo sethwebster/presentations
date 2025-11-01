@@ -7,85 +7,10 @@ import { ShapeElement } from '../elements/ShapeElement';
 import { ImageElement } from '../elements/ImageElement';
 import { BaseElement } from '../elements/BaseElement';
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
+import { getTransformService } from '../services/TransformService';
+import { getSnapService } from '../services/SnapService';
 
-const CANVAS_WIDTH = 1280;
-const CANVAS_HEIGHT = 720;
 const SNAP_THRESHOLD = 5;
-
-// Convert screen coordinates to canvas coordinates
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function screenToCanvas(screenX: number, screenY: number, _zoom: number, _pan: { x: number; y: number }): { x: number; y: number } {
-  const canvasContainer = document.querySelector('[data-canvas-container]') as HTMLElement;
-  if (!canvasContainer) {
-    return { x: screenX, y: screenY };
-  }
-
-  const rect = canvasContainer.getBoundingClientRect();
-  
-  // Calculate effective scale from actual rendered size vs canvas dimensions
-  // The rect already accounts for both outer wrapper scale(fitScale) and inner scale(zoom)
-  const CANVAS_WIDTH = 1280;
-  const effectiveScale = rect.width / CANVAS_WIDTH;
-  
-  const canvasX = (screenX - rect.left) / effectiveScale;
-  const canvasY = (screenY - rect.top) / effectiveScale;
-  return { x: canvasX, y: canvasY };
-}
-
-// Helper to find snap points (simplified version)
-function findSnapPoints(
-  elementBounds: { x: number; y: number; width: number; height: number },
-  allElements: Array<{ bounds?: { x?: number; y?: number; width?: number; height?: number } }>,
-): { snapX: number | null; snapY: number | null } {
-  const snapPointsX: number[] = [];
-  const snapPointsY: number[] = [];
-  
-  const elementCenterX = elementBounds.x + elementBounds.width / 2;
-  const elementCenterY = elementBounds.y + elementBounds.height / 2;
-  const elementLeft = elementBounds.x;
-  const elementRight = elementBounds.x + elementBounds.width;
-  const elementTop = elementBounds.y;
-  const elementBottom = elementBounds.y + elementBounds.height;
-
-  for (const el of allElements) {
-    if (!el.bounds) continue;
-    const bounds = el.bounds;
-    const otherLeft = bounds.x || 0;
-    const otherRight = (bounds.x || 0) + (bounds.width || 0);
-    const otherTop = bounds.y || 0;
-    const otherBottom = (bounds.y || 0) + (bounds.height || 0);
-    const otherCenterX = (bounds.x || 0) + (bounds.width || 0) / 2;
-    const otherCenterY = (bounds.y || 0) + (bounds.height || 0) / 2;
-
-    if (Math.abs(elementLeft - otherLeft) < SNAP_THRESHOLD) snapPointsX.push(otherLeft);
-    if (Math.abs(elementRight - otherRight) < SNAP_THRESHOLD) snapPointsX.push(otherRight - elementBounds.width);
-    if (Math.abs(elementCenterX - otherCenterX) < SNAP_THRESHOLD) snapPointsX.push(otherCenterX - elementBounds.width / 2);
-    if (Math.abs(elementTop - otherTop) < SNAP_THRESHOLD) snapPointsY.push(otherTop);
-    if (Math.abs(elementBottom - otherBottom) < SNAP_THRESHOLD) snapPointsY.push(otherBottom - elementBounds.height);
-    if (Math.abs(elementCenterY - otherCenterY) < SNAP_THRESHOLD) snapPointsY.push(otherCenterY - elementBounds.height / 2);
-  }
-
-  if (Math.abs(elementCenterX - CANVAS_WIDTH / 2) < SNAP_THRESHOLD) snapPointsX.push(CANVAS_WIDTH / 2 - elementBounds.width / 2);
-  if (Math.abs(elementCenterY - CANVAS_HEIGHT / 2) < SNAP_THRESHOLD) snapPointsY.push(CANVAS_HEIGHT / 2 - elementBounds.height / 2);
-  if (Math.abs(elementLeft) < SNAP_THRESHOLD) snapPointsX.push(0);
-  if (Math.abs(elementRight - CANVAS_WIDTH) < SNAP_THRESHOLD) snapPointsX.push(CANVAS_WIDTH - elementBounds.width);
-  if (Math.abs(elementTop) < SNAP_THRESHOLD) snapPointsY.push(0);
-  if (Math.abs(elementBottom - CANVAS_HEIGHT) < SNAP_THRESHOLD) snapPointsY.push(CANVAS_HEIGHT - elementBounds.height);
-
-  const snapX = snapPointsX.length > 0 
-    ? snapPointsX.reduce((closest, point) => 
-        Math.abs(point - elementBounds.x) < Math.abs(closest - elementBounds.x) ? point : closest
-      )
-    : null;
-  
-  const snapY = snapPointsY.length > 0
-    ? snapPointsY.reduce((closest, point) => 
-        Math.abs(point - elementBounds.y) < Math.abs(closest - elementBounds.y) ? point : closest
-      )
-    : null;
-
-  return { snapX, snapY };
-}
 
 interface ElementRendererProps {
   element: ElementDefinition;
@@ -249,7 +174,8 @@ function GroupBoundsOverlay({
 
     const handleMouseMove = (e: MouseEvent) => {
       e.preventDefault();
-      const canvasPos = screenToCanvas(e.clientX, e.clientY, zoom, pan);
+      const transformService = getTransformService();
+      const canvasPos = transformService.screenToCanvas(e.clientX, e.clientY, zoom, pan);
       
       if (!element.children || element.children.length === 0) return;
       
@@ -280,13 +206,15 @@ function GroupBoundsOverlay({
           width: primaryInitialBounds.width,
           height: primaryInitialBounds.height,
         };
-        const snapPoints = findSnapPoints(tempBounds, allElements);
+        const snapService = getSnapService();
+        snapService.setSnapThreshold(SNAP_THRESHOLD);
+        const snapPoints = snapService.findSnapPoints(tempBounds, allElements, []);
         
-        if (snapPoints.snapX !== null && Math.abs(snapPoints.snapX - primaryNewX) < SNAP_THRESHOLD) {
-          primaryNewX = snapPoints.snapX;
+        if (snapPoints.snapX !== null) {
+          primaryNewX = snapService.applySnap(primaryNewX, snapPoints.snapX, SNAP_THRESHOLD);
         }
-        if (snapPoints.snapY !== null && Math.abs(snapPoints.snapY - primaryNewY) < SNAP_THRESHOLD) {
-          primaryNewY = snapPoints.snapY;
+        if (snapPoints.snapY !== null) {
+          primaryNewY = snapService.applySnap(primaryNewY, snapPoints.snapY, SNAP_THRESHOLD);
         }
       }
       

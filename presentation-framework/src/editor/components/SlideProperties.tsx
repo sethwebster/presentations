@@ -626,6 +626,33 @@ export function SlideProperties() {
         />
       </div>
 
+      {/* Master Slide Template */}
+      {deck.settings?.theme?.masterSlides && deck.settings.theme.masterSlides.length > 0 && (
+        <div className="space-y-2">
+          <Label className={SECTION_HEADING}>Template</Label>
+          <select
+            value={slide.masterSlideId || ''}
+            onChange={(e) => {
+              const masterSlideId = e.target.value || null;
+              editor.applyMasterSlideToSlide(selectedSlideId, masterSlideId);
+            }}
+            className="w-full px-3 py-1.5 text-sm border border-border/30 rounded-xl bg-card/98 text-foreground"
+          >
+            <option value="">None (Custom)</option>
+            {deck.settings.theme.masterSlides.map((ms) => (
+              <option key={ms.id} value={ms.id}>
+                {ms.name}
+              </option>
+            ))}
+          </select>
+          {slide.masterSlideId && (
+            <p className="text-xs text-muted-foreground">
+              Using template &quot;{deck.settings.theme.masterSlides.find((ms) => ms.id === slide.masterSlideId)?.name}&quot;
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Background */}
       <div className="space-y-3">
         <Label className={SECTION_HEADING}>Background</Label>
