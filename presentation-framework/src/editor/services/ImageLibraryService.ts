@@ -17,9 +17,15 @@ export interface AddImageLibraryItemInput {
 type UpdateItemFn = (item: ImageLibraryItem) => ImageLibraryItem;
 
 interface StoredPayload {
-  items: ImageLibraryItem[];
+  items: StoredImageLibraryItem[];
   lastSyncAt: string | null;
 }
+
+// Stored items don't include full dataUrl if synced (server has it)
+// Only store thumbnails and keep dataUrl for pending items
+type StoredImageLibraryItem = Omit<ImageLibraryItem, 'dataUrl'> & {
+  dataUrl?: string; // Only present for unsynced items
+};
 
 const isBrowser = typeof window !== 'undefined';
 
@@ -393,6 +399,9 @@ export class ImageLibraryService {
       this.state = {
         items: payload.items.map((item) => ({
           ...item,
+          // For synced items without dataUrl, use thumbnail as placeholder
+          // Full image will be available after server hydration
+          dataUrl: item.dataUrl ?? (item.thumbnailDataUrl || ''),
           pendingAction: item.pendingAction ?? null,
           syncedAt: item.syncedAt ?? null,
         })),
@@ -400,6 +409,18 @@ export class ImageLibraryService {
         lastSyncAt: payload.lastSyncAt ?? null,
         lastSyncError: null,
       };
+      
+      // If we loaded items without full dataUrls (synced items), trigger server hydration
+      // Check if any synced item is using thumbnail as dataUrl (meaning we removed full image)
+      const needsHydration = this.state.items.some(
+        item => item.syncedAt && item.dataUrl === item.thumbnailDataUrl && item.thumbnailDataUrl
+      );
+      if (needsHydration && !this.hasHydratedFromServer) {
+        // Hydrate in the background to get full images from server
+        void this.hydrateFromServer(false).catch(() => {
+          // Silent fail - we'll use thumbnails if server hydration fails
+        });
+      }
     } catch (error) {
       console.error('ImageLibraryService: failed to load from localStorage', error);
     }
@@ -411,13 +432,107 @@ export class ImageLibraryService {
     }
 
     try {
+      // Convert items to storage format: remove full dataUrl for synced items
+      const storedItems: StoredImageLibraryItem[] = state.items.map((item) => {
+        // If item is synced, we can remove the full dataUrl (server has it)
+        // Keep it only for pending items that need to sync
+        const isSynced = item.syncedAt && !item.pendingAction;
+        return {
+          ...item,
+          dataUrl: isSynced ? undefined : item.dataUrl, // Remove full image for synced items
+        };
+      });
+
       const payload: StoredPayload = {
-        items: state.items,
+        items: storedItems,
         lastSyncAt: state.lastSyncAt,
       };
+
+      const serialized = JSON.stringify(payload);
+      
+      // Estimate size (rough approximation: UTF-16 encoding = 2 bytes per char)
+      const estimatedSize = serialized.length * 2;
+      const maxSize = 4.5 * 1024 * 1024; // Leave ~500KB buffer (localStorage is typically 5-10MB)
+      
+      if (estimatedSize > maxSize) {
+        // Remove oldest items until we're under the limit
+        const sortedItems = [...storedItems].sort((a, b) => 
+          Date.parse(a.updatedAt) - Date.parse(b.updatedAt)
+        );
+        
+        let trimmedItems = [...sortedItems];
+        while (trimmedItems.length > 0) {
+          const testPayload: StoredPayload = {
+            items: trimmedItems,
+            lastSyncAt: state.lastSyncAt,
+          };
+          const testSize = JSON.stringify(testPayload).length * 2;
+          
+          if (testSize <= maxSize) {
+            break;
+          }
+          
+          // Remove oldest item (but keep pending items)
+          const oldestPendingIndex = trimmedItems.findIndex(item => item.pendingAction);
+          if (oldestPendingIndex >= 0 && oldestPendingIndex < trimmedItems.length - 1) {
+            // Remove oldest synced item instead
+            trimmedItems = trimmedItems.filter((_, i) => i !== trimmedItems.length - 1);
+          } else {
+            trimmedItems.pop();
+          }
+        }
+        
+        // Re-sort by updatedAt descending
+        const keptIds = new Set(trimmedItems.map(item => item.id));
+        const remainingItems = storedItems.filter(item => keptIds.has(item.id));
+        
+        payload.items = remainingItems;
+        
+        console.warn(
+          `ImageLibraryService: localStorage quota approaching. Trimmed to ${remainingItems.length} items.`
+        );
+      }
+
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch (error) {
-      console.error('ImageLibraryService: failed to persist state', error);
+      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+        // Try to free space by removing oldest synced items
+        const syncedItems = state.items
+          .filter(item => item.syncedAt && !item.pendingAction)
+          .sort((a, b) => Date.parse(a.updatedAt) - Date.parse(b.updatedAt));
+        
+        // Remove oldest 25% of synced items
+        const itemsToRemove = Math.max(1, Math.floor(syncedItems.length * 0.25));
+        const idsToRemove = new Set(
+          syncedItems.slice(0, itemsToRemove).map(item => item.id)
+        );
+        
+        const filteredState = {
+          ...state,
+          items: state.items.filter(item => !idsToRemove.has(item.id)),
+        };
+        
+        try {
+          // Retry with reduced items
+          this.persistState(filteredState);
+          this.state = filteredState;
+          this.emit();
+          console.warn(
+            `ImageLibraryService: localStorage quota exceeded. Removed ${itemsToRemove} oldest synced items.`
+          );
+        } catch (retryError) {
+          console.error('ImageLibraryService: failed to persist state after cleanup', retryError);
+          // Clear localStorage for this key and start fresh
+          try {
+            window.localStorage.removeItem(STORAGE_KEY);
+            console.warn('ImageLibraryService: cleared localStorage to resolve quota error');
+          } catch (clearError) {
+            console.error('ImageLibraryService: failed to clear localStorage', clearError);
+          }
+        }
+      } else {
+        console.error('ImageLibraryService: failed to persist state', error);
+      }
     }
   }
 

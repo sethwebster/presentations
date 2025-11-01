@@ -103,10 +103,22 @@ export class Editor {
     const result = { ...target };
     for (const key in source) {
       if (source[key] !== undefined) {
-        if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key]) && source[key].constructor === Object) {
-          result[key] = this.deepMerge((target[key] || {}) as T[Extract<keyof T, string>], source[key] as Partial<T[Extract<keyof T, string>]>);
+        const sourceValue = source[key];
+        const targetValue = target[key];
+        
+        // Special handling for background: if types don't match (string vs object), replace entirely
+        if (key === 'background') {
+          result[key] = sourceValue as T[Extract<keyof T, string>];
+        } else if (sourceValue && typeof sourceValue === 'object' && !Array.isArray(sourceValue) && sourceValue.constructor === Object) {
+          // Only deep merge if target is also an object (not a string/primitive)
+          if (targetValue && typeof targetValue === 'object' && !Array.isArray(targetValue) && targetValue.constructor === Object) {
+            result[key] = this.deepMerge(targetValue as T[Extract<keyof T, string>], sourceValue as Partial<T[Extract<keyof T, string>]>);
+          } else {
+            // Replace entirely if types don't match
+            result[key] = sourceValue as T[Extract<keyof T, string>];
+          }
         } else {
-          result[key] = source[key] as T[Extract<keyof T, string>];
+          result[key] = sourceValue as T[Extract<keyof T, string>];
         }
       }
     }
@@ -139,10 +151,12 @@ export class Editor {
       }
       const deck = await response.json() as DeckDefinition;
       console.log('Deck loaded:', deckId, { slides: deck.slides.length, title: deck.meta.title });
+      const firstSlide = deck.slides[0];
       this.setState({
         deck,
         deckId,
         currentSlideIndex: 0,
+        selectedSlideId: firstSlide?.id || null,
         selectedElementIds: new Set(),
         isLoading: false,
       });

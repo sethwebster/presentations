@@ -32,7 +32,11 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
   const selectedElementIds = state.selectedElementIds;
   const autosaveEnabled = state.autosaveEnabled;
   const lastShapeStyle = state.lastShapeStyle;
-  const activeSlideId = state.selectedSlideId ?? deck?.slides?.[currentSlideIndex]?.id ?? null;
+  // Ensure we have an active slide ID - prioritize selectedSlideId, fallback to current slide
+  const activeSlideId = state.selectedSlideId ?? 
+    (deck?.slides?.[currentSlideIndex]?.id) ?? 
+    (deck?.slides?.[0]?.id) ?? 
+    null;
 
   const [showAlignMenu, setShowAlignMenu] = useState(false);
   const alignMenuRef = useRef<HTMLDivElement>(null);
