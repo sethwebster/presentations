@@ -40,7 +40,7 @@ export function StatusBar({ deckId: _deckId }: StatusBarProps) {
   };
 
   return (
-    <div className="flex h-[26px] select-none items-center border-t border-border/70 bg-card/80 px-3 text-[11px] font-mono text-muted-foreground backdrop-blur supports-[backdrop-filter]:bg-card/60">
+    <div className="flex h-[26px] select-none items-center border-t bg-card/80 px-3 text-[11px] font-mono text-muted-foreground backdrop-blur supports-[backdrop-filter]:bg-card/60" style={{ borderTopColor: 'rgba(148, 163, 184, 0.25)' }}>
       {/* Left side - Status indicators */}
       <div className="flex items-center gap-4 flex-1">
         {/* Save Status */}

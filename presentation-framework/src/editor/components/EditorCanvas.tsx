@@ -73,6 +73,24 @@ export function EditorCanvas({ deckId: _deckId }: EditorCanvasProps) {
     // Start selection box on left click on canvas background
     if (e.button === 0 && (e.target === e.currentTarget || target.closest('.editor-canvas') === e.currentTarget)) {
       e.preventDefault();
+      
+      // Check if click is outside the slide (on the gray canvas area)
+      // The slide container has data-canvas-container attribute
+      const slideContainer = document.querySelector('[data-canvas-container]') as HTMLElement;
+      if (slideContainer) {
+        const rect = slideContainer.getBoundingClientRect();
+        const clickX = e.clientX;
+        const clickY = e.clientY;
+        
+        // Check if click is outside the slide container bounds
+        if (clickX < rect.left || clickX > rect.right || clickY < rect.top || clickY > rect.bottom) {
+          // Clicked outside slide - select document
+          editor.setSelectedSlide(null);
+          editor.clearSelection();
+          return;
+        }
+      }
+      
       const transformService = getTransformService();
       const canvasPos = transformService.screenToCanvas(e.clientX, e.clientY, zoom, pan);
       setIsSelecting(true);
@@ -147,9 +165,36 @@ export function EditorCanvas({ deckId: _deckId }: EditorCanvasProps) {
         // Calculate selection box bounds
         const selectionBox = selectionService.calculateSelectionBox(selectionBoxStart, selectionBoxEnd);
 
-        // If selection box is too small, treat it as a click and clear selection
+        // If selection box is too small, treat it as a click
         if (!selectionService.isValidSelectionBox(selectionBox)) {
-          editor.clearSelection();
+          // Check if click was on an element or on the background
+          const currentSlide = deck?.slides[currentSlideIndex];
+          if (currentSlide && selectionBoxStart) {
+            const allElements = [
+              ...(currentSlide.elements || []),
+              ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+            ];
+            
+            // Check if click point intersects with any element
+            const clickedElement = allElements.find(el => {
+              if (!el.bounds) return false;
+              const bounds = el.bounds;
+              return selectionBoxStart.x >= bounds.x &&
+                     selectionBoxStart.x <= bounds.x + bounds.width &&
+                     selectionBoxStart.y >= bounds.y &&
+                     selectionBoxStart.y <= bounds.y + bounds.height;
+            });
+            
+            if (!clickedElement) {
+              // Clicked on background - select the slide
+              editor.setSelectedSlide(currentSlide.id);
+            } else {
+              // Clicked on an element (element selection is handled by BaseElement)
+              editor.clearSelection();
+            }
+          } else {
+            editor.clearSelection();
+          }
         } else {
           // Find all elements that intersect with the selection box
           const currentSlide = deck?.slides[currentSlideIndex];
@@ -249,9 +294,10 @@ export function EditorCanvas({ deckId: _deckId }: EditorCanvasProps) {
     <div
       ref={canvasRef}
       className={cn(
-        'editor-canvas relative flex-1 select-none overflow-hidden bg-[radial-gradient(circle_at_15%_15%,rgba(56,189,248,0.08),transparent_60%),radial-gradient(circle_at_85%_12%,rgba(129,140,248,0.08),transparent_55%),linear-gradient(180deg,hsla(var(--background),0.96)_0%,hsla(var(--background),0.9)_100%)] text-foreground transition-colors',
+        'editor-canvas relative flex-1 select-none overflow-hidden text-foreground transition-colors',
         isPanning ? 'cursor-grabbing' : 'cursor-default'
       )}
+      style={{ backgroundColor: '#808080' }}
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -566,7 +612,7 @@ export function EditorCanvas({ deckId: _deckId }: EditorCanvasProps) {
       </div>
 
       {/* Zoom Controls */}
-      <div className="absolute bottom-4 right-4 flex flex-col items-center gap-1 rounded-lg border border-border/60 bg-card/80 p-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/60">
+      <div className="absolute bottom-4 right-4 flex flex-col items-center gap-1 rounded-lg border bg-card/80 p-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/60" style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}>
         <Button
           variant="ghost"
           size="icon"

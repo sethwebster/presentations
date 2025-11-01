@@ -604,7 +604,13 @@ export function PropertiesPanel() {
   );
 
   return (
-    <Panel className="w-[300px] border-l border-border/20">
+    <Panel 
+      className="w-[300px] border-l rounded-none"
+      style={{ 
+        borderLeftColor: 'rgba(148, 163, 184, 0.2)',
+        borderTop: 'none',
+      }}
+    >
       <PanelHeader className="px-5 py-4">
         <div className="flex w-full items-center justify-between gap-2">
           <PanelTitle>Properties</PanelTitle>

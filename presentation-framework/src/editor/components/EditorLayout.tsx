@@ -66,7 +66,7 @@ export function EditorLayout({ deckId }: EditorLayoutProps) {
 
       {/* Bottom - Timeline Editor (conditional) */}
       {showTimeline && (
-        <div className="h-[200px] border-t border-border/60 bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+        <div className="h-[200px] border-t bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/60" style={{ borderTopColor: 'rgba(148, 163, 184, 0.2)' }}>
           <TimelineEditor deckId={deckId} />
         </div>
       )}

@@ -40,7 +40,8 @@ export function DocumentProperties() {
           value={meta.description || ""}
           onChange={(event) => editor.updateDeckMeta({ description: event.target.value })}
           placeholder="Describe the intent or audience"
-          className="min-h-[90px] w-full resize-y rounded-md border border-input bg-background p-3 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          className="min-h-[90px] w-full resize-y rounded-md border bg-background p-3 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}
         />
       </div>
 
@@ -51,7 +52,8 @@ export function DocumentProperties() {
             type="checkbox"
             checked={meta.public || false}
             onChange={(event) => editor.updateDeckMeta({ public: event.target.checked })}
-            className="w-4 h-4 border rounded border-input bg-background text-primary focus:ring-primary focus:ring-offset-0"
+            className="w-4 h-4 border rounded bg-background text-primary focus:ring-primary focus:ring-offset-0"
+            style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}
           />
           Make this presentation public
         </label>
@@ -214,7 +216,7 @@ export function DocumentProperties() {
         />
       </div>
 
-      <div className="pt-5 space-y-3 border-t border-border/60">
+      <div className="pt-5 space-y-3 border-t" style={{ borderTopColor: 'rgba(148, 163, 184, 0.2)' }}>
         <Label className={SECTION_HEADING}>Presentation</Label>
         <div className="space-y-3">
           <label className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -233,7 +235,8 @@ export function DocumentProperties() {
                   },
                 })
               }
-              className="w-4 h-4 border rounded border-input bg-background text-primary focus:ring-primary focus:ring-offset-0"
+              className="w-4 h-4 border rounded bg-background text-primary focus:ring-primary focus:ring-offset-0"
+            style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}
             />
             Loop presentation
           </label>
@@ -253,7 +256,8 @@ export function DocumentProperties() {
                   },
                 })
               }
-              className="w-4 h-4 border rounded border-input bg-background text-primary focus:ring-primary focus:ring-offset-0"
+              className="w-4 h-4 border rounded bg-background text-primary focus:ring-primary focus:ring-offset-0"
+            style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}
             />
             Auto-advance slides
           </label>
@@ -298,14 +302,15 @@ export function DocumentProperties() {
                   },
                 })
               }
-              className="w-4 h-4 border rounded border-input bg-background text-primary focus:ring-primary focus:ring-offset-0"
+              className="w-4 h-4 border rounded bg-background text-primary focus:ring-primary focus:ring-offset-0"
+            style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}
             />
             Show slide numbers
           </label>
         </div>
       </div>
 
-      <div className="pt-5 space-y-3 border-t border-border/60">
+      <div className="pt-5 space-y-3 border-t" style={{ borderTopColor: 'rgba(148, 163, 184, 0.2)' }}>
         <Label className={SECTION_HEADING}>Grid &amp; Guides</Label>
         <div className="space-y-2">
           <label className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -324,7 +329,8 @@ export function DocumentProperties() {
                   },
                 });
               }}
-              className="w-4 h-4 border rounded border-input bg-background text-primary focus:ring-primary focus:ring-offset-0"
+              className="w-4 h-4 border rounded bg-background text-primary focus:ring-primary focus:ring-offset-0"
+            style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}
             />
             Show grid
           </label>
@@ -344,7 +350,8 @@ export function DocumentProperties() {
                       },
                     })
                   }
-                  className="w-4 h-4 border rounded border-input bg-background text-primary focus:ring-primary focus:ring-offset-0"
+                  className="w-4 h-4 border rounded bg-background text-primary focus:ring-primary focus:ring-offset-0"
+            style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}
                 />
                 Snap to grid
               </label>

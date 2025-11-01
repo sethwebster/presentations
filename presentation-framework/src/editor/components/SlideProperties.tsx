@@ -800,8 +800,11 @@ export function SlideProperties() {
                   <>
                     <div
                       ref={imagePreviewRef}
-                      className="relative w-full overflow-hidden rounded-xl border border-border/60 bg-muted/40"
-                      style={previewStyle}
+                      className="relative w-full overflow-hidden rounded-xl bg-muted/40"
+                      style={{
+                        ...previewStyle,
+                        border: '1px solid rgba(22, 194, 199, 0.4)',
+                      }}
                       onMouseDown={handleImageDragStart}
                     >
                     <div className="absolute left-1/2 top-1/2 flex w-full -translate-x-1/2 -translate-y-1/2 justify-center">
@@ -945,7 +948,8 @@ export function SlideProperties() {
             type="checkbox"
             checked={slide.hidden || false}
             onChange={(e) => editor.updateSlide(selectedSlideId, { hidden: e.target.checked })}
-            className="h-4 w-4 rounded border border-input bg-background text-primary focus:ring-primary focus:ring-offset-0"
+            className="h-4 w-4 rounded border bg-background text-primary focus:ring-primary focus:ring-offset-0"
+            style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}
           />
           Hide slide in presentation
         </label>

@@ -26,10 +26,13 @@ const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedControlProps>
       <div
         ref={ref}
         className={cn(
-          "inline-flex h-10 items-center justify-center rounded-xl border border-border/30 bg-card/96 p-1 shadow-[0_10px_28px_rgba(11,16,34,0.09)] backdrop-blur-sm supports-[backdrop-filter]:bg-card/85",
+          "inline-flex h-10 items-center justify-center rounded-xl border bg-card/96 p-1 shadow-[0_10px_28px_rgba(11,16,34,0.09)] backdrop-blur-sm supports-[backdrop-filter]:bg-card/85",
           !isEditor && "text-muted-foreground",
           className
         )}
+        style={{
+          borderColor: 'rgba(148, 163, 184, 0.3)',
+        }}
         role="tablist"
       >
         {items.map((item) => {
@@ -45,10 +48,14 @@ const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedControlProps>
               className={cn(
                 "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ring-offset-background disabled:pointer-events-none disabled:opacity-50",
                 isSelected
-                  ? "bg-primary text-primary-foreground shadow-[0_6px_18px_rgba(11,16,34,0.12)]"
+                  ? "text-white shadow-[0_6px_18px_rgba(22,194,199,0.15)]"
                   : "text-muted-foreground hover:text-foreground/80",
                 "focus-visible:ring-[var(--editor-accent,theme(colors.primary.DEFAULT))]/45"
               )}
+              style={{
+                border: 'none',
+                ...(isSelected ? { backgroundColor: 'var(--lume-primary, #16C2C7)' } : {}),
+              }}
             >
               {item.label}
             </button>

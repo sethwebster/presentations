@@ -41,7 +41,15 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
   const currentSlide = deck?.slides[currentSlideIndex];
   if (!currentSlide) {
     return (
-      <Panel className="w-[280px] border-r border-border/70">
+      <Panel 
+      className="w-[280px] rounded-none" 
+      style={{ 
+        borderTop: 'none',
+        borderBottomColor: 'rgba(148, 163, 184, 0.25)',
+        borderLeftColor: 'rgba(148, 163, 184, 0.25)',
+        borderRightColor: 'rgba(148, 163, 184, 0.25)',
+      }}
+    >
         <PanelHeader className="px-4 py-4">
           <PanelTitle>Navigator</PanelTitle>
         </PanelHeader>
@@ -376,13 +384,17 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
           className={cn(
             'relative mx-auto mt-1 w-full max-w-[200px] rounded-xl border-2 border-transparent transition-all duration-200 ease-out',
             isSelected
-              ? 'border-primary shadow-[0_8px_24px_rgba(0,0,0,0.18)]'
-              : 'hover:border-border/70 hover:shadow-[0_6px_18px_rgba(0,0,0,0.12)]'
+              ? 'shadow-[0_8px_24px_rgba(22,194,199,0.18)]'
+              : 'hover:border-[var(--lume-primary)]/30 hover:shadow-[0_6px_18px_rgba(22,194,199,0.12)]'
           )}
+          style={isSelected ? { borderColor: 'var(--lume-primary, #16C2C7)' } : undefined}
         >
           <div
-            className="relative aspect-[16/9] w-full overflow-hidden rounded-lg border border-border/60 bg-card shadow-sm"
-            style={{ background: getBackground() }}
+            className="relative aspect-[16/9] w-full overflow-hidden rounded-lg bg-card shadow-sm"
+            style={{ 
+              background: getBackground(),
+              border: '1px solid rgba(148, 163, 184, 0.2)',
+            }}
           >
             <div
               className="relative w-full h-full"
@@ -435,9 +447,10 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
           className={cn(
             'mt-1 inline-flex min-w-[2.25rem] items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold transition-colors',
             isSelected
-              ? 'bg-primary text-primary-foreground'
+              ? 'text-white'
               : 'bg-muted text-muted-foreground'
           )}
+          style={isSelected ? { backgroundColor: 'var(--lume-primary, #16C2C7)' } : undefined}
         >
           {index + 1}
         </div>
@@ -446,7 +459,15 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
   };
 
   return (
-    <Panel className="w-[280px] border-r border-border/70">
+    <Panel 
+      className="w-[280px] rounded-none" 
+      style={{ 
+        borderTop: 'none',
+        borderBottomColor: 'rgba(148, 163, 184, 0.25)',
+        borderLeftColor: 'rgba(148, 163, 184, 0.25)',
+        borderRightColor: 'rgba(148, 163, 184, 0.25)',
+      }}
+    >
       <PanelHeader className="flex flex-col gap-2 px-4 py-4">
         <PanelTitle>Navigator</PanelTitle>
         <SegmentedControl
@@ -462,7 +483,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
       <PanelBody className="space-y-4">
         {activeTab === 'slides' ? (
           <>
-            <div className="pb-4 border-b border-border/60">
+            <div className="pb-4 border-b" style={{ borderBottomColor: 'rgba(148, 163, 184, 0.2)' }}>
               <Button
                 variant="outline"
                 className="flex items-center justify-center w-full gap-2"
@@ -555,7 +576,8 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                                 }
                               }}
                               onClick={(e) => e.stopPropagation()}
-                              className="flex-1 rounded border border-border bg-background px-1 py-0.5 text-[11px] font-semibold uppercase text-foreground"
+                              className="flex-1 rounded border bg-background px-1 py-0.5 text-[11px] font-semibold uppercase text-foreground"
+                              style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}
                             />
                           ) : (
                             <span
@@ -576,7 +598,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
             )}
 
             {allElements.length === 0 ? (
-              <div className="px-3 py-2 text-xs italic border border-dashed rounded-md border-border/60 text-muted-foreground">
+              <div className="px-3 py-2 text-xs italic border border-dashed rounded-md text-muted-foreground" style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}>
                 No layers yet
               </div>
             ) : (
@@ -611,9 +633,9 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
               const itemClasses = cn(
                 'group flex items-center gap-2 rounded-md border border-transparent px-3 py-2 text-xs transition-colors',
                 isGroupChild ? 'pl-6' : 'pl-3',
-                isSelected && 'border-primary/70 bg-primary/15 text-primary',
-                !isSelected && isDragOver && 'border-primary/50 border-dashed bg-primary/10',
-                !isSelected && !isDragOver && !isLocked && 'hover:bg-primary/10',
+                isSelected && 'bg-[var(--lume-primary,theme(colors.lume.primary))]/15 text-[var(--lume-primary,theme(colors.lume.primary))]',
+                !isSelected && isDragOver && 'border-dashed bg-[var(--lume-primary,theme(colors.lume.primary))]/10',
+                !isSelected && !isDragOver && !isLocked && 'hover:bg-[var(--lume-primary,theme(colors.lume.primary))]/10',
                 isLocked ? 'cursor-not-allowed text-muted-foreground/70' : 'cursor-pointer text-foreground',
                 isDragging && 'opacity-60'
               );
@@ -629,6 +651,10 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                   onDragEnd={handleDragEnd}
                   onClick={() => !isLocked && editor.selectElement(element.id, false)}
                   className={itemClasses}
+                  style={{
+                    ...(isSelected && { borderColor: 'rgba(22, 194, 199, 0.7)' }),
+                    ...(isDragOver && !isSelected && { borderColor: 'rgba(22, 194, 199, 0.5)' }),
+                  }}
                 >
                   {/* Expand/collapse icon for groups */}
                   {isGroup ? (
@@ -687,7 +713,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                   <span
                     className={cn(
                       'h-3 w-3 flex-shrink-0 rounded-sm transition-colors',
-                      isSelected ? 'bg-primary' : 'bg-border/60'
+                      isSelected ? 'bg-[var(--lume-primary,#16C2C7)]' : 'bg-[rgba(148,163,184,0.3)]'
                     )}
                   />
                   
@@ -706,7 +732,8 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                         }
                       }}
                       onClick={(e) => e.stopPropagation()}
-                      className="flex-1 rounded border border-border/60 bg-card/80 px-1 py-0.5 text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      className="flex-1 rounded border bg-card/80 px-1 py-0.5 text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}
                     />
                   ) : (
                     <span

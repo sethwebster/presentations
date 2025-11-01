@@ -729,9 +729,9 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
     setTimeout(() => setShowBackgroundModal(false), 200);
   }, [activeSlideId, currentSlideIndex, editor, setBackgroundFeedback]);
   return (
-    <div className="flex h-14 items-center gap-3 border-b border-border/70 bg-card/80 px-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/60">
+    <div className="flex h-14 items-center gap-3 border-b bg-card/80 px-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/60" style={{ borderBottomColor: 'rgba(148, 163, 184, 0.25)' }}>
       {/* Insert Tools */}
-      <div className="flex items-center gap-2 pr-4 mr-2 border-r border-border/60">
+      <div className="flex items-center gap-2 pr-4 mr-2 border-r" style={{ borderRightColor: 'rgba(148, 163, 184, 0.2)' }}>
         <ToolbarButton 
           title="Insert Text" 
           onClick={() => {
@@ -833,7 +833,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
 
       {/* Format Tools */}
       {selectedElementIds.size > 0 && (
-        <div className="flex items-center gap-2 pr-4 mr-2 border-r border-border/60">
+        <div className="flex items-center gap-2 pr-4 mr-2 border-r" style={{ borderRightColor: 'rgba(148, 163, 184, 0.2)' }}>
           <ToolbarButton title="Bold" onClick={() => {
             const deck = state.deck;
             const currentSlide = deck?.slides[currentSlideIndex];
@@ -883,7 +883,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       
       {/* Text Alignment Tools */}
       {selectedElementIds.size > 0 && (
-        <div className="flex items-center gap-2 pr-4 mr-2 border-r border-border/60">
+        <div className="flex items-center gap-2 pr-4 mr-2 border-r" style={{ borderRightColor: 'rgba(148, 163, 184, 0.2)' }}>
           <ToolbarButton title="Align Left" onClick={() => {
           const deck = state.deck;
           const currentSlide = deck?.slides[currentSlideIndex];
@@ -914,7 +914,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       )}
 
       {/* Layout Tools */}
-      <div className="mr-2 flex items-center gap-1.5 border-r border-border/60 pr-4">
+      <div className="mr-2 flex items-center gap-1.5 border-r pr-4" style={{ borderRightColor: 'rgba(148, 163, 184, 0.2)' }}>
         <ToolbarButton 
           title="Group (Cmd/Ctrl+G)" 
           onClick={() => {
@@ -955,7 +955,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
 
       {/* Layer Ordering Tools */}
       {selectedElementIds.size > 0 && (
-        <div className="flex items-center gap-2 pr-4 mr-2 border-r border-border/60">
+        <div className="flex items-center gap-2 pr-4 mr-2 border-r" style={{ borderRightColor: 'rgba(148, 163, 184, 0.2)' }}>
           <ToolbarButton 
             title="Bring to Front" 
             onClick={() => {
@@ -1009,7 +1009,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       )}
 
       {/* Right Side Actions */}
-      <div className="flex items-center gap-2 ml-auto pr-4 border-r border-border/60">
+      <div className="flex items-center gap-2 ml-auto pr-4 border-r" style={{ borderRightColor: 'rgba(148, 163, 184, 0.2)' }}>
         {/* Play Button - Before Autosave */}
         <ToolbarButton 
           title="Play Presentation" 

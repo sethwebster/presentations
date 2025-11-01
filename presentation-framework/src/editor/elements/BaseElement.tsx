@@ -317,12 +317,23 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
     ...visualStyles
   } = (element.style || {}) as any;
 
+  // Check if element fills the entire canvas (expanded to fill)
+  // This must be calculated before outerStyle uses it
+  const fillsCanvas = bounds.x === 0 && bounds.y === 0 && 
+    bounds.width >= 1279 && bounds.height >= 719; // Allow for small rounding differences
+  
+  // If an element fills the canvas and is an image, it's likely a background
+  // Background images should never be draggable - they're CSS properties, not elements
+  // Prevent dragging if element fills canvas (treated as background-like)
+  const isBackgroundLike = fillsCanvas && element.type === 'image';
+
   const outerStyle: React.CSSProperties = {
     left: `${bounds.x}px`,
     top: `${bounds.y}px`,
     width: `${bounds.width}px`,
     height: `${bounds.height}px`,
     boxSizing: 'border-box',
+    outline: 'none', // Remove any default outline
   };
 
   if (transform !== undefined) outerStyle.transform = transform;
@@ -335,15 +346,6 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
     opacity: opacityValue,
     ...visualStyles,
   };
-
-  // Check if element fills the entire canvas (expanded to fill)
-  const fillsCanvas = bounds.x === 0 && bounds.y === 0 && 
-    bounds.width >= 1279 && bounds.height >= 719; // Allow for small rounding differences
-  
-  // If an element fills the canvas and is an image, it's likely a background
-  // Background images should never be draggable - they're CSS properties, not elements
-  // Prevent dragging if element fills canvas (treated as background-like)
-  const isBackgroundLike = fillsCanvas && element.type === 'image';
   
   return (
     <div
@@ -354,10 +356,16 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
       onContextMenu={handleContextMenu}
       className={`
         absolute outline-none select-none
-        ${isSelected ? 'border-2 border-lume-primary' : fillsCanvas ? 'border-0' : 'border-2 border-transparent'}
         ${isDragging ? 'cursor-grabbing' : isLocked ? 'cursor-not-allowed' : isBackgroundLike ? 'cursor-default' : 'cursor-grab'}
       `}
-      style={outerStyle}
+      style={{
+        ...outerStyle,
+        border: isSelected && !fillsCanvas 
+          ? '2px solid var(--lume-primary, #16C2C7)' 
+          : fillsCanvas 
+            ? 'none' 
+            : '2px solid transparent',
+      }}
       onMouseDown={handleMouseDown}
     >
       <div className="w-full h-full" style={contentStyle}>
@@ -466,7 +474,7 @@ function ShapeElementContent({ element }: { element: ElementDefinition }) {
 function ImageElementContent({ element }: { element: ElementDefinition }) {
   if (element.type !== 'image') return null;
   const imageElement = element as any;
-
+  
   return (
     <img
       src={imageElement.src || imageElement.url || ''}
@@ -474,6 +482,8 @@ function ImageElementContent({ element }: { element: ElementDefinition }) {
       className="w-full h-full"
       style={{
         objectFit: imageElement.objectFit || 'cover',
+        border: 'none',
+        outline: 'none',
       }}
       onError={(e) => {
         // Show placeholder on error
@@ -644,42 +654,51 @@ function SelectionHandles({ element }: { element: ElementDefinition }) {
     return null;
   }
 
-  const handleBaseClasses = "absolute w-2 h-2 bg-lume-primary border border-white rounded-sm";
+  // Use inline styles instead of Tailwind classes to ensure colors work
+  const handleStyle: React.CSSProperties = {
+    position: 'absolute',
+    width: '8px',
+    height: '8px',
+    backgroundColor: 'var(--lume-primary, #16C2C7)',
+    border: '1px solid #ffffff',
+    borderRadius: '2px',
+    cursor: 'inherit',
+  };
 
   return (
     <>
       {/* Corner handles */}
       <div
-        className={`${handleBaseClasses} -top-1 -left-1 cursor-nwse-resize`}
+        style={{ ...handleStyle, top: '-4px', left: '-4px', cursor: 'nwse-resize' }}
         onMouseDown={(e) => handleResizeStart(e, 'nw')}
       />
       <div
-        className={`${handleBaseClasses} -top-1 -right-1 cursor-nesw-resize`}
+        style={{ ...handleStyle, top: '-4px', right: '-4px', cursor: 'nesw-resize' }}
         onMouseDown={(e) => handleResizeStart(e, 'ne')}
       />
       <div
-        className={`${handleBaseClasses} -bottom-1 -left-1 cursor-nesw-resize`}
+        style={{ ...handleStyle, bottom: '-4px', left: '-4px', cursor: 'nesw-resize' }}
         onMouseDown={(e) => handleResizeStart(e, 'sw')}
       />
       <div
-        className={`${handleBaseClasses} -bottom-1 -right-1 cursor-nwse-resize`}
+        style={{ ...handleStyle, bottom: '-4px', right: '-4px', cursor: 'nwse-resize' }}
         onMouseDown={(e) => handleResizeStart(e, 'se')}
       />
       {/* Edge handles */}
       <div
-        className={`${handleBaseClasses} -top-1 left-1/2 -translate-x-1/2 cursor-ns-resize`}
+        style={{ ...handleStyle, top: '-4px', left: '50%', transform: 'translateX(-50%)', cursor: 'ns-resize' }}
         onMouseDown={(e) => handleResizeStart(e, 'n')}
       />
       <div
-        className={`${handleBaseClasses} -bottom-1 left-1/2 -translate-x-1/2 cursor-ns-resize`}
+        style={{ ...handleStyle, bottom: '-4px', left: '50%', transform: 'translateX(-50%)', cursor: 'ns-resize' }}
         onMouseDown={(e) => handleResizeStart(e, 's')}
       />
       <div
-        className={`${handleBaseClasses} -left-1 top-1/2 -translate-y-1/2 cursor-ew-resize`}
+        style={{ ...handleStyle, left: '-4px', top: '50%', transform: 'translateY(-50%)', cursor: 'ew-resize' }}
         onMouseDown={(e) => handleResizeStart(e, 'w')}
       />
       <div
-        className={`${handleBaseClasses} -right-1 top-1/2 -translate-y-1/2 cursor-ew-resize`}
+        style={{ ...handleStyle, right: '-4px', top: '50%', transform: 'translateY(-50%)', cursor: 'ew-resize' }}
         onMouseDown={(e) => handleResizeStart(e, 'e')}
       />
     </>

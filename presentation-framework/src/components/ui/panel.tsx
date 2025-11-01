@@ -3,13 +3,21 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 const Panel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
+  ({ className, style, ...props }, ref) => (
     <div
       ref={ref}
       className={cn(
-        "flex flex-col overflow-hidden rounded-2xl border border-border/25 bg-card/98 text-card-foreground shadow-[0_14px_36px_rgba(11,16,34,0.08)] backdrop-blur-sm supports-[backdrop-filter]:bg-card/88",
+        "flex flex-col overflow-hidden rounded-2xl border bg-card/98 text-card-foreground shadow-[0_14px_36px_rgba(11,16,34,0.08)] backdrop-blur-sm supports-[backdrop-filter]:bg-card/88",
         className
       )}
+      style={{
+        borderColor: 'rgba(148, 163, 184, 0.25)',
+        borderTopColor: 'rgba(148, 163, 184, 0.25)',
+        borderBottomColor: 'rgba(148, 163, 184, 0.25)',
+        borderLeftColor: 'rgba(148, 163, 184, 0.25)',
+        borderRightColor: 'rgba(148, 163, 184, 0.25)',
+        ...(style || {}),
+      }}
       {...props}
     />
   )
@@ -17,13 +25,20 @@ const Panel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEleme
 Panel.displayName = "Panel"
 
 const PanelHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
+  ({ className, style, ...props }, ref) => (
     <div
       ref={ref}
       className={cn(
-        "flex items-center justify-between border-b border-border/25 px-5 py-4",
+        "flex items-center justify-between border-b px-5 py-4",
         className
       )}
+      style={{
+        borderBottomColor: 'rgba(148, 163, 184, 0.25)',
+        borderTopColor: 'transparent',
+        borderLeftColor: 'transparent',
+        borderRightColor: 'transparent',
+        ...(style || {}),
+      }}
       {...props}
     />
   )
