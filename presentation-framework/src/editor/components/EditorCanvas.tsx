@@ -187,7 +187,7 @@ export function EditorCanvas({ deckId: _deckId }: EditorCanvasProps) {
               if (!el.bounds) return false;
               // Skip background-like images (they handle selection themselves)
               const fillsCanvas = el.bounds.x === 0 && el.bounds.y === 0 && 
-                el.bounds.width >= 1279 && el.bounds.height >= 719;
+                el.bounds.width >= finalWidth - 1 && el.bounds.height >= finalHeight - 1;
               const isBackgroundLike = fillsCanvas && el.type === 'image';
               if (isBackgroundLike) return false;
               
@@ -303,10 +303,13 @@ export function EditorCanvas({ deckId: _deckId }: EditorCanvasProps) {
     };
   }, [zoom, finalWidth, finalHeight]);
 
-  // Update SnapService with current canvas dimensions
+  // Update SnapService and TransformService with current canvas dimensions
   useEffect(() => {
     const snapService = getSnapService();
     snapService.setCanvasDimensions(finalWidth, finalHeight);
+    
+    const transformService = getTransformService();
+    transformService.setCanvasDimensions(finalWidth, finalHeight);
   }, [finalWidth, finalHeight]);
 
   return (

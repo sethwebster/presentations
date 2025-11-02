@@ -25,6 +25,7 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
   const selectedElementIds = state.selectedElementIds;
   const zoom = state.zoom;
   const pan = state.pan;
+  const deck = state.deck;
   const isSelected = selectedElementIds.has(element.id);
 
   const bounds = element.bounds || { x: 0, y: 0, width: 100, height: 50 };
@@ -36,10 +37,18 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
   const [draggedSelectedIds, setDraggedSelectedIds] = useState<Set<string>>(new Set());
   const [isEditingText, setIsEditingText] = useState(false);
 
+  // Get canvas dimensions for background detection
+  const slideSize = deck?.settings?.slideSize;
+  const orientation = deck?.settings?.orientation;
+  const canvasWidth = slideSize?.width || 1280;
+  const canvasHeight = slideSize?.height || 720;
+  const finalWidth = orientation === 'portrait' ? canvasHeight : canvasWidth;
+  const finalHeight = orientation === 'portrait' ? canvasWidth : canvasHeight;
+
   const handleClick = (e: React.MouseEvent) => {
     // Handle background-like elements (images that fill canvas) - select slide and let event bubble
     const fillsCanvas = bounds.x === 0 && bounds.y === 0 && 
-      bounds.width >= 1279 && bounds.height >= 719;
+      bounds.width >= finalWidth - 1 && bounds.height >= finalHeight - 1; // Allow for small rounding differences
     const isBackgroundLike = fillsCanvas && element.type === 'image';
     
     if (isBackgroundLike) {
@@ -125,7 +134,7 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
     // Prevent dragging of background-like elements (images that fill the canvas)
     // Background images should never be draggable - they're CSS properties, not elements
     const fillsCanvas = bounds.x === 0 && bounds.y === 0 && 
-      bounds.width >= 1279 && bounds.height >= 719;
+      bounds.width >= finalWidth - 1 && bounds.height >= finalHeight - 1;
     const isBackgroundLike = fillsCanvas && element.type === 'image';
     
     if (isBackgroundLike) {
@@ -326,7 +335,7 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
   // Check if element fills the entire canvas (expanded to fill)
   // This must be calculated before outerStyle uses it
   const fillsCanvas = bounds.x === 0 && bounds.y === 0 && 
-    bounds.width >= 1279 && bounds.height >= 719; // Allow for small rounding differences
+    bounds.width >= finalWidth - 1 && bounds.height >= finalHeight - 1; // Allow for small rounding differences
   
   // If an element fills the canvas and is an image, it's likely a background
   // Background images should never be draggable - they're CSS properties, not elements

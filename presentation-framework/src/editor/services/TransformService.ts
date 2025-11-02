@@ -15,10 +15,21 @@ export interface ScreenPoint {
   y: number;
 }
 
-const CANVAS_WIDTH = 1280;
-const CANVAS_HEIGHT = 720;
+const DEFAULT_CANVAS_WIDTH = 1280;
+const DEFAULT_CANVAS_HEIGHT = 720;
 
 class TransformService {
+  private canvasWidth: number = DEFAULT_CANVAS_WIDTH;
+  private canvasHeight: number = DEFAULT_CANVAS_HEIGHT;
+  
+  /**
+   * Set canvas dimensions dynamically
+   */
+  setCanvasDimensions(width: number, height: number): void {
+    this.canvasWidth = width;
+    this.canvasHeight = height;
+  }
+  
   /**
    * Convert screen coordinates to canvas coordinates.
    * 
@@ -52,7 +63,7 @@ class TransformService {
     
     // Calculate effective scale from actual rendered size vs canvas dimensions
     // The rect already accounts for all transforms (fitScale + zoom + pan)
-    const effectiveScale = rect.width / CANVAS_WIDTH;
+    const effectiveScale = rect.width / this.canvasWidth;
     
     // Canvas top-left in screen space
     const canvasTopLeftScreenX = rect.left;
@@ -89,7 +100,7 @@ class TransformService {
     }
 
     const rect = canvasContainer.getBoundingClientRect();
-    const effectiveScale = rect.width / CANVAS_WIDTH;
+    const effectiveScale = rect.width / this.canvasWidth;
     
     // Convert canvas coordinates to screen coordinates
     const screenX = canvasContainer.getBoundingClientRect().left + (canvasX * effectiveScale);
@@ -112,7 +123,7 @@ class TransformService {
     }
 
     const rect = canvasContainer.getBoundingClientRect();
-    return rect.width / CANVAS_WIDTH;
+    return rect.width / this.canvasWidth;
   }
 
   /**
@@ -129,8 +140,8 @@ class TransformService {
     zoom: number
   ): number {
     // Calculate scale needed to fit the canvas (at current zoom) within the container
-    const scaleX = containerWidth / (CANVAS_WIDTH * zoom);
-    const scaleY = containerHeight / (CANVAS_HEIGHT * zoom);
+    const scaleX = containerWidth / (this.canvasWidth * zoom);
+    const scaleY = containerHeight / (this.canvasHeight * zoom);
     // Don't scale up beyond 1
     return Math.min(scaleX, scaleY, 1);
   }
@@ -139,7 +150,7 @@ class TransformService {
    * Get canvas dimensions.
    */
   getCanvasDimensions(): { width: number; height: number } {
-    return { width: CANVAS_WIDTH, height: CANVAS_HEIGHT };
+    return { width: this.canvasWidth, height: this.canvasHeight };
   }
 }
 

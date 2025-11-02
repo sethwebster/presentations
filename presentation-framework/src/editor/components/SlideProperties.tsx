@@ -35,6 +35,12 @@ export function SlideProperties() {
   const deckId = state.deckId ?? deck?.meta?.id ?? null;
   const slide = deck?.slides.find(s => s.id === selectedSlideId);
   
+  // Calculate preview scale factor for image drag-to-reposition
+  // Approximate preview width is ~400px, so we need to scale mouse deltas from preview to canvas space
+  const slideWidth = deck?.settings?.slideSize?.width ?? 1280;
+  const previewWidth = 400; // Approximate preview width
+  const previewScale = previewWidth / slideWidth;
+  
   // Helper function defined before hooks (used in useEffect)
   // Gradients are handled via the Color tab, so we map gradient -> color
   const getBackgroundType = (slideToCheck: typeof slide): 'color' | 'image' => {
@@ -466,8 +472,10 @@ export function SlideProperties() {
       const deltaX = event.clientX - dragStartRef.current.x;
       const deltaY = event.clientY - dragStartRef.current.y;
 
-      const nextOffsetX = Math.round(dragStartRef.current.offsetX + deltaX);
-      const nextOffsetY = Math.round(dragStartRef.current.offsetY + deltaY);
+      // Convert preview pixel delta to canvas pixel delta using the scale factor
+      const scale = previewScale;
+      const nextOffsetX = Math.round(dragStartRef.current.offsetX + deltaX / scale);
+      const nextOffsetY = Math.round(dragStartRef.current.offsetY + deltaY / scale);
       updateImageBackground({ offsetX: nextOffsetX, offsetY: nextOffsetY });
     };
 
@@ -482,7 +490,7 @@ export function SlideProperties() {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [updateImageBackground]);
+  }, [updateImageBackground, previewScale]);
 
   const handleScaleChange = useCallback((value: number) => {
     const clamped = Math.max(10, Math.min(400, value));
