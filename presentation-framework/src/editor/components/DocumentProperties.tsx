@@ -22,6 +22,20 @@ export function DocumentProperties() {
     return <div className="text-sm italic text-muted-foreground">No document loaded</div>;
   }
 
+  // Helper to generate a slug from title
+  const generateSlugFromTitle = (title: string): string => {
+    return title
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, '') // Remove special characters
+      .replace(/\s+/g, '-') // Replace spaces with hyphens
+      .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+      .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+  };
+
+  // Get the current slug (use existing slug or generate from title)
+  const currentSlug = meta.slug || (meta.title ? generateSlugFromTitle(meta.title) : '');
+
   return (
     <div className="flex flex-col gap-6 text-foreground">
       <div className="space-y-2">
@@ -32,6 +46,26 @@ export function DocumentProperties() {
           placeholder="Untitled presentation"
           className="h-9"
         />
+      </div>
+
+      {/* Deck Slug */}
+      <div className="space-y-2">
+        <Label className={SECTION_HEADING}>Slug</Label>
+        <Input
+          value={currentSlug}
+          onChange={(event) => {
+            const newSlug = event.target.value.trim();
+            if (newSlug && newSlug !== meta.slug) {
+              // Check if slug is unique
+              editor.updateDeckSlug(newSlug);
+            }
+          }}
+          placeholder="Auto-generated from title"
+          className="h-9"
+        />
+        <p className="text-xs text-muted-foreground">
+          {meta.title ? `Generated from title` : 'URL-friendly identifier for this presentation'}
+        </p>
       </div>
 
       <div className="space-y-2">

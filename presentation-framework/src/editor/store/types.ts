@@ -52,6 +52,8 @@ export interface EditorActions {
   setDeck: (deck: DeckDefinition) => void;
   updateDeckSettings: (settings: Partial<import('@/rsc/types').DeckSettings>) => void;
   updateDeckMeta: (meta: Partial<import('@/rsc/types').DeckMeta>) => void;
+  updateDeckId: (newDeckId: string) => void;
+  updateDeckSlug: (newSlug: string) => Promise<void>;
   
   // Slide operations
   setCurrentSlide: (index: number) => void;
@@ -59,6 +61,7 @@ export interface EditorActions {
   deleteSlide: (index: number) => void;
   duplicateSlide: (index: number) => void;
   reorderSlides: (fromIndex: number, toIndex: number) => void;
+  updateSlideId: (oldSlideId: string, newSlideId: string) => void;
   
   // Selection operations
   selectElement: (elementId: string, addToSelection?: boolean) => void;

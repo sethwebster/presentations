@@ -151,6 +151,68 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     });
   },
 
+  updateDeckId: (newDeckId: string) => {
+    const { deck } = get();
+    if (!deck) return;
+
+    const oldDeckId = deck.meta.id;
+
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      meta: {
+        ...deck.meta,
+        id: newDeckId,
+      },
+    };
+
+    set({ deck: updatedDeck, deckId: newDeckId });
+    get().executeCommand({
+      type: 'updateDeckId',
+      params: { oldDeckId, newDeckId },
+      timestamp: Date.now(),
+    });
+  },
+
+  updateDeckSlug: async (newSlug: string) => {
+    const { deck, deckId } = get();
+    if (!deck || !deckId) return;
+
+    // Check if slug is unique
+    try {
+      const response = await fetch(`/api/editor/check-slug?slug=${encodeURIComponent(newSlug)}&deckId=${encodeURIComponent(deckId)}`);
+      if (!response.ok) {
+        throw new Error('Failed to check slug uniqueness');
+      }
+      const data = await response.json() as { available: boolean };
+      if (!data.available) {
+        console.warn(`Slug "${newSlug}" is already taken`);
+        alert(`The slug "${newSlug}" is already in use. Please choose a different slug.`);
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking slug uniqueness:', error);
+      alert('Failed to check slug uniqueness. Please try again.');
+      return;
+    }
+
+    const oldSlug = deck.meta.slug;
+
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      meta: {
+        ...deck.meta,
+        slug: newSlug,
+      },
+    };
+
+    set({ deck: updatedDeck });
+    get().executeCommand({
+      type: 'updateDeckSlug',
+      params: { oldSlug, newSlug },
+      timestamp: Date.now(),
+    });
+  },
+
   // Slide operations
   setCurrentSlide: (index: number) => {
     const { deck } = get();
@@ -258,6 +320,38 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     get().executeCommand({
       type: 'reorderSlides',
       params: { fromIndex, toIndex },
+      timestamp: Date.now(),
+    });
+  },
+
+  updateSlideId: (oldSlideId: string, newSlideId: string) => {
+    const { deck, selectedSlideId } = get();
+    if (!deck) return;
+
+    // Check if new ID already exists
+    const idExists = deck.slides.some(s => s.id === newSlideId);
+    if (idExists) {
+      console.warn(`Slide ID ${newSlideId} already exists. Cannot rename.`);
+      return;
+    }
+
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      slides: deck.slides.map((slide) => {
+        if (slide.id === oldSlideId) {
+          return { ...slide, id: newSlideId };
+        }
+        return slide;
+      }),
+    };
+
+    // Update selected slide ID if it's the one being renamed
+    const currentSelectedSlideId = selectedSlideId === oldSlideId ? newSlideId : selectedSlideId;
+
+    set({ deck: updatedDeck, selectedSlideId: currentSelectedSlideId });
+    get().executeCommand({
+      type: 'updateSlideId',
+      params: { oldSlideId, newSlideId },
       timestamp: Date.now(),
     });
   },

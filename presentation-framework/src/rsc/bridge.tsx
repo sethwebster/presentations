@@ -141,6 +141,28 @@ function renderSlide(slide: SlideDefinition, assetsBase?: string, timelineTarget
       backgroundValue = slide.background.value as string;
     } else if (slide.background.type === 'gradient') {
       backgroundValue = gradientToCSS(slide.background.value);
+    } else if (slide.background.type === 'image') {
+      const value = slide.background.value;
+      if (typeof value === 'string') {
+        backgroundValue = `url(${value}) center / cover no-repeat`;
+      } else if (value && typeof value === 'object') {
+        const src = (value as any).src || (value as any).url;
+        if (typeof src === 'string' && src.length > 0) {
+          const offsetX = (value as any).offsetX ?? 0;
+          const offsetY = (value as any).offsetY ?? 0;
+          const scale = (value as any).scale ?? 100;
+          const position = offsetX !== 0 || offsetY !== 0 
+            ? `${offsetX}px ${offsetY}px`
+            : ((value as any).position || 'center');
+          const fit = (value as any).fit || 'cover';
+          const repeat = (value as any).repeat || 'no-repeat';
+          const base = (value as any).baseColor;
+          // Use scale% auto for percentage, or fit (cover/contain) if scale is 100
+          const size = scale !== 100 ? `${scale}% auto` : fit;
+          const imagePart = `url(${src}) ${position} / ${size} ${repeat}`;
+          backgroundValue = base ? `${base} ${imagePart}` : imagePart;
+        }
+      }
     }
   } else if (slide.style?.background) {
     const bg = slide.style.background;

@@ -18,26 +18,17 @@ interface PresentationState {
 }
 
 export function PresentationView() {
-  const params = useParams<{ presentationName: string }>();
+  const params = useParams<{ presentationName?: string; username?: string; slug?: string }>();
   const searchParams = useSearchParams();
+  
+  // Support both old format /present/[presentationName] and new format /present/[username]/[slug]
   const presentationName = params?.presentationName;
+  const username = params?.username;
+  const slug = params?.slug;
   
   // Check for deckId in URL query params (for editor decks)
   const deckId = searchParams?.get('deckId');
   const autoAuth = searchParams?.get('autoAuth') === 'true';
-
-  // Auto-authenticate if coming from editor - MUST happen synchronously before React renders
-  // The token should already be set in localStorage by the Toolbar before opening this window
-  // Force AuthService to immediately check localStorage and update its state
-  if (autoAuth && typeof window !== 'undefined') {
-    // Call synchronously before any React hooks run
-    const token = localStorage.getItem('lume-presenter-token');
-    console.log('PresentationView: autoAuth=true, token exists:', !!token);
-    authService.refreshAuthState();
-    // Double-check after refresh
-    const isAuth = authService.isAuthenticated();
-    console.log('PresentationView: After refreshAuthState, isAuthenticated:', isAuth);
-  }
 
   const [presentation, setPresentation] = useState<PresentationState | null>(null);
   const [presentationModule, setPresentationModule] = useState<PresentationModule | null>(null);
@@ -48,20 +39,28 @@ export function PresentationView() {
   const [exporting, setExporting] = useState<boolean>(false);
   const [exportFeedback, setExportFeedback] = useState<string | null>(null);
 
+  // Auto-authenticate if coming from editor - runs once on mount
   useEffect(() => {
+    if (autoAuth && typeof window !== 'undefined') {
+      const token = localStorage.getItem('lume-presenter-token');
+      console.log('PresentationView: autoAuth=true, token exists:', !!token);
+      authService.refreshAuthState();
+      const isAuth = authService.isAuthenticated();
+      console.log('PresentationView: After refreshAuthState, isAuthenticated:', isAuth);
+    }
+  }, [autoAuth]);
 
-    // If deckId is provided, use it as the presentation name; otherwise use presentationName from params
-    const effectivePresentationName = deckId || presentationName;
+  useEffect(() => {
+    // Determine which identifier to use
+    const identifier = slug || presentationName;
     
-    if (!effectivePresentationName) {
+    if (!identifier && !deckId) {
       setError('Presentation not found');
       setLoading(false);
       return;
     }
 
     let cancelled = false;
-    const assetsDir = deckId ? `/presentations/${deckId}-assets` : `/presentations/${presentationName}-assets`;
-    setAssetsPath(assetsDir);
 
     const loadPresentationData = async () => {
       let moduleLoaded = false;
@@ -69,10 +68,33 @@ export function PresentationView() {
       let lastModuleError: unknown = null;
       let lastRscError: unknown = null;
 
-      // Only try to load module if not using deckId (editor decks don't have modules)
-      if (!deckId) {
+      // First, try to resolve slug to deckId if no deckId is provided
+      let resolvedDeckId = deckId;
+      if (!deckId && identifier) {
         try {
-          const presentationModule = await loadPresentation(presentationName);
+          // Try username/slug format first if username is available
+          let response: Response;
+          if (username) {
+            response = await fetch(`/api/editor/user/${username}/slug/${slug || identifier}`);
+          } else {
+            response = await fetch(`/api/editor/slug/${identifier}`);
+          }
+          if (response.ok) {
+            const data = await response.json() as { deckId: string };
+            resolvedDeckId = data.deckId;
+          }
+        } catch (error) {
+          console.warn('Failed to resolve slug to deckId:', error);
+        }
+      }
+
+      const assetsDir = resolvedDeckId ? `/presentations/${resolvedDeckId}-assets` : `/presentations/${identifier}-assets`;
+      setAssetsPath(assetsDir);
+
+      // Only try to load module if not using resolved deckId (editor decks don't have modules)
+      if (!resolvedDeckId && identifier) {
+        try {
+          const presentationModule = await loadPresentation(identifier);
         if (!cancelled) {
           setPresentationModule(presentationModule as PresentationModule);
           const { getSlides, getBrandLogo, presentationConfig, customStyles } = presentationModule as PresentationModule;
@@ -98,8 +120,8 @@ export function PresentationView() {
         }
       }
 
-      // Try loading from editor API if deckId is provided, otherwise try RSC API
-      const apiUrl = deckId ? `/api/editor/${deckId}` : `/api/rsc/${presentationName}`;
+      // Try loading from editor API if resolvedDeckId is available, otherwise try RSC API
+      const apiUrl = resolvedDeckId ? `/api/editor/${resolvedDeckId}` : `/api/rsc/${identifier}`;
       try {
         const deck = await fetchDeckDefinition(apiUrl);
         if (!cancelled) {
@@ -111,7 +133,7 @@ export function PresentationView() {
         }
       } catch (rscError) {
         lastRscError = rscError;
-        console.warn(`${deckId ? 'Editor' : 'RSC'} deck load failed:`, rscError);
+        console.warn(`${resolvedDeckId ? 'Editor' : 'RSC'} deck load failed:`, rscError);
       }
 
       if (!cancelled && !moduleLoaded && !deckLoaded) {
@@ -134,7 +156,7 @@ export function PresentationView() {
     return () => {
       cancelled = true;
     };
-  }, [presentationName, deckId, autoAuth]);
+  }, [presentationName, slug, username, deckId, autoAuth]);
 
   const injectedStyles = useMemo(() => {
     const blocks: string[] = [];

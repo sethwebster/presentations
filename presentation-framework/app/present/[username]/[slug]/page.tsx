@@ -1,5 +1,6 @@
 import { PresentationView } from '@/views/PresentationView';
 
-export default function PresentationRoute() {
+export default function PresentationSlugRoute() {
   return <PresentationView />;
 }
+

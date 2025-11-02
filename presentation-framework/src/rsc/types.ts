@@ -11,6 +11,7 @@ export interface DeckDefinition {
 
 export interface DeckMeta {
   id: string;
+  slug?: string; // URL-friendly slug for presentation links (separate from internal ID)
   title: string;
   description?: string;
   authors?: Array<{ name: string; email?: string; role?: string }>;

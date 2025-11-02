@@ -59,6 +59,7 @@ export async function GET() {
             
             return {
               id: deckId,
+              slug: deckData.meta?.slug,
               title: deckData.meta?.title || 'Untitled Presentation',
               createdAt: deckData.meta?.createdAt || new Date().toISOString(),
               updatedAt: deckData.meta?.updatedAt || new Date().toISOString(),

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import { ToolbarButton } from '@/components/ui/toolbar-button';
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { AlignmentTools } from './AlignmentTools';
@@ -14,6 +15,7 @@ interface ToolbarProps {
 }
 
 export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
+  const { data: session } = useSession();
   const state = useEditor();
   const editor = useEditorInstance();
 
@@ -25,6 +27,15 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
     isSyncing: isLibrarySyncing,
     lastSyncError: imageLibraryError,
   } = useImageLibrary();
+
+  // Helper to derive username from session
+  const getUsername = useCallback(() => {
+    if (!session?.user) return null;
+    // Use email prefix before @ or name
+    const emailPrefix = session.user.email?.split('@')[0]?.toLowerCase();
+    const userName = session.user.name?.toLowerCase().replace(/\s+/g, '-');
+    return userName || emailPrefix || null;
+  }, [session]);
 
   const showGrid = state.showGrid;
   const deck = state.deck;
@@ -1087,9 +1098,15 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
             }
             // Small delay to ensure localStorage is synced across windows
             await new Promise(resolve => setTimeout(resolve, 100));
-            // Navigate to presentation mode with deckId and autoAuth parameters
+            // Navigate to presentation mode using slug if available
+            const presentationSlug = deck?.meta?.slug || deckId;
+            const username = getUsername();
+            // Use username/slug format if we have both, otherwise fall back to old format
+            const url = username && presentationSlug 
+              ? `/present/${username}/${presentationSlug}?autoAuth=true`
+              : `/present/${presentationSlug}?autoAuth=true`;
             // The token is set in localStorage, which is shared across windows on the same origin
-            window.open(`/present/${deckId}?deckId=${deckId}&autoAuth=true`, '_blank');
+            window.open(url, '_blank');
           }}
         >
           <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">

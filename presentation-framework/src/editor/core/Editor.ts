@@ -534,6 +534,80 @@ export class Editor {
     });
   }
 
+  updateDeckId(newDeckId: string): void {
+    const { deck } = this.state;
+    if (!deck) return;
+
+    // Store previous ID for undo
+    const oldDeckId = deck.meta.id;
+
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      meta: {
+        ...deck.meta,
+        id: newDeckId,
+      },
+    };
+
+    // Update deckId in state as well
+    this.setState({ deck: updatedDeck, deckId: newDeckId });
+    this.executeCommand({
+      type: 'updateDeckId',
+      params: { 
+        oldDeckId,
+        newDeckId,
+      },
+      timestamp: Date.now(),
+    });
+
+    // Note: This will require saving and potentially redirecting to the new URL
+    // The caller should handle the navigation
+  }
+
+  async updateDeckSlug(newSlug: string): Promise<void> {
+    const { deck, deckId } = this.state;
+    if (!deck || !deckId) return;
+
+    // Check if slug is unique
+    try {
+      const response = await fetch(`/api/editor/check-slug?slug=${encodeURIComponent(newSlug)}&deckId=${encodeURIComponent(deckId)}`);
+      if (!response.ok) {
+        throw new Error('Failed to check slug uniqueness');
+      }
+      const data = await response.json() as { available: boolean };
+      if (!data.available) {
+        console.warn(`Slug "${newSlug}" is already taken`);
+        alert(`The slug "${newSlug}" is already in use. Please choose a different slug.`);
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking slug uniqueness:', error);
+      alert('Failed to check slug uniqueness. Please try again.');
+      return;
+    }
+
+    // Store previous slug for undo
+    const oldSlug = deck.meta.slug;
+
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      meta: {
+        ...deck.meta,
+        slug: newSlug,
+      },
+    };
+
+    this.setState({ deck: updatedDeck });
+    this.executeCommand({
+      type: 'updateDeckSlug',
+      params: { 
+        oldSlug,
+        newSlug,
+      },
+      timestamp: Date.now(),
+    });
+  }
+
   updateLayerName(slideIndex: number, layerId: string, name: string): void {
     const { deck } = this.state;
     if (!deck) return;
@@ -2435,6 +2509,35 @@ export class Editor {
         }
         break;
       }
+      case 'updateDeckId': {
+        // Undo = restore previous deck ID
+        const oldDeckId = command.params.newDeckId as string;
+        const newDeckId = command.params.oldDeckId as string;
+        if (oldDeckId && newDeckId) {
+          updatedDeck = {
+            ...deck,
+            meta: {
+              ...deck.meta,
+              id: newDeckId,
+            },
+          };
+          this.setState({ deckId: newDeckId });
+        }
+        break;
+      }
+      case 'updateDeckSlug': {
+        // Undo = restore previous slug
+        const oldSlug = command.params.newSlug as string;
+        const newSlug = command.params.oldSlug as string | undefined;
+        updatedDeck = {
+          ...deck,
+          meta: {
+            ...deck.meta,
+            slug: newSlug,
+          },
+        };
+        break;
+      }
       case 'updateSlide': {
         // Undo = restore previous slide state
         const slideId = command.params.slideId as string;
@@ -2768,6 +2871,33 @@ export class Editor {
         }
         break;
       }
+      case 'updateDeckId': {
+        const oldDeckId = command.params.oldDeckId as string;
+        const newDeckId = command.params.newDeckId as string;
+        if (oldDeckId && newDeckId) {
+          updatedDeck = {
+            ...deck,
+            meta: {
+              ...deck.meta,
+              id: newDeckId,
+            },
+          };
+          this.setState({ deckId: newDeckId });
+        }
+        break;
+      }
+      case 'updateDeckSlug': {
+        const oldSlug = command.params.oldSlug as string | undefined;
+        const newSlug = command.params.newSlug as string;
+        updatedDeck = {
+          ...deck,
+          meta: {
+            ...deck.meta,
+            slug: newSlug,
+          },
+        };
+        break;
+      }
       case 'updateSlide': {
         const slideId = command.params.slideId as string;
         const updates = command.params.updates as Partial<SlideDefinition>;
@@ -2941,6 +3071,47 @@ export class Editor {
       params: { 
         slideId, 
         updates,
+        previousSlide,
+      },
+      timestamp: Date.now(),
+    });
+  }
+
+  updateSlideId(oldSlideId: string, newSlideId: string): void {
+    const { deck } = this.state;
+    if (!deck) return;
+
+    // Check if new ID already exists
+    const idExists = deck.slides.some(s => s.id === newSlideId);
+    if (idExists) {
+      console.warn(`Slide ID ${newSlideId} already exists. Cannot rename.`);
+      return;
+    }
+
+    // Find and store previous slide state for undo
+    const slide = deck.slides.find(s => s.id === oldSlideId);
+    const previousSlide = slide ? JSON.parse(JSON.stringify(slide)) : undefined;
+
+    const updatedDeck: DeckDefinition = {
+      ...deck,
+      slides: deck.slides.map((slide) => {
+        if (slide.id === oldSlideId) {
+          return { ...slide, id: newSlideId };
+        }
+        return slide;
+      }),
+    };
+
+    // Update selected slide ID if it's the one being renamed
+    const currentSelectedSlideId = this.state.selectedSlideId === oldSlideId ? newSlideId : this.state.selectedSlideId;
+
+    this.setState({ deck: updatedDeck, selectedSlideId: currentSelectedSlideId });
+
+    this.executeCommand({
+      type: 'updateSlideId',
+      params: { 
+        oldSlideId,
+        newSlideId,
         previousSlide,
       },
       timestamp: Date.now(),

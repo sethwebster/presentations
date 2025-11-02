@@ -17,6 +17,7 @@ export default function AccountPage() {
   const [loadedPresentations, setLoadedPresentations] = useState<Record<string, LoadedPresentation>>({});
   const [editorDecks, setEditorDecks] = useState<Array<{
     id: string;
+    slug?: string;
     title: string;
     createdAt: string;
     updatedAt: string;
@@ -158,7 +159,10 @@ export default function AccountPage() {
                       variant="outline"
                       onClick={(e) => {
                         e.stopPropagation();
-                        router.push(`/present/${presentation.id}?deckId=${presentation.id}&viewer=true`);
+                        // Use username/slug format
+                        const username = session?.user?.email?.split('@')[0]?.toLowerCase() || session?.user?.name?.toLowerCase().replace(/\s+/g, '-') || 'user';
+                        const slug = (presentation as any).slug || presentation.id;
+                        router.push(`/present/${username}/${slug}?viewer=true`);
                       }}
                       className="flex-1 border-white/20 text-[var(--lume-mist)] hover:bg-white/5"
                     >
