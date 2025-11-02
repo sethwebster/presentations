@@ -6,6 +6,7 @@ export async function fetchDeckDefinition(url: string): Promise<DeckDefinition> 
     headers: {
       Accept: 'text/x-component, application/json',
     },
+    credentials: 'include', // Include cookies for authentication
   });
 
   if (!response.ok) {
