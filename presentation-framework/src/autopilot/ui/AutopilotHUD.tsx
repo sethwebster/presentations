@@ -1,4 +1,5 @@
 import { CountdownState } from '../../types/services';
+import { Slider } from '@/components/ui/slider';
 import './AutopilotHUD.css';
 
 interface AutopilotHUDProps {
@@ -114,25 +115,19 @@ export function AutopilotHUD({
                 <label className="threshold-label" htmlFor="threshold-slider">
                   Threshold: {thresholdPercentage}%
                 </label>
-                <input
-                  id="threshold-slider"
-                  type="range"
-                  min="30"
-                  max="80"
-                  step="5"
-                  value={thresholdPercentage}
-                  onChange={(e) => {
-                    const newVal = parseInt(e.target.value) / 100;
-                    console.log('🎚️ Slider onChange - raw value:', e.target.value, '→', newVal, 'hasCallback:', !!onThresholdChange);
+                <Slider
+                  className="threshold-slider"
+                  value={[thresholdPercentage]}
+                  min={30}
+                  max={80}
+                  step={5}
+                  onValueChange={(value) => {
+                    const raw = value[0] ?? thresholdPercentage;
+                    const newVal = raw / 100;
                     if (onThresholdChange) {
-                      console.log('📞 Calling onThresholdChange with:', newVal);
                       onThresholdChange(newVal);
-                    } else {
-                      console.error('❌ onThresholdChange is not defined!');
                     }
                   }}
-                  className="threshold-slider"
-                  title={`Adjust threshold: ${thresholdPercentage}%`}
                 />
                 <div className="threshold-ticks">
                   <span>30%</span>

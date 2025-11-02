@@ -70,6 +70,10 @@ class DragResizeService {
   private pendingDragUpdates: Map<string, ElementBounds> | null = null;
   private pendingDragElement: { id: string; bounds: ElementBounds } | null = null;
   private pendingResizeUpdate: ElementBounds | null = null;
+  
+  // Store initial element states for undo at drag end
+  private dragInitialElements: Map<string, any> | null = null;
+  private resizeInitialElement: any | null = null;
 
   initialize(editor: Editor): void {
     this.editor = editor;
@@ -125,6 +129,23 @@ class DragResizeService {
       pan,
       snapElements, // Cache to avoid calling getState() on every mouse move
     };
+
+    // Store initial element states for undo at drag end
+    this.dragInitialElements = new Map();
+    // Reuse currentState and currentDeck from above
+    const initialSlide = currentDeck?.slides[currentState.currentSlideIndex];
+    if (initialSlide) {
+      const allElements = [
+        ...(initialSlide.elements || []),
+        ...(initialSlide.layers?.flatMap(l => l.elements) || []),
+      ];
+      selectedElementIds.forEach(elementId => {
+        const element = allElements.find(el => el.id === elementId);
+        if (element) {
+          this.dragInitialElements!.set(elementId, JSON.parse(JSON.stringify(element)));
+        }
+      });
+    }
 
     // Set dragging element in editor state
     const primaryBounds = initialBounds.get(primaryElementId);
@@ -248,7 +269,8 @@ class DragResizeService {
       });
       
       // Single batch update instead of multiple updateElement calls
-      this.editor.batchUpdateElements(updatesMap);
+      // Skip commands during drag - we'll create a single command when drag ends
+      this.editor.batchUpdateElements(updatesMap, true); // skipCommands = true
       this.pendingDragUpdates = null;
     }
 
@@ -270,14 +292,14 @@ class DragResizeService {
   endDrag(): void {
     if (!this.editor) return;
 
-    // Flush any pending drag update immediately on mouse up
+    // Flush any pending drag update immediately on mouse up (without creating commands)
     if (this.pendingDragUpdates && this.pendingDragUpdates.size > 0) {
-      // Use batch update for final position
+      // Use batch update for final position (skip commands - we'll create them below)
       const updatesMap = new Map<string, Partial<any>>();
       this.pendingDragUpdates.forEach((newBounds, id) => {
         updatesMap.set(id, { bounds: newBounds });
       });
-      this.editor.batchUpdateElements(updatesMap);
+      this.editor.batchUpdateElements(updatesMap, true); // skipCommands = true
       this.pendingDragUpdates = null;
     }
 
@@ -285,6 +307,53 @@ class DragResizeService {
     if (this.pendingDragElement) {
       this.editor.setDraggingElement(this.pendingDragElement.id, this.pendingDragElement.bounds);
       this.pendingDragElement = null;
+    }
+
+    // Create undo commands for all dragged elements (single command per element with initial state)
+    if (this.dragInitialElements && this.dragInitialElements.size > 0 && this.activeDrag) {
+      const currentState = this.editor.getState();
+      const currentDeck = currentState.deck;
+      const currentSlide = currentDeck?.slides[currentState.currentSlideIndex];
+      
+      if (currentSlide) {
+        const allElements = [
+          ...(currentSlide.elements || []),
+          ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+        ];
+        
+        // Create a command for each element that was dragged
+        this.activeDrag.selectedElementIds.forEach(elementId => {
+          const initialElement = this.dragInitialElements!.get(elementId);
+          const currentElement = allElements.find(el => el.id === elementId);
+          
+          // Only create command if element actually moved
+          if (initialElement && currentElement && initialElement.bounds && currentElement.bounds) {
+            const moved = 
+              initialElement.bounds.x !== currentElement.bounds.x ||
+              initialElement.bounds.y !== currentElement.bounds.y;
+            
+            if (moved) {
+              const boundsUpdate = {
+                bounds: currentElement.bounds,
+              };
+              
+              // Use the editor's executeCommand directly to create undo command
+              (this.editor as any).executeCommand({
+                type: 'updateElement',
+                target: elementId,
+                params: {
+                  updates: boundsUpdate,
+                  previousElement: initialElement,
+                },
+                timestamp: Date.now(),
+              });
+            }
+          }
+        });
+      }
+      
+      // Clear stored initial states
+      this.dragInitialElements = null;
     }
 
     // Clear dragging state
@@ -340,6 +409,22 @@ class DragResizeService {
       }
     }
 
+    // Capture initial element snapshot for undo/redo
+    let initialElementSnapshot: any = null;
+    const state = this.editor.getState();
+    const deck = state.deck;
+    const slide = deck?.slides[state.currentSlideIndex];
+    if (slide) {
+      const allElements = [
+        ...(slide.elements || []),
+        ...(slide.layers?.flatMap(l => l.elements) || []),
+      ];
+      const element = allElements.find(el => el.id === elementId);
+      if (element) {
+        initialElementSnapshot = JSON.parse(JSON.stringify(element));
+      }
+    }
+
     this.activeResize = {
       elementId,
       elementType,
@@ -355,6 +440,8 @@ class DragResizeService {
       isShiftPressed: false,
       initialObjectFit, // Store original objectFit for images
     };
+
+    this.resizeInitialElement = initialElementSnapshot;
 
     // Set draggingElementId to block autosave during resize
     this.editor.setDraggingElement(elementId, initialBounds);
@@ -731,7 +818,9 @@ class DragResizeService {
         }
       }
 
-      this.editor.updateElement(this.activeResize.elementId, updateData);
+      const updatesMap = new Map<string, Partial<any>>();
+      updatesMap.set(this.activeResize.elementId, updateData);
+      this.editor.batchUpdateElements(updatesMap, true);
       this.pendingResizeUpdate = null;
 
       // Update dragging state for alignment guides
@@ -761,13 +850,59 @@ class DragResizeService {
         updateData.objectFit = 'fill';
       }
 
-      this.editor.updateElement(this.activeResize.elementId, updateData);
+      const updatesMap = new Map<string, Partial<any>>();
+      updatesMap.set(this.activeResize.elementId, updateData);
+      this.editor.batchUpdateElements(updatesMap, true);
       this.pendingResizeUpdate = null;
+    }
+
+    // Capture final element state for undo/redo command
+    const currentState = this.editor.getState();
+    const currentDeck = currentState.deck;
+    const currentSlide = currentDeck?.slides[currentState.currentSlideIndex];
+    let finalElement: any = null;
+    if (currentSlide) {
+      const allElements = [
+        ...(currentSlide.elements || []),
+        ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+      ];
+      finalElement = allElements.find(el => el.id === this.activeResize.elementId);
+    }
+
+    if (this.resizeInitialElement && finalElement) {
+      const initialBounds = this.resizeInitialElement.bounds;
+      const finalBounds = finalElement.bounds;
+      const boundsChanged = JSON.stringify(initialBounds ?? null) !== JSON.stringify(finalBounds ?? null);
+
+      const initialFit = this.resizeInitialElement.objectFit;
+      const finalFit = finalElement.objectFit;
+      const fitChanged = initialFit !== finalFit;
+
+      if (boundsChanged || fitChanged) {
+        const updates: any = {};
+        if (finalBounds) {
+          updates.bounds = JSON.parse(JSON.stringify(finalBounds));
+        }
+        if (fitChanged) {
+          updates.objectFit = finalFit;
+        }
+
+        (this.editor as any).executeCommand({
+          type: 'updateElement',
+          target: this.activeResize.elementId,
+          params: {
+            updates,
+            previousElement: JSON.parse(JSON.stringify(this.resizeInitialElement)),
+          },
+          timestamp: Date.now(),
+        });
+      }
     }
 
     // Clear draggingElementId to allow autosave after resize completes
     this.editor.setDraggingElement(null, null);
     this.activeResize = null;
+    this.resizeInitialElement = null;
 
     // Cancel any pending animation frame
     if (this.rafId !== null) {

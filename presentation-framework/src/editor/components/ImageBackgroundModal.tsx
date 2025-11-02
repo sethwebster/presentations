@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Modal } from "@/components/ui/modal";
 import type { ImageLibraryItem } from "@/editor/types/imageLibrary";
 
 type ImageMode = "background" | "element";
@@ -48,12 +48,6 @@ export function ImageBackgroundModal({
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState<ImageMode>("background");
   const [activeTab, setActiveTab] = useState<"generate" | "upload" | "library">("generate");
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    return () => setMounted(false);
-  }, []);
 
   useEffect(() => {
     if (!open) {
@@ -62,16 +56,7 @@ export function ImageBackgroundModal({
       setActiveTab(initialTab);
       return;
     }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, onClose, initialTab]);
+  }, [open, initialTab]);
 
   useEffect(() => {
     if (open) {
@@ -95,39 +80,22 @@ export function ImageBackgroundModal({
     return [...libraryItems].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
   }, [libraryItems]);
 
-  if (!open || !mounted) {
-    return null;
-  }
-
   const isGenerating = status?.isGenerating ?? false;
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div
-        className="w-full max-w-xl rounded-2xl border border-black/10 bg-white/95 p-6 text-[var(--editor-text-strong)] shadow-[0_30px_90px_-30px_rgba(0,0,0,0.55)]"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <h2 className="text-lg font-semibold text-[var(--editor-text-strong)]">
-            Generate Image
-          </h2>
-          <button
-            onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--editor-text-muted)] transition hover:bg-white/5 hover:text-[var(--editor-text-strong)]"
-            aria-label="Close image generator"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
+  return (
+    <Modal open={open} onClose={onClose} size="xl" tone="brand">
+      <Modal.Header className="gap-3">
+        <Modal.Title className="text-[var(--editor-text-strong)] text-2xl font-semibold">
+          Generate Image
+        </Modal.Title>
+        <Modal.Description className="text-sm text-[var(--editor-text-muted)]">
+          Create rich backgrounds or on-slide imagery with AI or your saved library.
+        </Modal.Description>
+      </Modal.Header>
 
+      <Modal.Body className="space-y-6">
         {/* Tabs */}
-        <div className="mt-6 border-b border-[var(--editor-border)]">
+        <div className="border-b border-[var(--editor-border)]">
           <div className="flex gap-4">
             <button
               type="button"
@@ -172,22 +140,24 @@ export function ImageBackgroundModal({
 
         {/* Generate Tab */}
         {activeTab === "generate" && (
-          <>
-            <label className="mt-6 block text-sm font-medium text-[var(--editor-text-muted)]">
-              Prompt
-            </label>
-            <textarea
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              placeholder="Describe the image you want to generate..."
-              className={cn(
-                "mt-2 w-full rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-3 text-sm text-[var(--editor-text)]",
-                "focus:border-[var(--editor-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--editor-accent)]/40"
-              )}
-              rows={4}
-            />
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-[var(--editor-text-muted)]">
+                Prompt
+              </label>
+              <textarea
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value)}
+                placeholder="Describe the image you want to generate..."
+                className={cn(
+                  "mt-2 w-full rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-3 text-sm text-[var(--editor-text)]",
+                  "focus:border-[var(--editor-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--editor-accent)]/40"
+                )}
+                rows={4}
+              />
+            </div>
 
-            <div className="mt-4">
+            <div>
               <label className="block text-sm font-medium text-[var(--editor-text-muted)] mb-2">
                 Type
               </label>
@@ -202,18 +172,18 @@ export function ImageBackgroundModal({
             </div>
 
             {status?.error && (
-              <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+              <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
                 {status.error}
               </div>
             )}
 
             {status?.success && (
-              <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
                 {status.success}
               </div>
             )}
 
-            <div className="mt-6">
+            <div className="pt-2">
               <Button
                 type="button"
                 onClick={handleGenerateClick}
@@ -223,13 +193,13 @@ export function ImageBackgroundModal({
                 {isGenerating ? "Generating…" : "Generate"}
               </Button>
             </div>
-          </>
+          </div>
         )}
 
         {/* Upload Tab */}
         {activeTab === "upload" && (
-          <>
-            <div className="mt-6">
+          <div className="space-y-4">
+            <div>
               <label className="block text-sm font-medium text-[var(--editor-text-muted)] mb-2">
                 Type
               </label>
@@ -242,7 +212,7 @@ export function ImageBackgroundModal({
                 onValueChange={(value) => setMode(value as ImageMode)}
               />
             </div>
-            <div className="mt-6">
+            <div>
               <Button
                 type="button"
                 onClick={() => onUpload(mode)}
@@ -255,12 +225,12 @@ export function ImageBackgroundModal({
                 Select an image file from your computer to use as a {mode === "background" ? "background" : "image element"}.
               </p>
             </div>
-          </>
+          </div>
         )}
 
         {/* Library Tab */}
         {activeTab === "library" && isLibraryTabEnabled && (
-          <div className="mt-6">
+          <div className="space-y-4">
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <div className="flex flex-col gap-1">
@@ -380,9 +350,8 @@ export function ImageBackgroundModal({
             </div>
           </div>
         )}
-      </div>
-    </div>,
-    document.body
+      </Modal.Body>
+    </Modal>
   );
 }
 

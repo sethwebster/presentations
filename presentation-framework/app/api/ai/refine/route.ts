@@ -185,7 +185,6 @@ export async function POST(request: Request) {
           image: imageFile,
           size,
           n: 1,
-          response_format: "b64_json",
         });
 
         if (!result.data || result.data.length === 0) {

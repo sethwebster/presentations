@@ -1,4 +1,5 @@
 import type { DeckDefinition, SlideDefinition, ElementDefinition, DeckSettings, DeckMeta, GroupElementDefinition } from '@/rsc/types';
+import { CommandHistory } from './CommandHistory';
 
 export interface EditorCommand {
   type: string;
@@ -37,8 +38,6 @@ export interface EditorState {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type EditorStateListener = (state: EditorState) => void;
 
-const MAX_UNDO_STACK_SIZE = 50;
-
 export class Editor {
   private state: EditorState;
   private listeners: Set<EditorStateListener> = new Set();
@@ -46,8 +45,13 @@ export class Editor {
   private isSaving: boolean = false;
   private saveAbortController: AbortController | null = null;
   private savedDeckSnapshot: DeckDefinition | null = null;
+  private commandHistory: CommandHistory;
+  private historySaveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
+    // Create unlimited command history (no size cap)
+    this.commandHistory = new CommandHistory(null);
+    
     this.state = {
       deck: null,
       deckId: null,
@@ -85,7 +89,12 @@ export class Editor {
   }
 
   getState(): EditorState {
-    return { ...this.state };
+    // Sync command history with state before returning
+    return {
+      ...this.state,
+      undoStack: this.commandHistory.getUndoStack(),
+      redoStack: this.commandHistory.getRedoStack(),
+    };
   }
 
   private notify(): void {
@@ -129,12 +138,17 @@ export class Editor {
 
   // Command execution
   private executeCommand(command: EditorCommand): void {
-    const { undoStack } = this.state;
-    const newStack = [...undoStack, command].slice(-MAX_UNDO_STACK_SIZE);
+    // Add command to history (this clears redo stack automatically)
+    this.commandHistory.pushCommand(command);
+    
+    // Sync state with history
     this.setState({
-      undoStack: newStack,
-      redoStack: [], // Clear redo stack on new command
+      undoStack: this.commandHistory.getUndoStack(),
+      redoStack: this.commandHistory.getRedoStack(),
     });
+    
+    // Debounce history save
+    this.saveHistoryDebounced();
   }
 
   // Deck operations
@@ -179,6 +193,7 @@ export class Editor {
         currentSlideIndex = 0;
       }
       
+      // Set deck state first (don't wait for history)
       this.setState({
         deck,
         deckId,
@@ -187,12 +202,117 @@ export class Editor {
         selectedElementIds: new Set(),
         isLoading: false,
       });
+      
+      // Load command history in the background (non-blocking)
+      this.loadHistory(deckId).catch((error) => {
+        console.warn('Background history load failed:', error);
+        // History load failure doesn't affect deck loading
+      });
     } catch (error) {
       console.error('Error loading deck:', error);
       this.setState({
         error: error instanceof Error ? error.message : 'Failed to load deck',
         isLoading: false,
       });
+    }
+  }
+
+  /**
+   * Load command history from server
+   */
+  private async loadHistory(deckId: string): Promise<void> {
+    try {
+      const response = await fetch(`/api/editor/${deckId}/history`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+      
+      if (!response.ok) {
+        // If history endpoint fails, continue with empty history
+        console.warn('Failed to load command history:', response.statusText);
+        this.commandHistory.clear();
+        this.setState({
+          undoStack: [],
+          redoStack: [],
+        });
+        return;
+      }
+      
+      const history = await response.json() as { undoStack: EditorCommand[]; redoStack: EditorCommand[] };
+      this.commandHistory.setHistory(history.undoStack || [], history.redoStack || []);
+      
+      // Sync state with loaded history
+      this.setState({
+        undoStack: this.commandHistory.getUndoStack(),
+        redoStack: this.commandHistory.getRedoStack(),
+      });
+      
+      console.log('Command history loaded:', deckId, {
+        undoCount: this.commandHistory.getUndoCount(),
+        redoCount: this.commandHistory.getRedoCount(),
+      });
+    } catch (error) {
+      console.warn('Error loading command history:', error);
+      // Continue with empty history on error
+      this.commandHistory.clear();
+      this.setState({
+        undoStack: [],
+        redoStack: [],
+      });
+    }
+  }
+
+  /**
+   * Save command history to server (debounced)
+   */
+  private saveHistoryDebounced(): void {
+    if (!this.state.deckId) {
+      return;
+    }
+
+    // Clear existing timer
+    if (this.historySaveDebounceTimer) {
+      clearTimeout(this.historySaveDebounceTimer);
+    }
+
+    // Debounce history save (save less frequently than deck saves)
+    this.historySaveDebounceTimer = setTimeout(() => {
+      this.saveHistory();
+    }, 2000); // 2 second debounce
+  }
+
+  /**
+   * Save command history to server
+   */
+  private async saveHistory(): Promise<void> {
+    const { deckId } = this.state;
+    if (!deckId) {
+      return;
+    }
+
+    try {
+      const history = this.commandHistory.toJSON();
+      
+      const response = await fetch(`/api/editor/${deckId}/history`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(history),
+      });
+      
+      if (!response.ok) {
+        console.warn('Failed to save command history:', response.statusText);
+        return;
+      }
+      
+      console.log('Command history saved:', deckId, {
+        undoCount: history.undoStack.length,
+        redoCount: history.redoStack.length,
+      });
+    } catch (error) {
+      console.warn('Error saving command history:', error);
+      // Don't throw - history save failures shouldn't block editing
     }
   }
 
@@ -369,6 +489,9 @@ export class Editor {
     const { deck } = this.state;
     if (!deck) return;
 
+    // Store previous settings for undo
+    const previousSettings = deck.settings ? JSON.parse(JSON.stringify(deck.settings)) : undefined;
+
     const updatedDeck: DeckDefinition = {
       ...deck,
       settings: this.deepMerge(deck.settings || {}, settingsUpdate),
@@ -377,7 +500,10 @@ export class Editor {
     this.setState({ deck: updatedDeck });
     this.executeCommand({
       type: 'updateDeckSettings',
-      params: { settings: settingsUpdate },
+      params: { 
+        settings: settingsUpdate,
+        previousSettings,
+      },
       timestamp: Date.now(),
     });
   }
@@ -385,6 +511,9 @@ export class Editor {
   updateDeckMeta(metaUpdate: Partial<DeckMeta>): void {
     const { deck } = this.state;
     if (!deck) return;
+
+    // Store previous meta for undo
+    const previousMeta = deck.meta ? JSON.parse(JSON.stringify(deck.meta)) : undefined;
 
     const updatedDeck: DeckDefinition = {
       ...deck,
@@ -397,7 +526,10 @@ export class Editor {
     this.setState({ deck: updatedDeck });
     this.executeCommand({
       type: 'updateDeckMeta',
-      params: { meta: metaUpdate },
+      params: { 
+        meta: metaUpdate,
+        previousMeta,
+      },
       timestamp: Date.now(),
     });
   }
@@ -510,6 +642,9 @@ export class Editor {
     const { deck } = this.state;
     if (!deck || index < 0 || index >= deck.slides.length) return;
 
+    // Store the deleted slide for undo
+    const deletedSlide = deck.slides[index];
+
     const updatedDeck: DeckDefinition = {
       ...deck,
       slides: deck.slides.filter((_, i) => i !== index),
@@ -524,7 +659,10 @@ export class Editor {
 
     this.executeCommand({
       type: 'deleteSlide',
-      params: { index },
+      params: { 
+        index,
+        deletedSlide: JSON.parse(JSON.stringify(deletedSlide)), // Deep clone for undo
+      },
       timestamp: Date.now(),
     });
   }
@@ -1008,8 +1146,9 @@ export class Editor {
    * Batch update multiple elements in a single setState call.
    * This is much more efficient than calling updateElement multiple times,
    * especially during drag operations.
+   * @param skipCommands If true, don't create undo commands (use for intermediate drag positions)
    */
-  batchUpdateElements(updates: Map<string, Partial<ElementDefinition>>): void {
+  batchUpdateElements(updates: Map<string, Partial<ElementDefinition>>, skipCommands: boolean = false): void {
     const { deck, currentSlideIndex, openedGroupId } = this.state;
     if (!deck || updates.size === 0) return;
 
@@ -1146,19 +1285,21 @@ export class Editor {
     // Single setState call for all updates
     this.setState({ deck: updatedDeck });
 
-    // Execute commands for undo/redo (one per element)
-    updates.forEach((updatesForElement, elementId) => {
-      const previousElement = previousElements.get(elementId);
-      this.executeCommand({
-        type: 'updateElement',
-        target: elementId,
-        params: {
-          updates: updatesForElement,
-          previousElement: previousElement ? JSON.parse(JSON.stringify(previousElement)) : undefined,
-        },
-        timestamp: Date.now(),
+    // Execute commands for undo/redo (one per element) - skip during drag to avoid fine-grained undo
+    if (!skipCommands) {
+      updates.forEach((updatesForElement, elementId) => {
+        const previousElement = previousElements.get(elementId);
+        this.executeCommand({
+          type: 'updateElement',
+          target: elementId,
+          params: {
+            updates: updatesForElement,
+            previousElement: previousElement ? JSON.parse(JSON.stringify(previousElement)) : undefined,
+          },
+          timestamp: Date.now(),
+        });
       });
-    });
+    }
   }
 
   deleteElement(elementId: string): void {
@@ -1258,10 +1399,19 @@ export class Editor {
     });
 
     if (deletedElement) {
+      // Find which slide contains this element
+      const slideId = currentSlide.id;
+      
+      // Deep clone the element to ensure we have a snapshot for undo
+      const clonedElement = JSON.parse(JSON.stringify(deletedElement)) as ElementDefinition;
+      
       this.executeCommand({
         type: 'deleteElement',
         target: elementId,
-        params: { element: deletedElement },
+        params: { 
+          element: clonedElement,
+          slideId,
+        },
         timestamp: Date.now(),
       });
     }
@@ -1282,6 +1432,9 @@ export class Editor {
 
     const currentIndex = allElements.findIndex(el => el.id === elementId);
     if (currentIndex === -1 || currentIndex === newIndex) return;
+
+    // Store previous index for undo
+    const previousIndex = currentIndex;
 
     // Remove element from current position
     const [movedElement] = allElements.splice(currentIndex, 1);
@@ -1309,7 +1462,10 @@ export class Editor {
     this.executeCommand({
       type: 'reorderElement',
       target: elementId,
-      params: { newIndex },
+      params: { 
+        newIndex,
+        previousIndex,
+      },
       timestamp: Date.now(),
     });
   }
@@ -2070,32 +2226,702 @@ export class Editor {
 
   // Undo/Redo
   undo(): void {
-    const { undoStack, redoStack } = this.state;
-    if (undoStack.length === 0) return;
+    if (!this.commandHistory.canUndo()) {
+      return;
+    }
 
-    const command = undoStack[undoStack.length - 1];
-    // TODO: Implement undo logic based on command type
+    const command = this.commandHistory.undo();
+    if (!command) {
+      return;
+    }
+
+    // Apply inverse operation based on command type
+    this.applyUndoCommand(command);
+
+    // Sync state with history
     this.setState({
-      undoStack: undoStack.slice(0, -1),
-      redoStack: [...redoStack, command],
+      undoStack: this.commandHistory.getUndoStack(),
+      redoStack: this.commandHistory.getRedoStack(),
     });
+
+    // Save history after undo
+    this.saveHistoryDebounced();
   }
 
   redo(): void {
-    const { undoStack, redoStack } = this.state;
-    if (redoStack.length === 0) return;
+    if (!this.commandHistory.canRedo()) {
+      return;
+    }
 
-    const command = redoStack[redoStack.length - 1];
-    // TODO: Implement redo logic based on command type
+    const command = this.commandHistory.redo();
+    if (!command) {
+      return;
+    }
+
+    // Re-apply the original operation
+    this.applyRedoCommand(command);
+
+    // Sync state with history
     this.setState({
-      undoStack: [...undoStack, command],
-      redoStack: redoStack.slice(0, -1),
+      undoStack: this.commandHistory.getUndoStack(),
+      redoStack: this.commandHistory.getRedoStack(),
     });
+
+    // Save history after redo
+    this.saveHistoryDebounced();
+  }
+
+  /**
+   * Apply inverse operation for undo
+   */
+  private applyUndoCommand(command: EditorCommand): void {
+    const { deck } = this.state;
+    if (!deck) return;
+
+    let updatedDeck: DeckDefinition | undefined;
+
+    switch (command.type) {
+      case 'addElement': {
+        // Undo add = delete
+        const elementId = (command.params.element as ElementDefinition)?.id || command.target as string;
+        if (elementId) {
+          updatedDeck = {
+            ...deck,
+            slides: deck.slides.map(slide => ({
+              ...slide,
+              elements: slide.elements?.filter(el => el.id !== elementId),
+              layers: slide.layers?.map(layer => ({
+                ...layer,
+                elements: layer.elements.filter(el => el.id !== elementId),
+              })),
+            })),
+          };
+        }
+        break;
+      }
+      case 'deleteElement': {
+        // Undo delete = add back
+        const deletedElement = command.params.element as ElementDefinition | undefined;
+        const slideId = command.params.slideId as string | undefined;
+        if (deletedElement && slideId) {
+          const slideIndex = deck.slides.findIndex(s => s.id === slideId);
+          if (slideIndex >= 0) {
+            const slide = deck.slides[slideIndex];
+            // Restore element to its original slide
+            // Check if element should be in elements array or in a layer
+            // For now, restore to elements array (we don't track which layer it was in)
+            updatedDeck = {
+              ...deck,
+              slides: deck.slides.map((s, i) =>
+                i === slideIndex
+                  ? { ...s, elements: [...(s.elements || []), deletedElement] }
+                  : s
+              ),
+            };
+          }
+        }
+        break;
+      }
+      case 'updateElement': {
+        // Undo update = restore previous state
+        const elementId = command.target as string;
+        const previousElement = command.params.previousElement as ElementDefinition | undefined;
+        if (previousElement && elementId) {
+          updatedDeck = {
+            ...deck,
+            slides: deck.slides.map(slide => ({
+              ...slide,
+              elements: slide.elements?.map(el =>
+                el.id === elementId ? previousElement : el
+              ),
+              layers: slide.layers?.map(layer => ({
+                ...layer,
+                elements: layer.elements.map(el =>
+                  el.id === elementId ? previousElement : el
+                ),
+              })),
+            })),
+          };
+        }
+        break;
+      }
+      case 'addSlide': {
+        // Undo add = delete
+        const slide = command.params.slide as SlideDefinition;
+        if (slide?.id) {
+          const slideIndex = deck.slides.findIndex(s => s.id === slide.id);
+          if (slideIndex >= 0) {
+            updatedDeck = {
+              ...deck,
+              slides: deck.slides.filter((_, i) => i !== slideIndex),
+            };
+            // Update current slide index if needed
+            const newIndex = Math.min(slideIndex, updatedDeck.slides.length - 1);
+            this.setState({
+              currentSlideIndex: Math.max(0, newIndex),
+            });
+          }
+        }
+        break;
+      }
+      case 'deleteSlide': {
+        // Undo delete = add back
+        const deletedSlide = command.params.deletedSlide as SlideDefinition | undefined;
+        const index = command.params.index as number;
+        if (deletedSlide && typeof index === 'number') {
+          const slides = [...deck.slides];
+          slides.splice(index, 0, deletedSlide);
+          updatedDeck = {
+            ...deck,
+            slides,
+          };
+          this.setState({
+            currentSlideIndex: index,
+          });
+        }
+        break;
+      }
+      case 'duplicateSlide': {
+        // Undo duplicate = delete the duplicated slide
+        const index = command.params.index as number;
+        if (typeof index === 'number' && index + 1 < deck.slides.length) {
+          updatedDeck = {
+            ...deck,
+            slides: deck.slides.filter((_, i) => i !== index + 1),
+          };
+        }
+        break;
+      }
+      case 'reorderSlides': {
+        // Undo reorder = swap back
+        const fromIndex = command.params.fromIndex as number;
+        const toIndex = command.params.toIndex as number;
+        if (typeof fromIndex === 'number' && typeof toIndex === 'number') {
+          const slides = [...deck.slides];
+          const [moved] = slides.splice(toIndex, 1);
+          slides.splice(fromIndex, 0, moved);
+          updatedDeck = {
+            ...deck,
+            slides,
+          };
+          this.setState({
+            currentSlideIndex: fromIndex,
+          });
+        }
+        break;
+      }
+      case 'updateDeckSettings': {
+        // Undo = restore previous settings
+        const previousSettings = command.params.previousSettings as Partial<DeckSettings> | undefined;
+        if (previousSettings) {
+          updatedDeck = {
+            ...deck,
+            settings: this.deepMerge(deck.settings || {}, previousSettings),
+          };
+        }
+        break;
+      }
+      case 'updateDeckMeta': {
+        // Undo = restore previous meta
+        const previousMeta = command.params.previousMeta as Partial<DeckMeta> | undefined;
+        if (previousMeta) {
+          updatedDeck = {
+            ...deck,
+            meta: {
+              ...deck.meta,
+              ...previousMeta,
+            },
+          };
+        }
+        break;
+      }
+      case 'updateSlide': {
+        // Undo = restore previous slide state
+        const slideId = command.params.slideId as string;
+        const previousSlide = command.params.previousSlide as Partial<SlideDefinition> | undefined;
+        if (slideId && previousSlide) {
+          updatedDeck = {
+            ...deck,
+            slides: deck.slides.map(slide =>
+              slide.id === slideId ? this.deepMerge(slide, previousSlide) : slide
+            ),
+          };
+        }
+        break;
+      }
+      case 'reorderElement': {
+        // Undo = restore previous order
+        const elementId = command.target as string;
+        const previousIndex = command.params.previousIndex as number;
+        if (elementId && typeof previousIndex === 'number') {
+          const slide = deck.slides[this.state.currentSlideIndex];
+          if (slide) {
+            const allElements = [
+              ...(slide.elements || []),
+              ...(slide.layers?.flatMap(l => l.elements) || []),
+            ];
+            const currentIndex = allElements.findIndex(el => el.id === elementId);
+            if (currentIndex !== -1 && currentIndex !== previousIndex) {
+              const [moved] = allElements.splice(currentIndex, 1);
+              allElements.splice(previousIndex, 0, moved);
+              updatedDeck = {
+                ...deck,
+                slides: deck.slides.map((s, i) =>
+                  i === this.state.currentSlideIndex
+                    ? { ...s, elements: allElements }
+                    : s
+                ),
+              };
+            }
+          }
+        }
+        break;
+      }
+      case 'groupElements': {
+        // Undo = ungroup (restore individual elements)
+        const groupId = command.params.groupId as string;
+        const childrenIds = command.params.childrenIds as string[] | undefined;
+        if (groupId && childrenIds) {
+          // Find and remove the group, restore children
+          // This is simplified - full implementation would restore original positions
+          updatedDeck = {
+            ...deck,
+            slides: deck.slides.map(slide => ({
+              ...slide,
+              elements: slide.elements?.filter(el => el.id !== groupId),
+              layers: slide.layers?.map(layer => ({
+                ...layer,
+                elements: layer.elements.filter(el => el.id !== groupId),
+              })),
+            })),
+          };
+        }
+        break;
+      }
+      case 'ungroupElements': {
+        // Undo = re-group
+        const groupId = command.target as string;
+        const children = command.params.children as ElementDefinition[] | undefined;
+        if (groupId && children) {
+          // Recreate the group with children
+          const slide = deck.slides[this.state.currentSlideIndex];
+          if (slide) {
+            updatedDeck = {
+              ...deck,
+              slides: deck.slides.map((s, i) =>
+                i === this.state.currentSlideIndex
+                  ? { ...s, elements: [...(s.elements || []), { id: groupId, type: 'group', children } as ElementDefinition] }
+                  : s
+              ),
+            };
+          }
+        }
+        break;
+      }
+      case 'updateTimeline': {
+        // Undo = restore previous timeline
+        const slideId = command.target as string;
+        const previousTimeline = command.params.previousTimeline as import('@/rsc/types').TimelineDefinition | undefined;
+        if (slideId && previousTimeline !== undefined) {
+          updatedDeck = {
+            ...deck,
+            slides: deck.slides.map(slide =>
+              slide.id === slideId ? { ...slide, timeline: previousTimeline || undefined } : slide
+            ),
+          };
+        }
+        break;
+      }
+      case 'addMasterSlide': {
+        // Undo = delete master slide
+        const masterSlideId = command.target as string;
+        if (masterSlideId && deck.settings?.theme?.masterSlides) {
+          updatedDeck = {
+            ...deck,
+            settings: {
+              ...deck.settings,
+              theme: {
+                ...deck.settings.theme,
+                masterSlides: deck.settings.theme.masterSlides.filter(ms => ms.id !== masterSlideId),
+              },
+            },
+          };
+        }
+        break;
+      }
+      case 'deleteMasterSlide': {
+        // Undo = add back master slide
+        const masterSlide = command.params.masterSlide as import('@/rsc/types').MasterSlide | undefined;
+        if (masterSlide) {
+          updatedDeck = {
+            ...deck,
+            settings: {
+              ...deck.settings || {},
+              theme: {
+                ...deck.settings?.theme || {},
+                masterSlides: [...(deck.settings?.theme?.masterSlides || []), masterSlide],
+              },
+            },
+          };
+        }
+        break;
+      }
+      case 'updateMasterSlide': {
+        // Undo = restore previous master slide
+        const masterSlideId = command.target as string;
+        const previousMasterSlide = command.params.previousMasterSlide as import('@/rsc/types').MasterSlide | undefined;
+        if (masterSlideId && previousMasterSlide && deck.settings?.theme?.masterSlides) {
+          updatedDeck = {
+            ...deck,
+            settings: {
+              ...deck.settings,
+              theme: {
+                ...deck.settings.theme,
+                masterSlides: deck.settings.theme.masterSlides.map(ms =>
+                  ms.id === masterSlideId ? previousMasterSlide : ms
+                ),
+              },
+            },
+          };
+        }
+        break;
+      }
+      case 'applyMasterSlide': {
+        // Undo = remove master slide application
+        const slideId = command.target as string;
+        const previousMasterSlideId = command.params.previousMasterSlideId as string | null | undefined;
+        if (slideId) {
+          updatedDeck = {
+            ...deck,
+            slides: deck.slides.map(slide =>
+              slide.id === slideId
+                ? { ...slide, masterSlideId: previousMasterSlideId || undefined }
+                : slide
+            ),
+          };
+        }
+        break;
+      }
+      // Note: bringToFront, sendToBack, bringForward, sendBackward can be undone via reorderElement
+      // if we store the previous z-index/order
+    }
+
+    if (updatedDeck) {
+      this.setState({ deck: updatedDeck });
+    }
+  }
+
+  /**
+   * Re-apply operation for redo
+   */
+  private applyRedoCommand(command: EditorCommand): void {
+    const { deck } = this.state;
+    if (!deck) return;
+
+    let updatedDeck: DeckDefinition | undefined;
+
+    switch (command.type) {
+      case 'addElement': {
+        const element = command.params.element as ElementDefinition;
+        const slideIndex = command.params.slideIndex as number | undefined;
+        if (element) {
+          const targetIndex = slideIndex ?? this.state.currentSlideIndex;
+          const slide = deck.slides[targetIndex];
+          if (slide) {
+            updatedDeck = {
+              ...deck,
+              slides: deck.slides.map((s, i) =>
+                i === targetIndex
+                  ? { ...s, elements: [...(s.elements || []), element] }
+                  : s
+              ),
+            };
+          }
+        }
+        break;
+      }
+      case 'deleteElement': {
+        const elementId = command.target as string;
+        if (elementId) {
+          updatedDeck = {
+            ...deck,
+            slides: deck.slides.map(slide => ({
+              ...slide,
+              elements: slide.elements?.filter(el => el.id !== elementId),
+              layers: slide.layers?.map(layer => ({
+                ...layer,
+                elements: layer.elements.filter(el => el.id !== elementId),
+              })),
+            })),
+          };
+        }
+        break;
+      }
+      case 'updateElement': {
+        const elementId = command.target as string;
+        const updates = command.params.updates as Partial<ElementDefinition>;
+        if (elementId && updates) {
+          updatedDeck = {
+            ...deck,
+            slides: deck.slides.map(slide => ({
+              ...slide,
+              elements: slide.elements?.map(el =>
+                el.id === elementId ? { ...el, ...updates } : el
+              ),
+              layers: slide.layers?.map(layer => ({
+                ...layer,
+                elements: layer.elements.map(el =>
+                  el.id === elementId ? { ...el, ...updates } : el
+                ),
+              })),
+            })),
+          };
+        }
+        break;
+      }
+      case 'addSlide': {
+        const slide = command.params.slide as SlideDefinition;
+        if (slide) {
+          updatedDeck = {
+            ...deck,
+            slides: [...deck.slides, slide],
+          };
+        }
+        break;
+      }
+      case 'deleteSlide': {
+        const index = command.params.index as number;
+        if (typeof index === 'number' && index >= 0 && index < deck.slides.length) {
+          updatedDeck = {
+            ...deck,
+            slides: deck.slides.filter((_, i) => i !== index),
+          };
+          const newIndex = Math.min(index, updatedDeck.slides.length - 1);
+          this.setState({
+            currentSlideIndex: Math.max(0, newIndex),
+          });
+        }
+        break;
+      }
+      case 'duplicateSlide': {
+        const index = command.params.index as number;
+        if (typeof index === 'number' && index >= 0 && index < deck.slides.length) {
+          const slideToDuplicate = deck.slides[index];
+          const duplicatedSlide: SlideDefinition = {
+            ...slideToDuplicate,
+            id: `slide-${Date.now()}`,
+            layers: slideToDuplicate.layers?.map(layer => ({
+              ...layer,
+              elements: layer.elements.map(el => ({ ...el, id: `${el.id}-copy-${Date.now()}` })),
+            })),
+            elements: slideToDuplicate.elements?.map(el => ({
+              ...el,
+              id: `${el.id}-copy-${Date.now()}`,
+            })),
+          };
+          const slides = [...deck.slides];
+          slides.splice(index + 1, 0, duplicatedSlide);
+          updatedDeck = {
+            ...deck,
+            slides,
+          };
+        }
+        break;
+      }
+      case 'reorderSlides': {
+        const fromIndex = command.params.fromIndex as number;
+        const toIndex = command.params.toIndex as number;
+        if (typeof fromIndex === 'number' && typeof toIndex === 'number') {
+          const slides = [...deck.slides];
+          const [moved] = slides.splice(fromIndex, 1);
+          slides.splice(toIndex, 0, moved);
+          updatedDeck = {
+            ...deck,
+            slides,
+          };
+          this.setState({
+            currentSlideIndex: toIndex,
+          });
+        }
+        break;
+      }
+      case 'updateDeckSettings': {
+        const settings = command.params.settings as Partial<DeckSettings>;
+        if (settings) {
+          updatedDeck = {
+            ...deck,
+            settings: this.deepMerge(deck.settings || {}, settings),
+          };
+        }
+        break;
+      }
+      case 'updateDeckMeta': {
+        const meta = command.params.meta as Partial<DeckMeta>;
+        if (meta) {
+          updatedDeck = {
+            ...deck,
+            meta: {
+              ...deck.meta,
+              ...meta,
+            },
+          };
+        }
+        break;
+      }
+      case 'updateSlide': {
+        const slideId = command.params.slideId as string;
+        const updates = command.params.updates as Partial<SlideDefinition>;
+        if (slideId && updates) {
+          updatedDeck = {
+            ...deck,
+            slides: deck.slides.map(slide =>
+              slide.id === slideId ? this.deepMerge(slide, updates) : slide
+            ),
+          };
+        }
+        break;
+      }
+      case 'reorderElement': {
+        const elementId = command.target as string;
+        const newIndex = command.params.newIndex as number;
+        if (elementId && typeof newIndex === 'number') {
+          const slide = deck.slides[this.state.currentSlideIndex];
+          if (slide) {
+            const allElements = [
+              ...(slide.elements || []),
+              ...(slide.layers?.flatMap(l => l.elements) || []),
+            ];
+            const currentIndex = allElements.findIndex(el => el.id === elementId);
+            if (currentIndex !== -1 && currentIndex !== newIndex) {
+              const [moved] = allElements.splice(currentIndex, 1);
+              allElements.splice(newIndex, 0, moved);
+              updatedDeck = {
+                ...deck,
+                slides: deck.slides.map((s, i) =>
+                  i === this.state.currentSlideIndex
+                    ? { ...s, elements: allElements }
+                    : s
+                ),
+              };
+            }
+          }
+        }
+        break;
+      }
+      case 'updateTimeline': {
+        const slideId = command.target as string;
+        const timeline = command.params.timeline as import('@/rsc/types').TimelineDefinition;
+        if (slideId && timeline !== undefined) {
+          updatedDeck = {
+            ...deck,
+            slides: deck.slides.map(slide =>
+              slide.id === slideId ? { ...slide, timeline } : slide
+            ),
+          };
+        }
+        break;
+      }
+      case 'groupElements': {
+        const groupId = command.params.groupId as string;
+        // Re-grouping would require storing the original group structure
+        // This is a simplified version
+        break;
+      }
+      case 'ungroupElements': {
+        const groupId = command.target as string;
+        if (groupId) {
+          updatedDeck = {
+            ...deck,
+            slides: deck.slides.map(slide => ({
+              ...slide,
+              elements: slide.elements?.filter(el => el.id !== groupId),
+              layers: slide.layers?.map(layer => ({
+                ...layer,
+                elements: layer.elements.filter(el => el.id !== groupId),
+              })),
+            })),
+          };
+        }
+        break;
+      }
+      case 'addMasterSlide': {
+        const masterSlide = command.params.masterSlide as import('@/rsc/types').MasterSlide;
+        if (masterSlide) {
+          updatedDeck = {
+            ...deck,
+            settings: {
+              ...deck.settings || {},
+              theme: {
+                ...deck.settings?.theme || {},
+                masterSlides: [...(deck.settings?.theme?.masterSlides || []), masterSlide],
+              },
+            },
+          };
+        }
+        break;
+      }
+      case 'deleteMasterSlide': {
+        const masterSlideId = command.target as string;
+        if (masterSlideId && deck.settings?.theme?.masterSlides) {
+          updatedDeck = {
+            ...deck,
+            settings: {
+              ...deck.settings,
+              theme: {
+                ...deck.settings.theme,
+                masterSlides: deck.settings.theme.masterSlides.filter(ms => ms.id !== masterSlideId),
+              },
+            },
+          };
+        }
+        break;
+      }
+      case 'updateMasterSlide': {
+        const masterSlideId = command.target as string;
+        const updates = command.params.updates as Partial<import('@/rsc/types').MasterSlide>;
+        if (masterSlideId && updates && deck.settings?.theme?.masterSlides) {
+          updatedDeck = {
+            ...deck,
+            settings: {
+              ...deck.settings,
+              theme: {
+                ...deck.settings.theme,
+                masterSlides: deck.settings.theme.masterSlides.map(ms =>
+                  ms.id === masterSlideId ? { ...ms, ...updates } : ms
+                ),
+              },
+            },
+          };
+        }
+        break;
+      }
+      case 'applyMasterSlide': {
+        const slideId = command.target as string;
+        const masterSlideId = command.params.masterSlideId as string | null;
+        if (slideId) {
+          updatedDeck = {
+            ...deck,
+            slides: deck.slides.map(slide =>
+              slide.id === slideId ? { ...slide, masterSlideId: masterSlideId || undefined } : slide
+            ),
+          };
+        }
+        break;
+      }
+    }
+
+    if (updatedDeck) {
+      this.setState({ deck: updatedDeck });
+    }
   }
 
   updateSlide(slideId: string, updates: Partial<SlideDefinition>): void {
     const { deck } = this.state;
     if (!deck) return;
+
+    // Find and store previous slide state for undo
+    const slide = deck.slides.find(s => s.id === slideId);
+    const previousSlide = slide ? JSON.parse(JSON.stringify(slide)) : undefined;
 
     const updatedDeck: DeckDefinition = {
       ...deck,
@@ -2112,7 +2938,11 @@ export class Editor {
 
     this.executeCommand({
       type: 'updateSlide',
-      params: { slideId, updates },
+      params: { 
+        slideId, 
+        updates,
+        previousSlide,
+      },
       timestamp: Date.now(),
     });
   }
@@ -2121,6 +2951,10 @@ export class Editor {
   updateSlideTimeline(slideId: string, timeline: import('@/rsc/types').TimelineDefinition): void {
     const { deck } = this.state;
     if (!deck) return;
+
+    // Store previous timeline for undo
+    const slide = deck.slides.find(s => s.id === slideId);
+    const previousTimeline = slide?.timeline ? JSON.parse(JSON.stringify(slide.timeline)) : undefined;
 
     const updatedDeck: DeckDefinition = {
       ...deck,
@@ -2133,7 +2967,10 @@ export class Editor {
     this.executeCommand({
       type: 'updateTimeline',
       target: slideId,
-      params: { timeline },
+      params: { 
+        timeline,
+        previousTimeline,
+      },
       timestamp: Date.now(),
     });
   }
@@ -2291,6 +3128,15 @@ export class Editor {
 
   // Utility
   reset(): void {
+    // Clear command history
+    this.commandHistory.clear();
+    
+    // Clear history save timer
+    if (this.historySaveDebounceTimer) {
+      clearTimeout(this.historySaveDebounceTimer);
+      this.historySaveDebounceTimer = null;
+    }
+    
     this.state = {
       deck: null,
       deckId: null,

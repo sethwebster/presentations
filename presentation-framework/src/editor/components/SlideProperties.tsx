@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { ColorPicker } from './ColorPicker';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
 import { ImageBackgroundModal } from './ImageBackgroundModal';
+import { Modal } from '@/components/ui/modal';
 import { cn } from '@/lib/utils';
 import { useImageLibrary } from '../hooks/useImageLibrary';
 import type { ImageLibraryItem } from '@/editor/types/imageLibrary';
@@ -53,7 +54,6 @@ export function SlideProperties() {
   const [showImageModal, setShowImageModal] = useState(false);
   const [showRefineModal, setShowRefineModal] = useState(false);
   const [refineRequest, setRefineRequest] = useState('');
-  const [mounted, setMounted] = useState(false);
   const [imageModalInitialTab, setImageModalInitialTab] = useState<'generate' | 'upload' | 'library'>('generate');
   const [isLibraryRefreshing, setIsLibraryRefreshing] = useState(false);
   const [imageStatus, setImageStatus] = useState<{ isGenerating: boolean; error: string | null; success: string | null }>({
@@ -84,10 +84,6 @@ export function SlideProperties() {
     image?: { type: 'image'; value: object; opacity?: number };
   }>({});
 
-  useEffect(() => {
-    setMounted(true);
-    return () => setMounted(false);
-  }, []);
 
   useEffect(() => {
     if (showImageModal) {
@@ -833,7 +829,7 @@ export function SlideProperties() {
                   {/* Refine Image Button - Only show for AI-generated images */}
                   {(() => {
                     const hasPrompt = (imageData.meta as any)?.prompt;
-                    console.log('Refine button check:', { hasPrompt, meta: imageData.meta, showRefineModal, mounted });
+                    console.log('Refine button check:', { hasPrompt, meta: imageData.meta, showRefineModal });
                     return hasPrompt;
                   })() && (
                     <div className="space-y-2 pt-2">
@@ -888,13 +884,12 @@ export function SlideProperties() {
 
                   <div className="space-y-2">
                     <Label className="text-sm text-muted-foreground">Scale</Label>
-                    <input
-                      type="range"
+                    <Slider
+                      value={[imageData.scale]}
                       min={50}
                       max={200}
-                      value={imageData.scale}
-                      onChange={(e) => handleScaleChange(parseInt(e.target.value) || 100)}
-                      className="w-full"
+                      step={1}
+                      onValueChange={(value) => handleScaleChange(value[0] ?? imageData.scale)}
                     />
                     <div className="flex items-center gap-2">
                       <Input
@@ -1013,111 +1008,82 @@ export function SlideProperties() {
       />
 
       {/* Refine Image Modal */}
-      {showRefineModal && mounted && createPortal(
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80"
-          role="dialog"
-          aria-modal="true"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
+      <Modal
+        open={showRefineModal}
+        onClose={() => {
+          setShowRefineModal(false);
+          setRefineRequest('');
+        }}
+        size="md"
+        tone="brand"
+      >
+        <Modal.Header className="gap-3">
+          <Modal.Title>Refine Image</Modal.Title>
+          <Modal.Description>
+            Describe how you’d like to polish this background or element.
+          </Modal.Description>
+        </Modal.Header>
+
+        <Modal.Body className="space-y-4">
+          <textarea
+            value={refineRequest}
+            onChange={(e) => setRefineRequest(e.target.value)}
+            placeholder="e.g., soften the lighting, add subtle depth of field, increase vibrancy..."
+            className={cn(
+              "w-full rounded-xl border border-border/60 bg-card/80 p-3 text-sm text-foreground",
+              "focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+            )}
+            rows={4}
+            autoFocus
+          />
+
+          {imageStatus.isGenerating && (
+            <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-sm text-blue-200">
+              <div className="flex items-center gap-2">
+                <svg className="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Generating refined image... This may take 10-30 seconds.
+              </div>
+            </div>
+          )}
+
+          {imageStatus.error && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+              {imageStatus.error}
+            </div>
+          )}
+
+          {imageStatus.success && (
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+              {imageStatus.success}
+            </div>
+          )}
+        </Modal.Body>
+
+        <Modal.Footer className="gap-3">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
               setShowRefineModal(false);
               setRefineRequest('');
-            }
-          }}
-        >
-          <div
-          className="w-full max-w-xl rounded-2xl border border-border/60 bg-card/95 p-6 text-foreground shadow-2xl backdrop-blur supports-[backdrop-filter]:bg-card/80"
-            onClick={(e) => e.stopPropagation()}
+              setImageStatus({ isGenerating: false, error: null, success: null });
+            }}
+            disabled={imageStatus.isGenerating}
           >
-            <div className="flex items-start justify-between gap-4 mb-6">
-              <h2 className="text-lg font-semibold text-foreground">
-                Refine Image
-              </h2>
-              <button
-                onClick={() => {
-                  setShowRefineModal(false);
-                  setRefineRequest('');
-                }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted/40 hover:text-foreground"
-                aria-label="Close refine image dialog"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <Label className="mb-2 block text-sm font-medium text-muted-foreground">
-                  How would you like to refine this image?
-                </Label>
-                <textarea
-                  value={refineRequest}
-                  onChange={(e) => setRefineRequest(e.target.value)}
-                  placeholder="e.g., make it more vibrant, change the lighting, add more detail..."
-                  className={cn(
-                    "w-full rounded-xl border border-border/60 bg-card/80 p-3 text-sm text-foreground",
-                    "focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-                  )}
-                  rows={4}
-                  autoFocus
-                />
-              </div>
-
-              {imageStatus.isGenerating && (
-                <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-sm text-blue-200">
-                  <div className="flex items-center gap-2">
-                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Generating refined image... This may take 10-30 seconds.
-                  </div>
-                </div>
-              )}
-
-              {imageStatus.error && (
-                <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-                  {imageStatus.error}
-                </div>
-              )}
-
-              {imageStatus.success && (
-                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
-                  {imageStatus.success}
-                </div>
-              )}
-
-              <div className="flex gap-3">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => {
-                    setShowRefineModal(false);
-                    setRefineRequest('');
-                    setImageStatus({ isGenerating: false, error: null, success: null });
-                  }}
-                  className="flex-1"
-                  disabled={imageStatus.isGenerating}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleRefineImage}
-                  disabled={imageStatus.isGenerating || !refineRequest.trim()}
-                  className="flex-1"
-                >
-                  {imageStatus.isGenerating ? 'Refining...' : 'Refine'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={handleRefineImage}
+            disabled={imageStatus.isGenerating || !refineRequest.trim()}
+          >
+            {imageStatus.isGenerating ? 'Refining...' : 'Refine'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 }

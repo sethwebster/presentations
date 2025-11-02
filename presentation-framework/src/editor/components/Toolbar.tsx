@@ -730,6 +730,30 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
   }, [activeSlideId, currentSlideIndex, editor, setBackgroundFeedback]);
   return (
     <div className="flex h-14 items-center gap-3 border-b bg-card/80 px-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/60" style={{ borderBottomColor: 'rgba(148, 163, 184, 0.25)' }}>
+      {/* Undo/Redo Tools */}
+      <div className="flex items-center gap-2 pr-4 mr-2 border-r" style={{ borderRightColor: 'rgba(148, 163, 184, 0.2)' }}>
+        <ToolbarButton 
+          title="Undo (Cmd/Ctrl+Z)" 
+          onClick={() => editor.undo()}
+          disabled={!state.undoStack || state.undoStack.length === 0}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+            <path d="M3 7v6h6" />
+            <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+          </svg>
+        </ToolbarButton>
+        <ToolbarButton 
+          title="Redo (Cmd/Ctrl+Shift+Z or Cmd/Ctrl+Y)" 
+          onClick={() => editor.redo()}
+          disabled={!state.redoStack || state.redoStack.length === 0}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+            <path d="M21 7v6h-6" />
+            <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
+          </svg>
+        </ToolbarButton>
+      </div>
+
       {/* Insert Tools */}
       <div className="flex items-center gap-2 pr-4 mr-2 border-r" style={{ borderRightColor: 'rgba(148, 163, 184, 0.2)' }}>
         <ToolbarButton 
