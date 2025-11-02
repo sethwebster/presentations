@@ -98,23 +98,23 @@ export function DocumentProperties() {
       <div className="space-y-2">
         <Label className={SECTION_HEADING}>Slide Size</Label>
         <Select
-          value={settings.slideSize?.preset || "widescreen"}
+          value={settings.slideSize?.preset || "ultrawide"}
           onChange={(event) => {
-            const preset = event.target.value as "standard" | "widescreen" | "ultrawide" | "square" | "custom";
-            let width = 1280;
-            let height = 720;
+            const preset = event.target.value as "standard" | "ultrawide" | "cinema" | "square" | "custom";
+            let width = 1920;
+            let height = 1080;
 
             switch (preset) {
               case "standard":
                 width = 1024;
                 height = 768;
                 break;
-              case "widescreen":
-                width = 1280;
-                height = 720;
-                break;
               case "ultrawide":
                 width = 1920;
+                height = 1080;
+                break;
+              case "cinema":
+                width = 2560;
                 height = 1080;
                 break;
               case "square":
@@ -138,8 +138,8 @@ export function DocumentProperties() {
           }}
         >
           <option value="standard">Standard (4:3) – 1024×768</option>
-          <option value="widescreen">Widescreen (16:9) – 1280×720</option>
-          <option value="ultrawide">Ultrawide (16:9) – 1920×1080</option>
+          <option value="ultrawide">HD (16:9) – 1920×1080</option>
+          <option value="cinema">Cinema (21:9) – 2560×1080</option>
           <option value="square">Square (1:1) – 1080×1080</option>
           <option value="custom">Custom</option>
         </Select>

@@ -26,14 +26,24 @@ export interface AlignmentGuide {
   isCenter?: boolean;
 }
 
-const CANVAS_WIDTH = 1280;
-const CANVAS_HEIGHT = 720;
+const DEFAULT_CANVAS_WIDTH = 1280;
+const DEFAULT_CANVAS_HEIGHT = 720;
 const DEFAULT_SNAP_THRESHOLD = 5; // pixels
 const DEFAULT_GUIDE_THRESHOLD = 5; // pixels
 
 class SnapService {
+  private canvasWidth: number = DEFAULT_CANVAS_WIDTH;
+  private canvasHeight: number = DEFAULT_CANVAS_HEIGHT;
   private snapThreshold: number = DEFAULT_SNAP_THRESHOLD;
   private guideThreshold: number = DEFAULT_GUIDE_THRESHOLD;
+  
+  /**
+   * Set canvas dimensions dynamically
+   */
+  setCanvasDimensions(width: number, height: number): void {
+    this.canvasWidth = width;
+    this.canvasHeight = height;
+  }
 
   /**
    * Set the snap threshold in pixels.
@@ -118,8 +128,8 @@ class SnapService {
     }
 
     // Check alignment with canvas center and edges
-    const canvasCenterX = CANVAS_WIDTH / 2;
-    const canvasCenterY = CANVAS_HEIGHT / 2;
+    const canvasCenterX = this.canvasWidth / 2;
+    const canvasCenterY = this.canvasHeight / 2;
     
     // Vertical center alignment (element center, left edge, or right edge aligns with canvas center)
     if (
@@ -145,14 +155,14 @@ class SnapService {
     if (Math.abs(elementLeft) < this.snapThreshold) {
       snapPointsX.push(0);
     }
-    if (Math.abs(elementRight - CANVAS_WIDTH) < this.snapThreshold) {
-      snapPointsX.push(CANVAS_WIDTH - elementBounds.width);
+    if (Math.abs(elementRight - this.canvasWidth) < this.snapThreshold) {
+      snapPointsX.push(this.canvasWidth - elementBounds.width);
     }
     if (Math.abs(elementTop) < this.snapThreshold) {
       snapPointsY.push(0);
     }
-    if (Math.abs(elementBottom - CANVAS_HEIGHT) < this.snapThreshold) {
-      snapPointsY.push(CANVAS_HEIGHT - elementBounds.height);
+    if (Math.abs(elementBottom - this.canvasHeight) < this.snapThreshold) {
+      snapPointsY.push(this.canvasHeight - elementBounds.height);
     }
 
     // Return the closest snap point (or null if none within threshold)
@@ -253,8 +263,8 @@ class SnapService {
     const draggingCenterY = draggingBounds.y + draggingBounds.height / 2;
 
     // Canvas center
-    const canvasCenterX = CANVAS_WIDTH / 2;
-    const canvasCenterY = CANVAS_HEIGHT / 2;
+    const canvasCenterX = this.canvasWidth / 2;
+    const canvasCenterY = this.canvasHeight / 2;
     
     // Vertical center alignment (check center, left edge, and right edge)
     if (
@@ -278,14 +288,14 @@ class SnapService {
     if (Math.abs(draggingBounds.x) < this.guideThreshold) {
       detectedGuides.push({ type: 'vertical', position: 0 });
     }
-    if (Math.abs(draggingBounds.x + draggingBounds.width - CANVAS_WIDTH) < this.guideThreshold) {
-      detectedGuides.push({ type: 'vertical', position: CANVAS_WIDTH });
+    if (Math.abs(draggingBounds.x + draggingBounds.width - this.canvasWidth) < this.guideThreshold) {
+      detectedGuides.push({ type: 'vertical', position: this.canvasWidth });
     }
     if (Math.abs(draggingBounds.y) < this.guideThreshold) {
       detectedGuides.push({ type: 'horizontal', position: 0 });
     }
-    if (Math.abs(draggingBounds.y + draggingBounds.height - CANVAS_HEIGHT) < this.guideThreshold) {
-      detectedGuides.push({ type: 'horizontal', position: CANVAS_HEIGHT });
+    if (Math.abs(draggingBounds.y + draggingBounds.height - this.canvasHeight) < this.guideThreshold) {
+      detectedGuides.push({ type: 'horizontal', position: this.canvasHeight });
     }
 
     return detectedGuides;

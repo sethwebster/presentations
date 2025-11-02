@@ -51,6 +51,14 @@ export function deckDefinitionToPresentation(
       />
     );
   }
+  
+  // Pass slideSize and orientation from deck settings to config
+  if (deck.settings?.slideSize) {
+    config.slideSize = deck.settings.slideSize;
+  }
+  if (deck.settings?.orientation) {
+    config.orientation = deck.settings.orientation;
+  }
 
   return { slides, config };
 }
@@ -145,8 +153,6 @@ function renderSlide(slide: SlideDefinition, assetsBase?: string, timelineTarget
 
   const slideStyle: CSSProperties = {
     position: 'relative',
-    width: '1280px',
-    height: '720px',
     overflow: 'hidden',
     ...(backgroundValue ? { background: backgroundValue } : {}),
   };

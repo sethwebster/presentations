@@ -42,7 +42,7 @@ export interface DeckMeta {
 export interface SlideSize {
   width: number;
   height: number;
-  preset?: 'standard' | 'widescreen' | 'ultrawide' | 'square' | 'custom';
+  preset?: 'standard' | 'ultrawide' | 'cinema' | 'square' | 'custom';
   units?: 'pixels' | 'points' | 'inches' | 'centimeters';
 }
 

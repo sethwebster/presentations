@@ -9,6 +9,8 @@ type SwitchProps = React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root> 
   "data-switch-on-color"?: string
 }
 
+type CSSPropertiesWithVars = React.CSSProperties & Record<string, string | number | undefined>;
+
 const Switch = React.forwardRef<
   React.ElementRef<typeof SwitchPrimitives.Root>,
   SwitchProps
@@ -18,7 +20,7 @@ const Switch = React.forwardRef<
     style={{
       "--switch-on-color": props["data-switch-on-color"] ?? "var(--editor-accent,theme(colors.primary.DEFAULT))",
       ...(style as React.CSSProperties),
-    }}
+    } as CSSPropertiesWithVars}
     className={cn(
       "relative group inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border border-transparent bg-card/92 shadow-[inset_0_1px_3px_rgba(11,16,34,0.18),0_10px_28px_rgba(11,16,34,0.08)] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent,theme(colors.primary.DEFAULT))] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 group-data-[state=checked]:shadow-[inset_0_1px_3px_rgba(11,16,34,0.22),0_12px_30px_rgba(22,194,199,0.22)]",
       className

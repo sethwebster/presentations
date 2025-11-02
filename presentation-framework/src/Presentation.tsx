@@ -447,18 +447,32 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
   const { openPresenterView, presenterWindowOpen } = useWindowSync(currentSlide, goToSlideWithReset);
   const { isIdle, hasMouseMoved } = useMouseIdle(500);
 
-  // Calculate scale to fit 1280x720 canvas in viewport
+  // Calculate scale to fit slide in viewport - use dynamic dimensions from config
+  const slideWidth = config.slideSize?.width || 1280;
+  const slideHeight = config.slideSize?.height || 720;
   const [slideScale, setSlideScale] = useState(1);
   useEffect(() => {
     const updateScale = () => {
-      const scaleX = window.innerWidth / 1280;
-      const scaleY = window.innerHeight / 720;
+      const scaleX = window.innerWidth / slideWidth;
+      const scaleY = window.innerHeight / slideHeight;
       setSlideScale(Math.min(scaleX, scaleY));
     };
     updateScale();
     window.addEventListener('resize', updateScale);
     return () => window.removeEventListener('resize', updateScale);
-  }, []);
+  }, [slideWidth, slideHeight]);
+
+  // Apply orientation and dimensions as CSS custom properties
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--slide-width', `${slideWidth}px`);
+    root.style.setProperty('--slide-height', `${slideHeight}px`);
+    
+    if (config.orientation === 'portrait') {
+      root.style.setProperty('--slide-width', `${slideHeight}px`);
+      root.style.setProperty('--slide-height', `${slideWidth}px`);
+    }
+  }, [slideWidth, slideHeight, config.orientation]);
 
   if (isPresenterMode) {
     return (

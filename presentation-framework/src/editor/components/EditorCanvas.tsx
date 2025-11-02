@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getTransformService } from '../services/TransformService';
 import { getSelectionService } from '../services/SelectionService';
+import { getSnapService } from '../services/SnapService';
 
 interface EditorCanvasProps {
   deckId: string;
@@ -38,9 +39,15 @@ export function EditorCanvas({ deckId: _deckId }: EditorCanvasProps) {
   const [previewSelectedIds, setPreviewSelectedIds] = useState<Set<string>>(new Set());
   const [fitScale, setFitScale] = useState(1);
 
-  // Canvas dimensions (matching presentation format)
-  const CANVAS_WIDTH = 1280;
-  const CANVAS_HEIGHT = 720;
+  // Canvas dimensions (matching presentation format) - dynamic from deck settings
+  const slideSize = deck?.settings?.slideSize;
+  const orientation = deck?.settings?.orientation;
+  const CANVAS_WIDTH = slideSize?.width || 1280;
+  const CANVAS_HEIGHT = slideSize?.height || 720;
+  
+  // Apply orientation by swapping dimensions if needed
+  const finalWidth = orientation === 'portrait' ? CANVAS_HEIGHT : CANVAS_WIDTH;
+  const finalHeight = orientation === 'portrait' ? CANVAS_WIDTH : CANVAS_HEIGHT;
 
   const handleWheel = (e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
@@ -275,8 +282,8 @@ export function EditorCanvas({ deckId: _deckId }: EditorCanvasProps) {
       const containerHeight = containerRect.height;
       
       // Calculate scale needed to fit the canvas within the container (independent of zoom)
-      const scaleX = containerWidth / CANVAS_WIDTH;
-      const scaleY = containerHeight / CANVAS_HEIGHT;
+      const scaleX = containerWidth / finalWidth;
+      const scaleY = containerHeight / finalHeight;
       const newFitScale = Math.min(scaleX, scaleY, 1); // Don't upscale beyond 1
       
       setFitScale(newFitScale);
@@ -294,7 +301,13 @@ export function EditorCanvas({ deckId: _deckId }: EditorCanvasProps) {
     return () => {
       window.removeEventListener('resize', calculateFitScale);
     };
-  }, [zoom]);
+  }, [zoom, finalWidth, finalHeight]);
+
+  // Update SnapService with current canvas dimensions
+  useEffect(() => {
+    const snapService = getSnapService();
+    snapService.setCanvasDimensions(finalWidth, finalHeight);
+  }, [finalWidth, finalHeight]);
 
   return (
     <div
@@ -327,8 +340,8 @@ export function EditorCanvas({ deckId: _deckId }: EditorCanvasProps) {
           position: 'absolute',
           top: '50%',
           left: '50%',
-          width: `${CANVAS_WIDTH}px`,
-          height: `${CANVAS_HEIGHT}px`,
+          width: `${finalWidth}px`,
+          height: `${finalHeight}px`,
           transform: `translate(-50%, -50%) scale(${fitScale})`,
           transformOrigin: 'center center',
           transition: 'transform 0.2s ease-out',
@@ -344,8 +357,8 @@ export function EditorCanvas({ deckId: _deckId }: EditorCanvasProps) {
             transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${zoom})`,
             transformOrigin: 'center center',
             transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            width: `${CANVAS_WIDTH}px`,
-            height: `${CANVAS_HEIGHT}px`,
+            width: `${finalWidth}px`,
+            height: `${finalHeight}px`,
             background: 'hsl(var(--background))',
             boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4)',
           }}

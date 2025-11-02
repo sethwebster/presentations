@@ -20,6 +20,13 @@ export interface PresentationConfig {
   renderSlideNumber?: () => ReactNode;
   renderNavigation?: () => ReactNode;
   customStyles?: string;
+  slideSize?: {
+    width: number;
+    height: number;
+    preset?: string;
+    units?: string;
+  };
+  orientation?: 'landscape' | 'portrait';
   [key: string]: unknown;
 }
 
