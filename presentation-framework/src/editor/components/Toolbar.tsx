@@ -28,15 +28,6 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
     lastSyncError: imageLibraryError,
   } = useImageLibrary();
 
-  // Helper to derive username from session
-  const getUsername = useCallback(() => {
-    if (!session?.user) return null;
-    // Use email prefix before @ or name
-    const emailPrefix = session.user.email?.split('@')[0]?.toLowerCase();
-    const userName = session.user.name?.toLowerCase().replace(/\s+/g, '-');
-    return userName || emailPrefix || null;
-  }, [session]);
-
   const showGrid = state.showGrid;
   const deck = state.deck;
   const currentSlideIndex = state.currentSlideIndex;
@@ -1048,64 +1039,15 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
         {/* Play Button - Before Autosave */}
         <ToolbarButton 
           title="Play Presentation" 
-          onClick={async () => {
-            // Auto-authenticate when coming from editor
-            // Check if deck has a presenter password set
-            const deckPasswordHash = deck?.meta?.presenterPasswordHash;
-            
-            // Check if we have a presenter token, if not try to auto-authenticate
-            let token = localStorage.getItem('lume-presenter-token');
-            if (!token && deckPasswordHash) {
-              // Deck has a password set, but we can't auto-authenticate without the password
-              // The user will need to enter it in the presentation view
-              console.log('⚠️ Deck has presenter password set. User will need to enter password in presentation view.');
-            } else if (!token) {
-              // No deck password and no token - try global fallback for backwards compatibility
-              try {
-                // @ts-ignore - process.env types don't include custom env vars
-                const nextPublicSecret = typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_LUME_CONTROL_SECRET;
-                
-                if (nextPublicSecret) {
-                  console.log('Attempting auto-authentication with global secret...');
-                  const response = await fetch('/api/auth/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: nextPublicSecret, deckId }),
-                  });
-                  if (response.ok) {
-                    const data = await response.json();
-                    if (data.token) {
-                      localStorage.setItem('lume-presenter-token', data.token);
-                      token = data.token;
-                      console.log('✅ Auto-authenticated successfully');
-                      // Trigger a storage event so AuthService in new window picks it up
-                      window.dispatchEvent(new StorageEvent('storage', {
-                        key: 'lume-presenter-token',
-                        newValue: data.token,
-                        storageArea: localStorage,
-                      }));
-                    }
-                  } else {
-                    const errorData = await response.json().catch(() => ({}));
-                    console.warn('Auto-authentication failed:', response.status, errorData);
-                  }
-                }
-              } catch (err) {
-                console.warn('Auto-authentication error:', err);
-              }
-            } else {
-              console.log('✅ Already authenticated with existing token');
-            }
-            // Small delay to ensure localStorage is synced across windows
-            await new Promise(resolve => setTimeout(resolve, 100));
-            // Navigate to presentation mode using slug if available
+          onClick={() => {
+            // Derive username from session data
+            const username = session?.user?.username 
+              || session?.user?.email?.split('@')[0]?.toLowerCase()
+              || session?.user?.name?.toLowerCase().replace(/\s+/g, '-')
+              || session?.user?.id?.replace('user:', '')?.split('-')[0]
+              || 'user';
             const presentationSlug = deck?.meta?.slug || deckId;
-            const username = getUsername();
-            // Use username/slug format if we have both, otherwise fall back to old format
-            const url = username && presentationSlug 
-              ? `/present/${username}/${presentationSlug}?autoAuth=true`
-              : `/present/${presentationSlug}?autoAuth=true`;
-            // The token is set in localStorage, which is shared across windows on the same origin
+            const url = `/present/${username}/${presentationSlug}`;
             window.open(url, '_blank');
           }}
         >

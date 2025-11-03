@@ -68,6 +68,9 @@ const authOptions = {
         if (user.name) {
           session.user.name = user.name;
         }
+        if (user.username) {
+          session.user.username = user.username as string;
+        }
       }
       
       // JWT sessions (without adapter)
@@ -80,6 +83,9 @@ const authOptions = {
         }
         if (token.name) {
           session.user.name = token.name as string;
+        }
+        if (token.username) {
+          session.user.username = token.username as string;
         }
       }
       
@@ -99,6 +105,7 @@ const authOptions = {
         token.id = user.id;
         token.email = user.email;
         token.name = user.name;
+        token.username = user.username;
       }
       
       return token;
@@ -188,5 +195,5 @@ const { handlers, auth } = NextAuth(authOptions);
 
 export const GET = handlers.GET;
 export const POST = handlers.POST;
-export { auth };
+export { auth, authOptions };
 

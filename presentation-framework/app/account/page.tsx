@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/Header';
 import { PresentationsGrid } from '@/components/PresentationsGrid';
+import { AIPresentationWizard } from '@/components/ai/AIPresentationWizard';
 import { presentations } from '@/presentations';
 import { presentationLoaderService } from '@/services/PresentationLoaderService';
 import { LoadedPresentation } from '@/types/presentation';
@@ -14,6 +15,7 @@ import { LoadedPresentation } from '@/types/presentation';
 export default function AccountPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
+  const [showAIWizard, setShowAIWizard] = useState(false);
   const [loadedPresentations, setLoadedPresentations] = useState<Record<string, LoadedPresentation>>({});
   const [editorDecks, setEditorDecks] = useState<Array<{
     id: string;
@@ -26,7 +28,7 @@ export default function AccountPage() {
 
   // Log session status for debugging
   useEffect(() => {
-    console.log('[Account Page] Session status:', { status, hasSession: !!session, user: session?.user });
+    console.log('[Account Page] Session status:', { status, hasSession: !!session, user: session?.user, email: session?.user?.email, name: session?.user?.name, id: session?.user?.id });
   }, [status, session]);
 
   // Load editor-created decks
@@ -80,6 +82,18 @@ export default function AccountPage() {
     <div className="min-h-screen bg-[var(--lume-midnight)] text-[var(--lume-mist)]">
       <Header />
       
+      {showAIWizard && (
+        <AIPresentationWizard
+          onComplete={(deckId) => {
+            setShowAIWizard(false);
+            if (deckId) {
+              router.push(`/editor/${deckId}`);
+            }
+          }}
+          onCancel={() => setShowAIWizard(false)}
+        />
+      )}
+      
       <main className="max-w-7xl mx-auto px-6 sm:px-12 py-12 pt-28">
         {/* Account Header */}
         <div className="mb-12">
@@ -92,10 +106,7 @@ export default function AccountPage() {
             </div>
             <div className="flex items-center gap-4">
               <Button
-                onClick={() => {
-                  const newDeckId = `deck-${Date.now()}`;
-                  router.push(`/editor/${newDeckId}`);
-                }}
+                onClick={() => setShowAIWizard(true)}
                 className="bg-[var(--lume-primary)] text-[var(--lume-midnight)] hover:bg-[var(--lume-primary)]/90"
               >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -129,10 +140,7 @@ export default function AccountPage() {
                 <h3 className="text-xl font-light text-white mb-2">No presentations yet</h3>
                 <p className="text-[var(--lume-mist)]/70 mb-6">Create your first presentation to get started</p>
                 <Button
-                  onClick={() => {
-                    const newDeckId = `deck-${Date.now()}`;
-                    router.push(`/editor/${newDeckId}`);
-                  }}
+                  onClick={() => setShowAIWizard(true)}
                   className="bg-[var(--lume-primary)] text-[var(--lume-midnight)] hover:bg-[var(--lume-primary)]/90"
                 >
                   Create Presentation
@@ -152,35 +160,42 @@ export default function AccountPage() {
                 }))}
                 emptyMessage="You haven't created any presentations yet."
                 showActions={true}
-                actionButtons={(presentation) => (
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // Use username/slug format
-                        const username = session?.user?.email?.split('@')[0]?.toLowerCase() || session?.user?.name?.toLowerCase().replace(/\s+/g, '-') || 'user';
-                        const slug = (presentation as any).slug || presentation.id;
-                        router.push(`/present/${username}/${slug}?viewer=true`);
-                      }}
-                      className="flex-1 border-white/20 text-[var(--lume-mist)] hover:bg-white/5"
-                    >
-                      Watch
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/editor/${presentation.id}`);
-                      }}
-                      className="flex-1 border-[var(--lume-primary)]/50 text-[var(--lume-primary)] hover:bg-[var(--lume-primary)]/10"
-                    >
-                      Edit
-                    </Button>
-                  </div>
-                )}
+                actionButtons={(presentation) => {
+                  // Derive username from session data (consistent with Toolbar)
+                  const username = session?.user?.username 
+                    || session?.user?.email?.split('@')[0]?.toLowerCase()
+                    || session?.user?.name?.toLowerCase().replace(/\s+/g, '-')
+                    || session?.user?.id?.replace('user:', '')?.split('-')[0]
+                    || 'user';
+                  const slug = (presentation as any).slug || presentation.id;
+                  
+                  return (
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/present/${username}/${slug}?viewer=true`);
+                        }}
+                        className="flex-1 border-white/20 text-[var(--lume-mist)] hover:bg-white/5"
+                      >
+                        Watch
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/editor/${presentation.id}`);
+                        }}
+                        className="flex-1 border-[var(--lume-primary)]/50 text-[var(--lume-primary)] hover:bg-[var(--lume-primary)]/10"
+                      >
+                        Edit
+                      </Button>
+                    </div>
+                  );
+                }}
               />
 
               {/* Static presentations */}
@@ -197,32 +212,41 @@ export default function AccountPage() {
                     }))}
                     emptyMessage=""
                     showActions={true}
-                    actionButtons={(presentation) => (
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/present/${presentation.id}?viewer=true`);
-                          }}
-                          className="flex-1 border-white/20 text-[var(--lume-mist)] hover:bg-white/5"
-                        >
-                          Watch
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/present/${presentation.id}`);
-                          }}
-                          className="flex-1 border-[var(--lume-primary)]/50 text-[var(--lume-primary)] hover:bg-[var(--lume-primary)]/10"
-                        >
-                          Present
-                        </Button>
-                      </div>
-                    )}
+                    actionButtons={(presentation) => {
+                      // Derive username from session data (consistent with Toolbar)
+                      const username = session?.user?.username 
+                        || session?.user?.email?.split('@')[0]?.toLowerCase()
+                        || session?.user?.name?.toLowerCase().replace(/\s+/g, '-')
+                        || session?.user?.id?.replace('user:', '')?.split('-')[0]
+                        || 'user';
+                      
+                      return (
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/present/${username}/${presentation.id}?viewer=true`);
+                            }}
+                            className="flex-1 border-white/20 text-[var(--lume-mist)] hover:bg-white/5"
+                          >
+                            Watch
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/present/${username}/${presentation.id}`);
+                            }}
+                            className="flex-1 border-[var(--lume-primary)]/50 text-[var(--lume-primary)] hover:bg-[var(--lume-primary)]/10"
+                          >
+                            Present
+                          </Button>
+                        </div>
+                      );
+                    }}
                   />
                 </div>
               )}

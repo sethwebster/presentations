@@ -54,30 +54,59 @@ export function AIPresentationWizard({
     setPhase('generation');
     setGenerationPhase('outline');
 
-    // TODO: Implement actual generation phases
-    // For now, just simulate progress
-    setTimeout(() => {
+    try {
+      // Extract title from outline (first section or first slide)
+      const presentationTitle = outline[0]?.title || outline[0]?.children?.[0]?.title || 'AI Generated Presentation';
+
       setGenerationPhase('content');
-      setTimeout(() => {
-        setGenerationPhase('design');
-        setTimeout(() => {
-          setGenerationPhase('images');
-          setTimeout(() => {
-            setGenerationPhase('animations');
-            setTimeout(() => {
-              setGenerationPhase('complete');
-              setTimeout(() => {
-                // Navigate to editor
-                if (deckId) {
-                  router.push(`/editor/${deckId}`);
-                }
-                onComplete?.(deckId || '');
-              }, 1000);
-            }, 1500);
-          }, 1000);
-        }, 1500);
-      }, 2000);
-    }, 2000);
+
+      // Call generation API
+      const response = await fetch('/api/ai/generate-deck', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          outline,
+          title: presentationTitle,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to generate presentation');
+      }
+
+      const result = await response.json();
+      setDeckId(result.deckId);
+
+      // Load the generated deck to show in preview
+      const deckResponse = await fetch(`/api/editor/${result.deckId}`);
+      if (deckResponse.ok) {
+        const deck = await deckResponse.json();
+        setGeneratedSlides(deck.slides || []);
+      }
+
+      setGenerationPhase('design');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setGenerationPhase('images');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setGenerationPhase('animations');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setGenerationPhase('complete');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Navigate to editor
+      if (result.deckId) {
+        router.push(`/editor/${result.deckId}`);
+        onComplete?.(result.deckId);
+      }
+    } catch (error: any) {
+      console.error('Generation error:', error);
+      alert(`Failed to generate presentation: ${error.message}`);
+      setPhase('conversation');
+    }
   };
 
   if (phase === 'generation') {

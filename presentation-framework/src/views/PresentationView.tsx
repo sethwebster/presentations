@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { Presentation } from '../Presentation';
 import { loadPresentation } from '@/presentations';
 import type { PresentationModule, PresentationConfig, SlideData } from '../types/presentation';
@@ -9,7 +9,6 @@ import { exportSlidesAsLume, downloadLumeArchive } from '../services/LumePackage
 import { fetchDeckDefinition } from '../rsc/client';
 import type { DeckDefinition } from '../rsc/types';
 import { deckDefinitionToPresentation, createPresentationModuleFromDeck } from '../rsc/bridge';
-import { authService } from '../services/AuthService';
 
 interface PresentationState {
   slides: SlideData[];
@@ -18,17 +17,10 @@ interface PresentationState {
 }
 
 export function PresentationView() {
-  const params = useParams<{ presentationName?: string; username?: string; slug?: string }>();
-  const searchParams = useSearchParams();
+  const params = useParams<{ username?: string; slug?: string }>();
   
-  // Support both old format /present/[presentationName] and new format /present/[username]/[slug]
-  const presentationName = params?.presentationName;
   const username = params?.username;
   const slug = params?.slug;
-  
-  // Check for deckId in URL query params (for editor decks)
-  const deckId = searchParams?.get('deckId');
-  const autoAuth = searchParams?.get('autoAuth') === 'true';
 
   const [presentation, setPresentation] = useState<PresentationState | null>(null);
   const [presentationModule, setPresentationModule] = useState<PresentationModule | null>(null);
@@ -39,22 +31,8 @@ export function PresentationView() {
   const [exporting, setExporting] = useState<boolean>(false);
   const [exportFeedback, setExportFeedback] = useState<string | null>(null);
 
-  // Auto-authenticate if coming from editor - runs once on mount
   useEffect(() => {
-    if (autoAuth && typeof window !== 'undefined') {
-      const token = localStorage.getItem('lume-presenter-token');
-      console.log('PresentationView: autoAuth=true, token exists:', !!token);
-      authService.refreshAuthState();
-      const isAuth = authService.isAuthenticated();
-      console.log('PresentationView: After refreshAuthState, isAuthenticated:', isAuth);
-    }
-  }, [autoAuth]);
-
-  useEffect(() => {
-    // Determine which identifier to use
-    const identifier = slug || presentationName;
-    
-    if (!identifier && !deckId) {
+    if (!slug) {
       setError('Presentation not found');
       setLoading(false);
       return;
@@ -68,17 +46,14 @@ export function PresentationView() {
       let lastModuleError: unknown = null;
       let lastRscError: unknown = null;
 
-      // First, try to resolve slug to deckId if no deckId is provided
-      let resolvedDeckId = deckId;
-      if (!deckId && identifier) {
+      // Resolve slug to deckId
+      let resolvedDeckId: string | null = null;
+      if (slug) {
         try {
-          // Try username/slug format first if username is available
-          let response: Response;
-          if (username) {
-            response = await fetch(`/api/editor/user/${username}/slug/${slug || identifier}`);
-          } else {
-            response = await fetch(`/api/editor/slug/${identifier}`);
-          }
+          // Use username/slug API if username is available
+          const response = username 
+            ? await fetch(`/api/editor/user/${username}/slug/${slug}`)
+            : await fetch(`/api/editor/slug/${slug}`);
           if (response.ok) {
             const data = await response.json() as { deckId: string };
             resolvedDeckId = data.deckId;
@@ -88,13 +63,13 @@ export function PresentationView() {
         }
       }
 
-      const assetsDir = resolvedDeckId ? `/presentations/${resolvedDeckId}-assets` : `/presentations/${identifier}-assets`;
+      const assetsDir = resolvedDeckId ? `/presentations/${resolvedDeckId}-assets` : `/presentations/${slug}-assets`;
       setAssetsPath(assetsDir);
 
       // Only try to load module if not using resolved deckId (editor decks don't have modules)
-      if (!resolvedDeckId && identifier) {
+      if (!resolvedDeckId && slug) {
         try {
-          const presentationModule = await loadPresentation(identifier);
+          const presentationModule = await loadPresentation(slug);
         if (!cancelled) {
           setPresentationModule(presentationModule as PresentationModule);
           const { getSlides, getBrandLogo, presentationConfig, customStyles } = presentationModule as PresentationModule;
@@ -121,7 +96,7 @@ export function PresentationView() {
       }
 
       // Try loading from editor API if resolvedDeckId is available, otherwise try RSC API
-      const apiUrl = resolvedDeckId ? `/api/editor/${resolvedDeckId}` : `/api/rsc/${identifier}`;
+      const apiUrl = resolvedDeckId ? `/api/editor/${resolvedDeckId}` : `/api/rsc/${slug}`;
       try {
         const deck = await fetchDeckDefinition(apiUrl);
         if (!cancelled) {
@@ -156,7 +131,7 @@ export function PresentationView() {
     return () => {
       cancelled = true;
     };
-  }, [presentationName, slug, username, deckId, autoAuth]);
+  }, [slug, username, deckId]);
 
   const injectedStyles = useMemo(() => {
     const blocks: string[] = [];
@@ -228,7 +203,7 @@ export function PresentationView() {
   }
 
   const handleExport = async () => {
-    if (!presentationName) return;
+    if (!slug) return;
 
     try {
       setExporting(true);
@@ -236,8 +211,8 @@ export function PresentationView() {
       const { archive } = await exportSlidesAsLume(
         presentation.slides,
         {
-          deckId: presentationName,
-          title: presentationName.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+          deckId: slug,
+          title: slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
         },
         {},
         {
@@ -247,7 +222,7 @@ export function PresentationView() {
         },
       );
 
-      downloadLumeArchive(`${presentationName}.lume`, archive);
+      downloadLumeArchive(`${slug}.lume`, archive);
       setExportFeedback('Exported .lume package');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Export failed';

@@ -83,6 +83,7 @@ export function RedisAdapter(): Adapter | undefined {
           name: user.name || null,
           emailVerified: user.emailVerified || null,
           image: user.image || null,
+          username: user.username || null,
         };
         
         // Validate email is present for email provider users

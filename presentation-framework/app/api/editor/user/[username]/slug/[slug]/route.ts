@@ -42,7 +42,9 @@ export async function GET(request: Request, context: UserSlugRouteContext) {
           const user = JSON.parse(userData);
           const emailPrefix = user.email?.split('@')[0]?.toLowerCase();
           const userName = user.name?.toLowerCase().replace(/\s+/g, '-');
+          const userUsername = user.username?.toLowerCase();
           if (
+            userUsername === username.toLowerCase() ||
             emailPrefix === username.toLowerCase() ||
             userName === username.toLowerCase() ||
             user.id === username
@@ -72,8 +74,8 @@ export async function GET(request: Request, context: UserSlugRouteContext) {
       const deckDataJson = await redis.get(key);
       if (deckDataJson) {
         const deckData = JSON.parse(deckDataJson) as DeckDefinition;
-        // Match by slug and owner ID
-        if (deckData.meta?.ownerId === userId && deckData.meta?.slug === slug) {
+        // Match by slug (or deckId as fallback for legacy decks) and owner ID
+        if (deckData.meta?.ownerId === userId && (deckData.meta?.slug === slug || deckId === slug)) {
           return NextResponse.json({ deckId }, {
             headers: {
               'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

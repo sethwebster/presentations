@@ -37,14 +37,20 @@ function PresentationCard({
     if (onCardClick) {
       onCardClick(presentation);
     } else {
-      window.open(`/present/${presentation.id}?viewer=true`, '_blank');
+      // Templates use /present/demo/[slug], editor decks use /present/[username]/[slug]
+      // Since we don't have username/session context here, we can't distinguish
+      // The onCardClick or actionButtons should be used instead for editor decks
+      window.open(`/present/demo/${presentation.id}?viewer=true`, '_blank');
     }
   };
+
+  // Only attach onClick handler if no custom actionButtons provided
+  const shouldHandleClick = !actionButtons && (onCardClick || !showActions);
 
   return (
     <Card
       className="group cursor-pointer overflow-hidden transition-all duration-300 hover:scale-[1.02] bg-white/[0.04] border border-white/10 hover:border-[var(--lume-primary)]/50"
-      onClick={handleClick}
+      onClick={shouldHandleClick ? handleClick : undefined}
     >
       <CardContent className="p-0">
         {/* Thumbnail */}

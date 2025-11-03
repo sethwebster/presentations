@@ -174,11 +174,7 @@ export function HomePage() {
               e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
               e.currentTarget.style.borderColor = 'rgba(236, 236, 236, 0.2)';
             }}
-            onClick={() => {
-              // Generate a new deck ID
-              const newDeckId = `deck-${Date.now()}`;
-              router.push(`/editor/${newDeckId}`);
-            }}
+            onClick={() => setShowAIWizard(true)}
           >
             <CardContent className="p-0">
               <div className="w-full aspect-video flex flex-col items-center justify-center"

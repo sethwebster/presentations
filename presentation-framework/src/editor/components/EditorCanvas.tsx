@@ -602,11 +602,14 @@ export function EditorCanvas({ deckId: _deckId }: EditorCanvasProps) {
           
           {/* Slide content will be rendered here */}
           {currentSlide && (
-            <div style={{
-              width: '100%',
-              height: '100%',
-              position: 'relative',
-            }}>
+            <div 
+              key={`slide-${currentSlide.id}-${currentSlideIndex}`}
+              style={{
+                width: '100%',
+                height: '100%',
+                position: 'relative',
+              }}
+            >
               {/* Render elements from slide */}
               {currentSlide.elements?.map((element) => (
                 <ElementRenderer

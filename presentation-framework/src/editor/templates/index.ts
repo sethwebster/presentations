@@ -24,10 +24,10 @@ export function createHeroSlide(slideData: {
       content: slideData.title,
       bounds: { x: 100, y: 280, width: 1080, height: 80 },
       style: {
-        fontSize: 72,
+        fontSize: '72px',
         fontWeight: 'bold',
         textAlign: 'center',
-        color: 'var(--luds-ink)',
+        color: 'hsl(var(--luds-ink))',
       },
     },
   ];
@@ -39,9 +39,9 @@ export function createHeroSlide(slideData: {
       content: slideData.subtitle,
       bounds: { x: 100, y: 380, width: 1080, height: 60 },
       style: {
-        fontSize: 32,
+        fontSize: '32px',
         textAlign: 'center',
-        color: 'var(--luds-ink-mute)',
+        color: 'hsl(var(--luds-ink-mute))',
       },
     });
   }
@@ -73,9 +73,9 @@ export function createContentSlide(slideData: {
       content: slideData.title,
       bounds: { x: 100, y: 100, width: 1080, height: 80 },
       style: {
-        fontSize: 56,
+        fontSize: '56px',
         fontWeight: 'bold',
-        color: 'var(--luds-ink)',
+        color: 'hsl(var(--luds-ink))',
       },
     },
   ];
@@ -94,8 +94,8 @@ export function createContentSlide(slideData: {
           height: 60,
         },
         style: {
-          fontSize: 32,
-          color: 'var(--luds-ink)',
+          fontSize: '32px',
+          color: 'hsl(var(--luds-ink))',
         },
       });
     });
@@ -106,9 +106,9 @@ export function createContentSlide(slideData: {
       content: slideData.body,
       bounds: { x: 100, y: 220, width: 1080, height: 400 },
       style: {
-        fontSize: 28,
+        fontSize: '28px',
         lineHeight: 1.6,
-        color: 'var(--luds-ink)',
+        color: 'hsl(var(--luds-ink))',
       },
     });
   }
@@ -151,9 +151,9 @@ export function createImageLeftSlide(slideData: {
       content: slideData.title,
       bounds: { x: 640, y: 180, width: 540, height: 60 },
       style: {
-        fontSize: 42,
+        fontSize: '42px',
         fontWeight: 'bold',
-        color: 'var(--luds-ink)',
+        color: 'hsl(var(--luds-ink))',
       },
     },
     {
@@ -162,9 +162,9 @@ export function createImageLeftSlide(slideData: {
       content: slideData.body,
       bounds: { x: 640, y: 260, width: 540, height: 320 },
       style: {
-        fontSize: 24,
+        fontSize: '24px',
         lineHeight: 1.5,
-        color: 'var(--luds-ink)',
+        color: 'hsl(var(--luds-ink))',
       },
     },
   ];
@@ -195,11 +195,11 @@ export function createQuoteSlide(slideData: {
       content: `"${slideData.quote}"`,
       bounds: { x: 200, y: 240, width: 880, height: 200 },
       style: {
-        fontSize: 40,
+        fontSize: '40px',
         fontWeight: 'italic',
         fontStyle: 'italic',
         textAlign: 'center',
-        color: 'var(--luds-ink)',
+        color: 'hsl(var(--luds-ink))',
         lineHeight: 1.6,
       },
     },
@@ -212,9 +212,9 @@ export function createQuoteSlide(slideData: {
       content: slideData.attribution,
       bounds: { x: 200, y: 460, width: 880, height: 40 },
       style: {
-        fontSize: 24,
+        fontSize: '24px',
         textAlign: 'center',
-        color: 'var(--luds-ink-mute)',
+        color: 'hsl(var(--luds-ink-mute))',
       },
     });
   }
@@ -248,10 +248,10 @@ export function createClosingSlide(slideData: {
       content: slideData.title,
       bounds: { x: 100, y: 280, width: 1080, height: 80 },
       style: {
-        fontSize: 64,
+        fontSize: '64px',
         fontWeight: 'bold',
         textAlign: 'center',
-        color: 'var(--luds-ink)',
+        color: 'hsl(var(--luds-ink))',
       },
     });
   }
@@ -263,9 +263,9 @@ export function createClosingSlide(slideData: {
       content: slideData.subtitle,
       bounds: { x: 100, y: 380, width: 1080, height: 60 },
       style: {
-        fontSize: 28,
+        fontSize: '28px',
         textAlign: 'center',
-        color: 'var(--luds-ink-mute)',
+        color: 'hsl(var(--luds-ink-mute))',
       },
     });
   }
@@ -277,9 +277,9 @@ export function createClosingSlide(slideData: {
       content: slideData.contactInfo,
       bounds: { x: 100, y: 480, width: 1080, height: 80 },
       style: {
-        fontSize: 24,
+        fontSize: '24px',
         textAlign: 'center',
-        color: 'var(--luds-ink-mute)',
+        color: 'hsl(var(--luds-ink-mute))',
       },
     });
   }

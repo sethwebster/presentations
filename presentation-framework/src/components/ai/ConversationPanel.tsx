@@ -19,14 +19,24 @@ export function ConversationPanel({
   const [input, setInput] = React.useState('');
   const [isStreaming, setIsStreaming] = React.useState(false);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const messagesContainerRef = React.useRef<HTMLDivElement>(null);
   const parserRef = React.useRef<StreamParser | null>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = (force = false) => {
+    if (!messagesContainerRef.current || !messagesEndRef.current) return;
+    
+    const container = messagesContainerRef.current;
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+    
+    // Only auto-scroll if user is near bottom or force is true
+    if (force || isNearBottom) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   React.useEffect(() => {
-    scrollToBottom();
+    // Only auto-scroll on new messages if user is already at bottom
+    scrollToBottom(false);
   }, [messages]);
 
   const handleSend = async () => {
@@ -42,6 +52,9 @@ export function ConversationPanel({
     };
     setMessages(prev => [...prev, newMessage]);
     setIsStreaming(true);
+    
+    // Scroll to bottom when user sends a message
+    setTimeout(() => scrollToBottom(true), 0);
 
     try {
       // Create parser for this stream
@@ -68,6 +81,8 @@ export function ConversationPanel({
               updated.push({ role: 'assistant', content: assistantMessage, streaming: true });
             }
             
+            // Scroll to bottom when streaming new content
+            setTimeout(() => scrollToBottom(false), 0);
             return updated;
           });
         }
@@ -79,19 +94,23 @@ export function ConversationPanel({
           functionCallName = event.data.name;
         }
         
-        if (event.data?.arguments) {
-          functionCallArgs += event.data.arguments;
+        // Arguments come as a string that accumulates - don't parse until complete
+        if (event.data?.arguments !== undefined) {
+          const argChunk = typeof event.data.arguments === 'string' 
+            ? event.data.arguments 
+            : JSON.stringify(event.data.arguments);
+          functionCallArgs += argChunk;
         }
       });
 
-      // Handle function result
+      // Handle function result - use the parsed result from API, not accumulated string
       parser.on('function_result', (event: ConversationStreamEvent) => {
-        if (functionCallName && event.data) {
-          try {
-            const args = JSON.parse(functionCallArgs);
-            onFunctionCall?.(functionCallName, args);
-          } catch (err) {
-            console.error('Failed to parse function call args:', err);
+        if (event.data) {
+          const functionName = event.data.name || functionCallName;
+          const args = event.data.result;
+          
+          if (functionName && args) {
+            onFunctionCall?.(functionName, args);
           }
         }
         
@@ -158,7 +177,11 @@ export function ConversationPanel({
   return (
     <div className="flex flex-col h-full bg-panel/60 backdrop-blur-sm border border-white/40 dark:border-white/10 rounded-xl overflow-hidden">
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div 
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto p-6 space-y-4"
+        style={{ scrollBehavior: 'smooth' }}
+      >
         {messages.length === 0 && (
           <div className="text-center text-ink-subtle py-12">
             <p className="text-lg mb-2">Hello! I'm here to help you create an amazing presentation.</p>

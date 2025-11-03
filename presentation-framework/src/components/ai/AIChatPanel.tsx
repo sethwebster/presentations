@@ -23,14 +23,24 @@ export function AIChatPanel({
   const [input, setInput] = React.useState('');
   const [isStreaming, setIsStreaming] = React.useState(false);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const messagesContainerRef = React.useRef<HTMLDivElement>(null);
   const panelRef = React.useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = (force = false) => {
+    if (!messagesContainerRef.current || !messagesEndRef.current) return;
+    
+    const container = messagesContainerRef.current;
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+    
+    // Only auto-scroll if user is near bottom or force is true
+    if (force || isNearBottom) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   React.useEffect(() => {
-    scrollToBottom();
+    // Only auto-scroll on new messages if user is already at bottom
+    scrollToBottom(false);
   }, [messages]);
 
   const handleSend = async () => {
@@ -45,6 +55,9 @@ export function AIChatPanel({
     };
     setMessages(prev => [...prev, newMessage]);
     setIsStreaming(true);
+    
+    // Scroll to bottom when user sends a message
+    setTimeout(() => scrollToBottom(true), 0);
 
     try {
       const parser = new StreamParser();
@@ -63,6 +76,8 @@ export function AIChatPanel({
             } else {
               updated.push({ role: 'assistant', content: assistantMessage, streaming: true });
             }
+            // Scroll to bottom when streaming new content
+            setTimeout(() => scrollToBottom(false), 0);
             return updated;
           });
         }
@@ -78,12 +93,12 @@ export function AIChatPanel({
       });
 
       parser.on('function_result', (event: ConversationStreamEvent) => {
-        if (functionCallName && event.data) {
-          try {
-            const args = JSON.parse(functionCallArgs);
-            onFunctionCall?.(functionCallName, args);
-          } catch (err) {
-            console.error('Failed to parse function call args:', err);
+        if (event.data) {
+          const functionName = event.data.name || functionCallName;
+          const args = event.data.result;
+          
+          if (functionName && args) {
+            onFunctionCall?.(functionName, args);
           }
         }
         functionCallName = null;
@@ -179,7 +194,11 @@ export function AIChatPanel({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div 
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-3"
+        style={{ scrollBehavior: 'smooth' }}
+      >
         {messages.length === 0 && (
           <div className="text-center text-ink-subtle py-8">
             <p className="text-sm">Hi! I'm here to help improve your presentation.</p>
