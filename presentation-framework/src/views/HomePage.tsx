@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { Header } from '../components/Header';
+import { AIPresentationWizard } from '../components/ai/AIPresentationWizard';
 import { presentations } from '@/presentations';
 import { presentationLoaderService } from '../services/PresentationLoaderService';
 import { PresentationThumbnail } from '../components/PresentationThumbnail';
@@ -12,16 +14,19 @@ import { usePresenterAuth } from '../hooks/usePresenterAuth';
 
 export function HomePage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [loadedPresentations, setLoadedPresentations] = useState<Record<string, LoadedPresentation>>({});
   const auth = usePresenterAuth();
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
+  const [showAIWizard, setShowAIWizard] = useState(false);
   const [selectedPresentation, setSelectedPresentation] = useState<string | null>(null);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState(false);
   const [liveDecks, setLiveDecks] = useState<Set<string>>(new Set());
   const [editorDecks, setEditorDecks] = useState<Array<{
     id: string;
+    slug?: string;
     title: string;
     createdAt: string;
     updatedAt: string;
@@ -93,6 +98,18 @@ export function HomePage() {
   return (
     <div className="min-h-screen" style={{ background: 'var(--lume-midnight)', color: 'var(--lume-mist)' }}>
       <Header />
+      
+      {showAIWizard && (
+        <AIPresentationWizard
+          onComplete={(deckId) => {
+            setShowAIWizard(false);
+            if (deckId) {
+              router.push(`/editor/${deckId}`);
+            }
+          }}
+          onCancel={() => setShowAIWizard(false)}
+        />
+      )}
 
       <main className="pt-28 px-8 pb-16 max-w-6xl mx-auto">
         {/* Hero */}
@@ -107,6 +124,40 @@ export function HomePage() {
 
         {/* Presentation List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Create with AI Card */}
+          <Card
+            className="group cursor-pointer overflow-hidden transition-all duration-300 hover:scale-[1.02]"
+            style={{
+              background: 'linear-gradient(135deg, rgba(22, 194, 199, 0.1) 0%, rgba(200, 75, 210, 0.1) 100%)',
+              borderColor: 'rgba(22, 194, 199, 0.3)',
+              borderWidth: '2px',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(22, 194, 199, 0.2) 0%, rgba(200, 75, 210, 0.2) 100%)';
+              e.currentTarget.style.borderColor = 'rgba(22, 194, 199, 0.6)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(22, 194, 199, 0.1) 0%, rgba(200, 75, 210, 0.1) 100%)';
+              e.currentTarget.style.borderColor = 'rgba(22, 194, 199, 0.3)';
+            }}
+            onClick={() => setShowAIWizard(true)}
+          >
+            <CardContent className="p-0">
+              <div className="w-full aspect-video flex flex-col items-center justify-center"
+                   style={{ background: 'rgba(255, 255, 255, 0.03)' }}>
+                <div className="text-5xl mb-4" style={{ color: 'var(--lume-primary)' }}>
+                  ✨
+                </div>
+                <div className="text-lg font-medium" style={{ color: 'var(--lume-mist)' }}>
+                  Create with AI
+                </div>
+                <div className="text-sm mt-1 opacity-60" style={{ color: 'var(--lume-mist)' }}>
+                  AI-powered creation
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Add New Presentation Card */}
           <Card
             className="group cursor-pointer overflow-hidden transition-all duration-300 hover:scale-[1.02] border-dashed"
@@ -215,7 +266,7 @@ export function HomePage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          router.push(`/present/${name}?viewer=true`);
+                          router.push(`/present/demo/${name}?viewer=true`);
                         }}
                         className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all hover:scale-105 relative cursor-pointer"
                         style={{
@@ -258,7 +309,7 @@ export function HomePage() {
                         onClick={(e) => {
                           e.stopPropagation();
                           if (auth.isAuthenticated) {
-                            router.push(`/present/${name}`);
+                            router.push(`/present/demo/${name}`);
                           } else {
                             setSelectedPresentation(name);
                             setShowPasswordPrompt(true);
@@ -339,7 +390,14 @@ export function HomePage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          router.push(`/present/${deck.id}?deckId=${deck.id}&viewer=true`);
+                          // Derive username from session data
+                          const username = session?.user?.username 
+                            || session?.user?.email?.split('@')[0]?.toLowerCase()
+                            || session?.user?.name?.toLowerCase().replace(/\s+/g, '-')
+                            || session?.user?.id?.replace('user:', '')?.split('-')[0]
+                            || 'user';
+                          const slug = deck.slug || deck.id;
+                          router.push(`/present/${username}/${slug}?viewer=true`);
                         }}
                         className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all hover:scale-105 cursor-pointer"
                         style={{
@@ -377,7 +435,14 @@ export function HomePage() {
                         onClick={(e) => {
                           e.stopPropagation();
                           if (auth.isAuthenticated) {
-                            router.push(`/present/${deck.id}?deckId=${deck.id}`);
+                            // Derive username from session data
+                            const username = session?.user?.username 
+                              || session?.user?.email?.split('@')[0]?.toLowerCase()
+                              || session?.user?.name?.toLowerCase().replace(/\s+/g, '-')
+                              || session?.user?.id?.replace('user:', '')?.split('-')[0]
+                              || 'user';
+                            const slug = deck.slug || deck.id;
+                            router.push(`/present/${username}/${slug}`);
                           } else {
                             setSelectedPresentation(deck.id);
                             setShowPasswordPrompt(true);
@@ -479,7 +544,14 @@ export function HomePage() {
                   setPasswordError(false);
                   // Navigate to presentation as presenter
                   if (selectedPresentation) {
-                    router.push(`/present/${selectedPresentation}`);
+                    // Derive username from session data
+                    const username = session?.user?.username 
+                      || session?.user?.email?.split('@')[0]?.toLowerCase()
+                      || session?.user?.name?.toLowerCase().replace(/\s+/g, '-')
+                      || session?.user?.id?.replace('user:', '')?.split('-')[0]
+                      || 'user';
+                    const slug = editorDecks.find(d => d.id === selectedPresentation)?.slug || selectedPresentation;
+                    router.push(`/present/${username}/${slug}`);
                   }
                 } else {
                   setPasswordError(true);
