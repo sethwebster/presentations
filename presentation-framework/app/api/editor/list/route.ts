@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { listDecks } from '@/lib/deckApi';
+import { listDecks, getDeck } from '@/lib/deckApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,18 +36,28 @@ export async function GET() {
       return false;
     });
 
-    // Filter out deleted decks and format response
-    const validDecks = accessibleDecks
-      .filter((deck) => !deck.deletedAt)
-      .map((deck) => ({
-        id: deck.id,
-        slug: deck.slug,
-        title: deck.title || 'Untitled Presentation',
-        createdAt: deck.createdAt || new Date().toISOString(),
-        updatedAt: deck.updatedAt || new Date().toISOString(),
-        slideCount: 0, // Will be populated from meta in future if needed
-      }))
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    // Filter out deleted decks and load full deck data to get slide counts
+    const validDecks = await Promise.all(
+      accessibleDecks
+        .filter((deck) => !deck.deletedAt)
+        .map(async (deck) => {
+          // Load full deck to get slide count
+          const fullDeck = await getDeck(deck.id);
+          const slideCount = fullDeck?.slides?.length || 0;
+
+          return {
+            id: deck.id,
+            slug: deck.slug,
+            title: deck.title || 'Untitled Presentation',
+            createdAt: deck.createdAt || new Date().toISOString(),
+            updatedAt: deck.updatedAt || new Date().toISOString(),
+            slideCount,
+          };
+        })
+    );
+
+    // Sort by updatedAt
+    validDecks.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
     return NextResponse.json(validDecks, {
       headers: {
