@@ -10,3 +10,7 @@ export { EditorRoot } from './EditorRoot';
 export { EditorProvider } from './EditorProvider';
 export { EditorShell } from './EditorShell';
 export { TimelineDrawer } from './TimelineDrawer';
+export { NewPresentationModal } from './NewPresentationModal';
+export { AuthWarningBanner } from './AuthWarningBanner';
+export { EditorLoadingState } from './EditorLoadingState';
+export { EditorErrorState } from './EditorErrorState';
