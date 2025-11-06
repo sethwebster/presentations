@@ -1841,64 +1841,68 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
         </ToolbarButton>
       </div>
 
-      <ImageBackgroundModal
-        open={showBackgroundModal}
-        onClose={() => {
-          setShowBackgroundModal(false);
-          setBackgroundStatus({ isGenerating: false, error: null, success: null });
-        }}
-        onGenerate={handleGenerateImage}
-        onUpload={(mode) => {
-          setBackgroundFeedback({ error: null, success: null });
-          triggerBackgroundUpload(mode);
-        }}
-        status={backgroundStatus}
-        libraryItems={imageLibraryItems}
-        onSelectFromLibrary={handleSelectLibraryImage}
-        onRefreshLibrary={handleLibraryRefresh}
-        libraryStatus={{
-          isLoading: isLibraryRefreshing,
-          isSyncing: isLibrarySyncing,
-          error: imageLibraryError,
-        }}
-        initialPrompt={(() => {
-          // Extract prompt from current slide's background if it exists
-          const currentSlide = deck?.slides?.[currentSlideIndex];
-          if (currentSlide?.background && typeof currentSlide.background === 'object' && currentSlide.background.type === 'image') {
-            // Check for prompt at background level (new format)
-            if ('prompt' in currentSlide.background && typeof currentSlide.background.prompt === 'string') {
-              return currentSlide.background.prompt;
+      {showBackgroundModal && (
+        <ImageBackgroundModal
+          open={showBackgroundModal}
+          onClose={() => {
+            setShowBackgroundModal(false);
+            setBackgroundStatus({ isGenerating: false, error: null, success: null });
+          }}
+          onGenerate={handleGenerateImage}
+          onUpload={(mode) => {
+            setBackgroundFeedback({ error: null, success: null });
+            triggerBackgroundUpload(mode);
+          }}
+          status={backgroundStatus}
+          libraryItems={imageLibraryItems}
+          onSelectFromLibrary={handleSelectLibraryImage}
+          onRefreshLibrary={handleLibraryRefresh}
+          libraryStatus={{
+            isLoading: isLibraryRefreshing,
+            isSyncing: isLibrarySyncing,
+            error: imageLibraryError,
+          }}
+          initialPrompt={(() => {
+            // Extract prompt from current slide's background if it exists
+            const currentSlide = deck?.slides?.[currentSlideIndex];
+            if (currentSlide?.background && typeof currentSlide.background === 'object' && currentSlide.background.type === 'image') {
+              // Check for prompt at background level (new format)
+              if ('prompt' in currentSlide.background && typeof currentSlide.background.prompt === 'string') {
+                return currentSlide.background.prompt;
+              }
+              // Also check in background.value for backwards compatibility
+              const bgValue = currentSlide.background.value;
+              if (bgValue && typeof bgValue === 'object' && 'prompt' in bgValue && typeof bgValue.prompt === 'string') {
+                return bgValue.prompt;
+              }
             }
-            // Also check in background.value for backwards compatibility
-            const bgValue = currentSlide.background.value;
-            if (bgValue && typeof bgValue === 'object' && 'prompt' in bgValue && typeof bgValue.prompt === 'string') {
-              return bgValue.prompt;
-            }
-          }
-          return undefined;
-        })()}
-      />
+            return undefined;
+          })()}
+        />
+      )}
 
-      <RefinePanel
-        open={showRefineModal}
-        onClose={() => {
-          setShowRefineModal(false);
-          setRefineStatus({ isProcessing: false, error: null });
-        }}
-        onRefine={handleRefine}
-        isProcessing={refineStatus.isProcessing}
-        error={refineStatus.error}
-        messages={refineMessages}
-        onMessageUpdate={(messages) => {
-          if (activeSlideId) {
-            setRefineMessagesBySlide(prev => {
-              const newMap = new Map(prev);
-              newMap.set(activeSlideId, messages);
-              return newMap;
-            });
-          }
-        }}
-      />
+      {showRefineModal && (
+        <RefinePanel
+          open={showRefineModal}
+          onClose={() => {
+            setShowRefineModal(false);
+            setRefineStatus({ isProcessing: false, error: null });
+          }}
+          onRefine={handleRefine}
+          isProcessing={refineStatus.isProcessing}
+          error={refineStatus.error}
+          messages={refineMessages}
+          onMessageUpdate={(messages) => {
+            if (activeSlideId) {
+              setRefineMessagesBySlide(prev => {
+                const newMap = new Map(prev);
+                newMap.set(activeSlideId, messages);
+                return newMap;
+              });
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
