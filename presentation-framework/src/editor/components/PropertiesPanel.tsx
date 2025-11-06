@@ -476,16 +476,17 @@ export function PropertiesPanel() {
       const isBold =
         weight === 'bold' ||
         weight === '700' ||
+        weight === 700 ||
         (typeof weight === 'number' && weight >= 600) ||
         (!weight && boldAll);
-      return { style: { fontWeight: isBold ? undefined : '700' } };
+      return { style: { fontWeight: isBold ? 'normal' : 'bold' } };
     });
   }, [applyTextStyle, boldAll]);
 
   const toggleItalic = useCallback(() => {
     applyTextStyle(({ style }) => {
       const isItalic = style.fontStyle === 'italic';
-      return { style: { fontStyle: isItalic ? undefined : 'italic' } };
+      return { style: { fontStyle: isItalic ? 'normal' : 'italic' } };
     });
   }, [applyTextStyle]);
 
