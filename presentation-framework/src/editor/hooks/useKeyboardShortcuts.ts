@@ -186,8 +186,16 @@ export function useKeyboardShortcuts() {
       // Duplicate (Cmd/Ctrl + D)
       if (modKey && e.key === 'd') {
         e.preventDefault();
+        // If an element is selected, duplicate the element
         if (selectedElementIds.size === 1) {
           editor.duplicateElement(Array.from(selectedElementIds)[0]);
+        }
+        // If no elements are selected but a slide is selected, duplicate the slide
+        else if (selectedElementIds.size === 0 && selectedSlideId && deck) {
+          const slideIndex = deck.slides.findIndex(s => s.id === selectedSlideId);
+          if (slideIndex !== -1) {
+            editor.duplicateSlide(slideIndex);
+          }
         }
         return;
       }
