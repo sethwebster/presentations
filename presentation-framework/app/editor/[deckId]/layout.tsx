@@ -1,11 +1,11 @@
-import { Suspense } from 'react';
+import { ReactNode, Suspense } from 'react';
 import { EditorRoot } from './_components/EditorRoot';
 import { DeckDataLoader } from './_components/DeckDataLoader';
 import { EditorInitializer } from './_components/EditorInitializer';
 import { EditorLoadingState } from './_components/EditorLoadingState';
 
 interface EditorLayoutProps {
-  children: React.ReactNode;
+  children: ReactNode;
   params: Promise<{ deckId: string }>;
 }
 

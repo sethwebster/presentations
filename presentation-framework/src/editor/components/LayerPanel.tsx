@@ -9,13 +9,14 @@ import { SlideContextMenu } from './SlideContextMenu';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { ReorderableList, ReorderableListItem } from '@/components/ui/reorderable-list';
+import { ReorderableList } from '@/components/ui/reorderable-list';
 import { cn } from '@/lib/utils';
 
 interface LayerPanelProps {
   deckId: string;
 }
 
+// eslint-disable-next-line no-unused-vars
 export function LayerPanel({ deckId }: LayerPanelProps) {
   const state = useEditor();
   const editor = useEditorInstance();

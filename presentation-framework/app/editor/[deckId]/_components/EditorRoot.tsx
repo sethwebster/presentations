@@ -1,12 +1,13 @@
 "use client";
 
+import { ReactNode } from 'react';
 import { EditorProvider } from './EditorProvider';
 import { EditorShell } from './EditorShell';
 import { KeyboardShortcutsOverlay } from '@/editor/components/KeyboardShortcutsOverlay';
 
 interface EditorRootProps {
   deckId: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 /**
