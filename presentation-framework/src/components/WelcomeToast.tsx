@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import React from 'react';
+
+const { useState, useEffect } = React;
 import { authService } from '../services/AuthService';
 import type { AuthEvent } from '../types/services';
 

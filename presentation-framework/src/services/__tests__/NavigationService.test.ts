@@ -65,20 +65,11 @@ describe('NavigationService', () => {
   });
 
   describe('getViewerURL', () => {
-    it('generates viewer URL with viewer=true', () => {
+    it('generates viewer URL with slide parameter', () => {
       mockLocation.search = '';
       const url = navigationService.getViewerURL(3);
 
       expect(url).toContain('slide=4');
-      expect(url).toContain('viewer=true');
-    });
-
-    it('removes presenterKey from URL', () => {
-      mockLocation.search = '?presenterKey=secret';
-      const url = navigationService.getViewerURL(3);
-
-      expect(url).not.toContain('presenterKey');
-      expect(url).toContain('viewer=true');
     });
   });
 });

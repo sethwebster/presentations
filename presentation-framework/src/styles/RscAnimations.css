@@ -1,0 +1,1273 @@
+/* =============================================================================
+   LUME MOTION SYSTEM - Keynote-grade animations
+   Variable-driven, GPU-optimized, with View Transition API support
+   ============================================================================= */
+
+/* =========================
+   MOTION SYSTEM VARIABLES
+   ========================= */
+
+:root {
+  /* Global timing knobs (override per-element or per-slide) */
+  --rsc-duration: 600ms;
+  --rsc-delay: 0ms;
+  --rsc-iterations: 1;
+  --rsc-fill: both;
+  --rsc-direction: normal;
+  --rsc-ease: cubic-bezier(.25, .8, .25, 1); /* "standard" */
+
+  /* Distances/angles/scales */
+  --rsc-distance-x: 100%;
+  --rsc-distance-y: 100%;
+  --rsc-distance: 100%;
+  --rsc-scale-from: .92;
+  --rsc-scale-to: 1;
+  --rsc-rotate-from: -180deg;
+  --rsc-rotate-to: 180deg;
+
+  /* Advanced */
+  --rsc-perspective: 1200px;
+  --rsc-origin: center center;
+  --rsc-blur-from: 20px;
+  --rsc-glow-radius: 24px;
+
+  /* Stagger helpers */
+  --rsc-stagger-step: 60ms;
+
+  /* Transition duration/easing (set by JS before view transitions) */
+  --rsc-transition-duration: 600ms;
+  --rsc-transition-easing: cubic-bezier(.25, .8, .25, 1);
+}
+
+/* Easing presets (Keynote/Slides-style) */
+:root {
+  --ease-standard: cubic-bezier(.25, .8, .25, 1);
+  --ease-accelerate: cubic-bezier(.5, 0, 1, 1);
+  --ease-decelerate: cubic-bezier(0, 0, .2, 1);
+  --ease-emph: cubic-bezier(.2, .7, 0, 1);           /* snappy in */
+  --ease-back: cubic-bezier(.34, 1.56, .64, 1);      /* overshoot */
+  --ease-bounce: cubic-bezier(.33, .66, .04, 1.01);  /* subtle bounce */
+}
+
+/* =========================
+   BASE ANIMATION CLASS
+   ========================= */
+
+.rsc-animate {
+  animation-duration: var(--rsc-duration);
+  animation-delay: var(--rsc-delay);
+  animation-iteration-count: var(--rsc-iterations);
+  animation-fill-mode: var(--rsc-fill);
+  animation-direction: var(--rsc-direction);
+  animation-timing-function: var(--rsc-ease);
+  transform-origin: var(--rsc-origin);
+  will-change: transform, opacity;
+  backface-visibility: hidden; /* Prevent 3D artifacts */
+  contain: paint;              /* Isolate paints for smoother rendering */
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .rsc-animate {
+    animation: none !important;
+    transition: none !important;
+  }
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* =============================================================================
+   ENTRY ANIMATIONS (IN)
+   ============================================================================= */
+
+@keyframes rsc-appear-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes rsc-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes rsc-dissolve {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes rsc-move-in-x {
+  from {
+    opacity: 0;
+    transform: translateX(var(--rsc-distance-x, 100%));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes rsc-move-in-y {
+  from {
+    opacity: 0;
+    transform: translateY(var(--rsc-distance-y, 100%));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rsc-move-in-xy {
+  from {
+    opacity: 0;
+    transform: translate(var(--rsc-distance-x, 100%), var(--rsc-distance-y, 100%));
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes rsc-zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(var(--rsc-scale-from, .85));
+  }
+  to {
+    opacity: 1;
+    transform: scale(var(--rsc-scale-to, 1));
+  }
+}
+
+@keyframes rsc-rotate-in {
+  from {
+    opacity: 0;
+    transform: rotate(var(--rsc-rotate-from, -180deg)) scale(var(--rsc-scale-from, .9));
+  }
+  to {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+@keyframes rsc-fly-in {
+  from {
+    opacity: 0;
+    transform: translate(var(--rsc-translate-x, 0), var(--rsc-translate-y, 200px)) scale(var(--rsc-scale-from, .9));
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+/* Anvil - Fixed: vertical squash -> overshoot -> settle */
+@keyframes rsc-anvil-in {
+  0% {
+    opacity: 0;
+    transform: scaleY(.2) translateZ(0);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleY(1.08);
+  }
+  75% {
+    transform: scaleY(.96);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+/* Pop - Subtle overshoot */
+@keyframes rsc-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Blur-in */
+@keyframes rsc-blur-in {
+  0% {
+    opacity: 0;
+    filter: blur(var(--rsc-blur-from, 20px));
+    transform: translateZ(0);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+/* Bounce */
+@keyframes rsc-bounce {
+  0% {
+    opacity: 0;
+    transform: translateY(calc(var(--rsc-distance, -200%))) scale(var(--rsc-scale-from, 0.3));
+    animation-timing-function: ease-out;
+  }
+  60% {
+    transform: translateY(var(--rsc-bounce-up, 30px)) scale(1.05);
+    animation-timing-function: ease-in;
+  }
+  80% {
+    transform: translateY(calc(var(--rsc-bounce-up, 30px) * -0.5)) scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Drop */
+@keyframes rsc-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(var(--rsc-distance, -100%)) scale(var(--rsc-scale-from, 1.3));
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Reveal / Staggered Reveal */
+@keyframes rsc-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0px);
+  }
+}
+
+@keyframes rsc-staggered-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0px);
+  }
+}
+
+/* =============================================================================
+   EXIT ANIMATIONS (OUT)
+   ============================================================================= */
+
+@keyframes rsc-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes rsc-dissolve-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes rsc-move-out-x {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(var(--rsc-distance-x, -100%));
+  }
+}
+
+@keyframes rsc-move-out-y {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(var(--rsc-distance-y, -100%));
+  }
+}
+
+@keyframes rsc-zoom-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(var(--rsc-scale-to, .9));
+  }
+}
+
+@keyframes rsc-rotate-out {
+  from {
+    opacity: 1;
+    transform: rotate(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: rotate(var(--rsc-rotate-to, 180deg)) scale(var(--rsc-scale-to, .9));
+  }
+}
+
+@keyframes rsc-fly-out {
+  from {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--rsc-translate-x, 0), var(--rsc-translate-y, -200px)) scale(var(--rsc-scale-to, .5));
+  }
+}
+
+@keyframes rsc-disappear {
+  0% { opacity: 1; }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/* =============================================================================
+   EMPHASIS ANIMATIONS
+   ============================================================================= */
+
+@keyframes rsc-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(var(--rsc-pulse-scale, 1.08));
+  }
+}
+
+@keyframes rsc-pop-emphasis {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(var(--rsc-pop-scale, 1.3));
+  }
+}
+
+/* Jiggle - Fixed: smoother rotation */
+@keyframes rsc-jiggle {
+  0%, 100% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(-2.5deg);
+  }
+  50% {
+    transform: rotate(2.5deg);
+  }
+  75% {
+    transform: rotate(-1.5deg);
+  }
+}
+
+@keyframes rsc-swing {
+  0% {
+    transform: rotate(0);
+  }
+  50% {
+    transform: rotate(var(--rsc-swing-angle, 12deg));
+  }
+  100% {
+    transform: rotate(0);
+  }
+}
+
+@keyframes rsc-flip {
+  0% {
+    transform: rotateY(0);
+  }
+  100% {
+    transform: rotateY(var(--rsc-flip-angle, 360deg));
+  }
+}
+
+@keyframes rsc-grow-shrink {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(var(--rsc-scale-amount, 1.5));
+  }
+}
+
+@keyframes rsc-spin {
+  from {
+    transform: rotate(0);
+  }
+  to {
+    transform: rotate(var(--rsc-spin-angle, 360deg));
+  }
+}
+
+@keyframes rsc-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 0 var(--rsc-glow-color, currentColor));
+  }
+  50% {
+    filter: drop-shadow(0 0 var(--rsc-glow-radius, 20px) var(--rsc-glow-color, currentColor));
+  }
+}
+
+@keyframes rsc-color-change {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(var(--rsc-hue-rotation, 360deg));
+  }
+}
+
+@keyframes rsc-typewriter {
+  0% {
+    clip-path: inset(0 100% 0 0);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* =============================================================================
+   3D SLIDE TRANSITIONS
+   ============================================================================= */
+
+.rsc-3d {
+  perspective: var(--rsc-perspective, 1200px);
+  transform-style: preserve-3d;
+  isolation: isolate;
+}
+
+/* Cube Transitions */
+@keyframes rsc-cube-in-left {
+  from { transform: rotateY(-90deg); }
+  to { transform: rotateY(0); }
+}
+
+@keyframes rsc-cube-out-left {
+  from { transform: rotateY(0); }
+  to { transform: rotateY(90deg); }
+}
+
+@keyframes rsc-cube-in-right {
+  from { transform: rotateY(90deg); }
+  to { transform: rotateY(0); }
+}
+
+@keyframes rsc-cube-out-right {
+  from { transform: rotateY(0); }
+  to { transform: rotateY(-90deg); }
+}
+
+@keyframes rsc-cube-in-up {
+  from { transform: rotateX(90deg); }
+  to { transform: rotateX(0); }
+}
+
+@keyframes rsc-cube-out-up {
+  from { transform: rotateX(0); }
+  to { transform: rotateX(-90deg); }
+}
+
+@keyframes rsc-cube-in-down {
+  from { transform: rotateX(-90deg); }
+  to { transform: rotateX(0); }
+}
+
+@keyframes rsc-cube-out-down {
+  from { transform: rotateX(0); }
+  to { transform: rotateX(90deg); }
+}
+
+/* Flip (Card) Transitions - Pure 3D rotation, no crossfade */
+@keyframes rsc-flip-in-y {
+  from { transform: rotateY(-90deg); }
+  to { transform: rotateY(0); }
+}
+
+@keyframes rsc-flip-out-y {
+  from { transform: rotateY(0); }
+  to { transform: rotateY(90deg); }
+}
+
+@keyframes rsc-flip-in-x {
+  from { transform: rotateX(90deg); }
+  to { transform: rotateX(0); }
+}
+
+@keyframes rsc-flip-out-x {
+  from { transform: rotateX(0); }
+  to { transform: rotateX(-90deg); }
+}
+
+/* Door Transition */
+@keyframes rsc-door-in-left {
+  from { transform: rotateY(-75deg); }
+  to { transform: rotateY(0); }
+}
+
+@keyframes rsc-door-out-left {
+  from { transform: rotateY(0); }
+  to { transform: rotateY(75deg); }
+}
+
+/* Page Curl */
+@keyframes rsc-page-curl {
+  0% {
+    transform: rotateY(90deg);
+    transform-origin: left;
+    opacity: 0;
+  }
+  100% {
+    transform: rotateY(0deg);
+    opacity: 1;
+  }
+}
+
+/* Fall */
+@keyframes rsc-fall {
+  0% {
+    transform: translateY(var(--rsc-fall-distance, -100%)) rotate(var(--rsc-fall-rotation, -10deg));
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+/* Perspective */
+@keyframes rsc-perspective {
+  0% {
+    transform: perspective(1000px) rotateY(var(--rsc-perspective-from, -90deg)) scale(var(--rsc-scale-from, 0.8));
+    opacity: 0;
+  }
+  100% {
+    transform: perspective(1000px) rotateY(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Swap */
+@keyframes rsc-swap {
+  0% {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+  50% {
+    transform: scaleX(0);
+  }
+  100% {
+    transform: scaleX(1);
+    transform-origin: right;
+  }
+}
+
+/* =============================================================================
+   VIEW TRANSITION API MAPPINGS
+   ============================================================================= */
+
+/* Apply common timing via CSS vars - improved inheritance in modern browsers */
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: var(--rsc-transition-duration, 600ms);
+  animation-timing-function: var(--rsc-transition-easing, var(--ease-standard));
+  animation-delay: var(--rsc-delay, 0ms);
+  animation-fill-mode: both;
+  backface-visibility: hidden;
+}
+
+/* Default slide transition */
+::view-transition-old(slide-content),
+::view-transition-new(slide-content) {
+  animation-duration: var(--rsc-transition-duration, 0.5s);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+}
+
+/* =========================
+   PUSH TRANSITIONS
+   ========================= */
+
+::view-transition-group(rsc-push-left) { overflow: clip; }
+::view-transition-old(rsc-push-left) {
+  animation-name: rsc-push-old-left;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+::view-transition-new(rsc-push-left) {
+  animation-name: rsc-push-new-left;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+
+@keyframes rsc-push-old-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+
+@keyframes rsc-push-new-left {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+::view-transition-group(rsc-push-right) { overflow: clip; }
+::view-transition-old(rsc-push-right) {
+  animation-name: rsc-push-old-right;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+::view-transition-new(rsc-push-right) {
+  animation-name: rsc-push-new-right;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+
+@keyframes rsc-push-old-right {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+
+@keyframes rsc-push-new-right {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+::view-transition-group(rsc-push-up) { overflow: clip; }
+::view-transition-old(rsc-push-up) {
+  animation-name: rsc-push-old-up;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+::view-transition-new(rsc-push-up) {
+  animation-name: rsc-push-new-up;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+
+@keyframes rsc-push-old-up {
+  from { transform: translateY(0); }
+  to { transform: translateY(-100%); }
+}
+
+@keyframes rsc-push-new-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+::view-transition-group(rsc-push-down) { overflow: clip; }
+::view-transition-old(rsc-push-down) {
+  animation-name: rsc-push-old-down;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+::view-transition-new(rsc-push-down) {
+  animation-name: rsc-push-new-down;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+
+@keyframes rsc-push-old-down {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+
+@keyframes rsc-push-new-down {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+
+/* =========================
+   FADE / DISSOLVE TRANSITIONS
+   ========================= */
+
+::view-transition-old(rsc-fade),
+::view-transition-old(rsc-fade-in),
+::view-transition-old(rsc-dissolve) {
+  animation-name: rsc-fade-out;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+
+::view-transition-new(rsc-fade),
+::view-transition-new(rsc-fade-in),
+::view-transition-new(rsc-dissolve) {
+  animation-name: rsc-fade-in;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+
+/* =========================
+   ZOOM TRANSITIONS
+   ========================= */
+
+::view-transition-old(rsc-zoom) {
+  animation-name: rsc-zoom-out;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+
+::view-transition-new(rsc-zoom) {
+  animation-name: rsc-zoom-in;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+
+/* =========================
+   WIPE TRANSITIONS
+   Old slide progressively disappears to reveal new slide underneath
+   ========================= */
+
+::view-transition-new(rsc-wipe-left),
+::view-transition-new(rsc-wipe-right),
+::view-transition-new(rsc-wipe-up),
+::view-transition-new(rsc-wipe-down) {
+  animation: none;
+  /* New slide stays in place underneath */
+}
+
+::view-transition-group(rsc-wipe-left),
+::view-transition-group(rsc-wipe-right),
+::view-transition-group(rsc-wipe-up),
+::view-transition-group(rsc-wipe-down) {
+  overflow: hidden;
+}
+
+/* Wipe Left: Old slide disappears from left to right → */
+::view-transition-old(rsc-wipe-left) {
+  animation-name: rsc-wipe-left;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+  transform-origin: left center;
+}
+
+@keyframes rsc-wipe-left {
+  from {
+    transform: translateX(0) scaleX(1);
+  }
+  to {
+    transform: translateX(-100%) scaleX(0);
+  }
+}
+
+/* Wipe Right: Old slide disappears from right to left ← */
+::view-transition-old(rsc-wipe-right) {
+  animation-name: rsc-wipe-right;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+  transform-origin: right center;
+}
+
+@keyframes rsc-wipe-right {
+  from {
+    transform: translateX(0) scaleX(1);
+  }
+  to {
+    transform: translateX(100%) scaleX(0);
+  }
+}
+
+/* Wipe Up: Old slide disappears from bottom to top ↑ */
+::view-transition-old(rsc-wipe-up) {
+  animation-name: rsc-wipe-up;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+  transform-origin: center bottom;
+}
+
+@keyframes rsc-wipe-up {
+  from {
+    transform: translateY(0) scaleY(1);
+  }
+  to {
+    transform: translateY(-100%) scaleY(0);
+  }
+}
+
+/* Wipe Down: Old slide disappears from top to bottom ↓ */
+::view-transition-old(rsc-wipe-down) {
+  animation-name: rsc-wipe-down;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+  transform-origin: center top;
+}
+
+@keyframes rsc-wipe-down {
+  from {
+    transform: translateY(0) scaleY(1);
+  }
+  to {
+    transform: translateY(100%) scaleY(0);
+  }
+}
+
+/* =========================
+   REVEAL TRANSITIONS
+   ========================= */
+
+::view-transition-old(rsc-reveal-left) {
+  animation-name: rsc-reveal-left-exit;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+
+::view-transition-new(rsc-reveal-left) {
+  animation-name: rsc-reveal-left;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+
+@keyframes rsc-reveal-left-exit {
+  0% {
+    clip-path: inset(0 0 0 0);
+  }
+  100% {
+    clip-path: inset(0 100% 0 0);
+  }
+}
+
+@keyframes rsc-reveal-left {
+  0% {
+    clip-path: inset(0 100% 0 0);
+    transform: translateX(0);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    transform: translateX(0);
+  }
+}
+
+::view-transition-old(rsc-reveal-right) {
+  animation-name: rsc-reveal-right-exit;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+
+::view-transition-new(rsc-reveal-right) {
+  animation-name: rsc-reveal-right;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+
+@keyframes rsc-reveal-right-exit {
+  0% {
+    clip-path: inset(0 0 0 0);
+  }
+  100% {
+    clip-path: inset(0 0 0 100%);
+  }
+}
+
+@keyframes rsc-reveal-right {
+  0% {
+    clip-path: inset(0 0 0 100%);
+    transform: translateX(0);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    transform: translateX(0);
+  }
+}
+
+::view-transition-old(rsc-reveal-up) {
+  animation-name: rsc-reveal-up-exit;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+
+::view-transition-new(rsc-reveal-up) {
+  animation-name: rsc-reveal-up;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+
+@keyframes rsc-reveal-up-exit {
+  0% {
+    clip-path: inset(0 0 0 0);
+  }
+  100% {
+    clip-path: inset(100% 0 0 0);
+  }
+}
+
+@keyframes rsc-reveal-up {
+  0% {
+    clip-path: inset(100% 0 0 0);
+    transform: translateY(0);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    transform: translateY(0);
+  }
+}
+
+::view-transition-old(rsc-reveal-down) {
+  animation-name: rsc-reveal-down-exit;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+
+::view-transition-new(rsc-reveal-down) {
+  animation-name: rsc-reveal-down;
+  animation-duration: var(--rsc-transition-duration, 500ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+}
+
+@keyframes rsc-reveal-down-exit {
+  0% {
+    clip-path: inset(0 0 0 0);
+  }
+  100% {
+    clip-path: inset(0 0 100% 0);
+  }
+}
+
+@keyframes rsc-reveal-down {
+  0% {
+    clip-path: inset(0 0 100% 0);
+    transform: translateY(0);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    transform: translateY(0);
+  }
+}
+
+/* =========================
+   3D CUBE TRANSITIONS
+   ========================= */
+
+::view-transition-group(rsc-cube-left) {
+  perspective: var(--rsc-perspective, 1200px);
+  transform-style: preserve-3d;
+}
+
+::view-transition-old(rsc-cube-left) {
+  animation-name: rsc-cube-out-left;
+  animation-duration: var(--rsc-transition-duration, 600ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+  transform-origin: left center;
+}
+
+::view-transition-new(rsc-cube-left) {
+  animation-name: rsc-cube-in-left;
+  animation-duration: var(--rsc-transition-duration, 600ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+  transform-origin: right center;
+}
+
+::view-transition-group(rsc-cube-right) {
+  perspective: var(--rsc-perspective, 1200px);
+  transform-style: preserve-3d;
+}
+
+::view-transition-old(rsc-cube-right) {
+  animation-name: rsc-cube-out-right;
+  animation-duration: var(--rsc-transition-duration, 600ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+  transform-origin: right center;
+}
+
+::view-transition-new(rsc-cube-right) {
+  animation-name: rsc-cube-in-right;
+  animation-duration: var(--rsc-transition-duration, 600ms);
+  animation-timing-function: var(--rsc-transition-easing, ease-in-out);
+  animation-fill-mode: both;
+  transform-origin: left center;
+}
+
+/* =========================
+   FLIP TRANSITIONS
+   Paired-planes effect: card with front/back faces
+   ========================= */
+
+::view-transition-group(rsc-flip-left) {
+  perspective: var(--rsc-perspective, 1200px);
+  transform-style: preserve-3d;
+  isolation: isolate;
+}
+
+/* Old = front face rotating out; New = back face rotating in */
+::view-transition-old(rsc-flip-left),
+::view-transition-new(rsc-flip-left) {
+  backface-visibility: hidden;
+  transform-origin: center right; /* hinge on the right for a left flip */
+  animation-duration: var(--rsc-transition-duration, 650ms);
+  animation-timing-function: var(--rsc-transition-easing, cubic-bezier(.2, .7, 0, 1));
+  animation-fill-mode: both;
+}
+
+/* Force stacking so the "front" sits above until ~90deg */
+::view-transition-old(rsc-flip-left) {
+  z-index: 2;
+  animation-name: rsc-flip-old-left;
+}
+
+::view-transition-new(rsc-flip-left) {
+  z-index: 1;
+  animation-name: rsc-flip-new-left;
+}
+
+@keyframes rsc-flip-old-left {
+  from { transform: rotateY(0); }
+  to { transform: rotateY(90deg); }
+}
+
+@keyframes rsc-flip-new-left {
+  from { transform: rotateY(-90deg); }
+  to { transform: rotateY(0); }
+}
+
+::view-transition-group(rsc-flip-right) {
+  perspective: var(--rsc-perspective, 1200px);
+  transform-style: preserve-3d;
+  isolation: isolate;
+}
+
+::view-transition-old(rsc-flip-right),
+::view-transition-new(rsc-flip-right) {
+  backface-visibility: hidden;
+  transform-origin: center left; /* hinge on the left for a right flip */
+  animation-duration: var(--rsc-transition-duration, 650ms);
+  animation-timing-function: var(--rsc-transition-easing, cubic-bezier(.2, .7, 0, 1));
+  animation-fill-mode: both;
+}
+
+::view-transition-old(rsc-flip-right) {
+  z-index: 2;
+  animation-name: rsc-flip-old-right;
+}
+
+::view-transition-new(rsc-flip-right) {
+  z-index: 1;
+  animation-name: rsc-flip-new-right;
+}
+
+@keyframes rsc-flip-old-right {
+  from { transform: rotateY(0); }
+  to { transform: rotateY(-90deg); }
+}
+
+@keyframes rsc-flip-new-right {
+  from { transform: rotateY(90deg); }
+  to { transform: rotateY(0); }
+}
+
+/* =============================================================================
+   UTILITY CLASSES FOR DIRECTION
+   ============================================================================= */
+
+/* Move In (X/Y/XY) */
+.rsc-in-left {
+  --rsc-distance-x: -100%;
+  animation-name: rsc-move-in-x;
+}
+
+.rsc-in-right {
+  --rsc-distance-x: 100%;
+  animation-name: rsc-move-in-x;
+}
+
+.rsc-in-up {
+  --rsc-distance-y: -100%;
+  animation-name: rsc-move-in-y;
+}
+
+.rsc-in-down {
+  --rsc-distance-y: 100%;
+  animation-name: rsc-move-in-y;
+}
+
+/* Out */
+.rsc-out-left {
+  --rsc-distance-x: -100%;
+  animation-name: rsc-move-out-x;
+}
+
+.rsc-out-right {
+  --rsc-distance-x: 100%;
+  animation-name: rsc-move-out-x;
+}
+
+.rsc-out-up {
+  --rsc-distance-y: -100%;
+  animation-name: rsc-move-out-y;
+}
+
+.rsc-out-down {
+  --rsc-distance-y: 100%;
+  animation-name: rsc-move-out-y;
+}
+
+/* Zoom / Rotate / Pop / Anvil */
+.rsc-zoom-in {
+  animation-name: rsc-zoom-in;
+}
+
+.rsc-zoom-out {
+  animation-name: rsc-zoom-out;
+}
+
+.rsc-rotate-in {
+  animation-name: rsc-rotate-in;
+}
+
+.rsc-rotate-out {
+  animation-name: rsc-rotate-out;
+}
+
+.rsc-pop-in {
+  animation-name: rsc-pop-in;
+  --rsc-ease: var(--ease-back);
+}
+
+.rsc-anvil-in {
+  animation-name: rsc-anvil-in;
+  --rsc-ease: var(--ease-emph);
+}
+
+.rsc-blur-in {
+  animation-name: rsc-blur-in;
+}
+
+.rsc-fade-in {
+  animation-name: rsc-fade-in;
+}
+
+.rsc-fade-out {
+  animation-name: rsc-fade-out;
+}
+
+/* Emphasis */
+.rsc-pulse {
+  animation-name: rsc-pulse;
+}
+
+.rsc-jiggle {
+  animation-name: rsc-jiggle;
+}
+
+.rsc-swing {
+  animation-name: rsc-swing;
+}
+
+.rsc-spin {
+  animation-name: rsc-spin;
+}
+
+/* =============================================================================
+   COMPATIBILITY ALIASES (for backward compatibility)
+   ============================================================================= */
+
+/* Legacy names that may be in existing code */
+@keyframes rsc-appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes rsc-rotate {
+  from {
+    transform: rotate(var(--rsc-rotate-from, -180deg)) scale(var(--rsc-scale-from, .9));
+  }
+  to {
+    transform: rotate(0) scale(1);
+  }
+}
+
+/* Old anvil name points to new fixed version */
+@keyframes rsc-anvil {
+  0% {
+    opacity: 0;
+    transform: scaleY(.2);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleY(1.08);
+  }
+  75% {
+    transform: scaleY(.96);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+/* Legacy element animation names */
+@keyframes rsc-enter-translate {
+  0% {
+    opacity: 0;
+    transform: translate(var(--rsc-translate-x, 0px), var(--rsc-translate-y, 16px))
+      scale(var(--rsc-scale-from, 1));
+  }
+  100% {
+    opacity: 1;
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+@keyframes rsc-exit-translate {
+  0% {
+    opacity: 1;
+    transform: translate(0px, 0px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--rsc-translate-x, 0px), var(--rsc-translate-y, 16px))
+      scale(var(--rsc-scale-from, 1));
+  }
+}
+
+@keyframes rsc-magic-move {
+  0% {
+    opacity: 0;
+    transform: translate(var(--rsc-translate-x, 0px), var(--rsc-translate-y, 12px))
+      scale(var(--rsc-scale-from, 0.96));
+  }
+  100% {
+    opacity: 1;
+    transform: translate(0px, 0px) scale(1);
+  }
+}

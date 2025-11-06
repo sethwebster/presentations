@@ -1,0 +1,13 @@
+{
+  "series": [
+    {
+      "label": "Adoption",
+      "values": [40, 68, 92]
+    },
+    {
+      "label": "Retention",
+      "values": [32, 54, 78]
+    }
+  ],
+  "categories": ["Q1", "Q2", "Q3"]
+}

@@ -4,7 +4,7 @@ import { authService } from '../AuthService';
 describe('AuthService', () => {
   beforeEach(() => {
     localStorage.clear();
-    authService.authStateListeners.clear();
+    authService.resetForTests();
   });
 
   describe('isAuthenticated', () => {
@@ -51,12 +51,12 @@ describe('AuthService', () => {
       const listener = vi.fn();
       const unsubscribe = authService.onAuthStateChange(listener);
 
-      authService.emitAuthState({ type: 'test' });
+      authService.emitAuthState({ type: 'authenticated', token: 'abc' });
 
-      expect(listener).toHaveBeenCalledWith({ type: 'test' });
+      expect(listener).toHaveBeenCalledWith({ type: 'authenticated', token: 'abc' });
 
       unsubscribe();
-      authService.emitAuthState({ type: 'test2' });
+      authService.emitAuthState({ type: 'logged_out' });
 
       expect(listener).toHaveBeenCalledTimes(1);
     });

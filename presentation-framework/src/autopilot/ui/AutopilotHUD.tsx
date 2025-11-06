@@ -1,11 +1,12 @@
 import { CountdownState } from '../../types/services';
+import { Slider } from '@/components/ui/slider';
 import './AutopilotHUD.css';
 
 interface AutopilotHUDProps {
   connected: boolean;
   enabled: boolean;
-  currentScore: number;
-  threshold: number;
+  currentScore: number | null;
+  threshold?: number | null;
   error: string | null;
   countdown: CountdownState | null;
   onToggle: () => void;
@@ -20,16 +21,18 @@ export function AutopilotHUD({
   connected,
   enabled,
   currentScore,
-  threshold = 0.50,
+  threshold = 0.5,
   error,
   countdown: _countdown = null, // Used by parent component
   onToggle,
   onCancelCountdown: _onCancelCountdown, // Used by parent component
   onThresholdChange,
 }: AutopilotHUDProps) {
-  const progressPercentage = Math.round(currentScore * 100);
-  const thresholdPercentage = Math.round(threshold * 100);
-  const isReadyToAdvance = currentScore >= threshold;
+  const score = currentScore ?? 0;
+  const activeThreshold = threshold ?? 0.5;
+  const progressPercentage = Math.round(score * 100);
+  const thresholdPercentage = Math.round(activeThreshold * 100);
+  const isReadyToAdvance = score >= activeThreshold;
 
   // Remove excessive logging
   // console.log('🎚️ AutopilotHUD render - threshold:', threshold, 'percentage:', thresholdPercentage, 'sliderValue:', thresholdPercentage);
@@ -103,7 +106,7 @@ export function AutopilotHUD({
                   />
                   <div
                     className="confidence-threshold"
-                    style={{ left: `${threshold * 100}%` }}
+                    style={{ left: `${activeThreshold * 100}%` }}
                   />
                 </div>
               </div>
@@ -112,25 +115,19 @@ export function AutopilotHUD({
                 <label className="threshold-label" htmlFor="threshold-slider">
                   Threshold: {thresholdPercentage}%
                 </label>
-                <input
-                  id="threshold-slider"
-                  type="range"
-                  min="30"
-                  max="80"
-                  step="5"
-                  value={thresholdPercentage}
-                  onChange={(e) => {
-                    const newVal = parseInt(e.target.value) / 100;
-                    console.log('🎚️ Slider onChange - raw value:', e.target.value, '→', newVal, 'hasCallback:', !!onThresholdChange);
+                <Slider
+                  className="threshold-slider"
+                  value={[thresholdPercentage]}
+                  min={30}
+                  max={80}
+                  step={5}
+                  onValueChange={(value) => {
+                    const raw = value[0] ?? thresholdPercentage;
+                    const newVal = raw / 100;
                     if (onThresholdChange) {
-                      console.log('📞 Calling onThresholdChange with:', newVal);
                       onThresholdChange(newVal);
-                    } else {
-                      console.error('❌ onThresholdChange is not defined!');
                     }
                   }}
-                  className="threshold-slider"
-                  title={`Adjust threshold: ${thresholdPercentage}%`}
                 />
                 <div className="threshold-ticks">
                   <span>30%</span>

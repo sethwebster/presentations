@@ -1,0 +1,48 @@
+/* Slide Preview Styles */
+/* Default styling for common slide element IDs */
+
+/* Hero/Title slides */
+#hero-title,
+#closing-title {
+  font-size: 72px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.2;
+  /* Color should come from inline styles on the element */
+}
+
+/* Content titles */
+#content-title {
+  font-size: 56px;
+  font-weight: 600;
+  line-height: 1.3;
+  /* Color should come from inline styles on the element */
+}
+
+/* Bullet points */
+[id^="bullet-"] {
+  font-size: 36px;
+  font-weight: 400;
+  line-height: 1.5;
+  padding-left: 40px;
+  /* Color should come from inline styles on the element */
+}
+
+/* Subtitle */
+#subtitle {
+  font-size: 40px;
+  font-weight: 400;
+  line-height: 1.4;
+  /* Color should come from inline styles on the element */
+}
+
+/* Default text styling */
+.slide [data-element-type="text"],
+.slide [data-element-type="richtext"] {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Background opacity support */
+.slide[style*="opacity"] {
+  position: relative;
+}

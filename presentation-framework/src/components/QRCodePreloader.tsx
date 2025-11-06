@@ -1,4 +1,6 @@
-import { useMemo } from 'react';
+import React from 'react';
+
+const { useMemo } = React;
 import { QRCodeSVG } from 'qrcode.react';
 
 interface QRCodePreloaderProps {
@@ -17,7 +19,7 @@ export function QRCodePreloader({ currentSlide, totalSlides }: QRCodePreloaderPr
 
     const baseUrl = window.location.origin + window.location.pathname;
     const params = new URLSearchParams(window.location.search);
-    params.set('slide', nextIndex + 1);
+    params.set('slide', String(nextIndex + 1));
     return `${baseUrl}?${params.toString()}`;
   }, [currentSlide, totalSlides]);
 

@@ -1,0 +1,328 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* Lume brand tokens */
+    --lume-size: 64px;
+    --lume-gap: 12px;
+
+    /* Lume 5-color core palette */
+    --lume-primary: #16C2C7;      /* Lume Teal - signature brand */
+    --lume-accent: #C84BD2;       /* Lume Magenta - vibrant highlights */
+    --lume-ember: #FF6A3D;        /* Lume Ember - warm glow */
+    --lume-midnight: #0B1022;     /* Lume Midnight - deep navy glass */
+    --lume-mist: #ECECEC;         /* Lume Mist - clean neutral */
+
+    /* Legacy aliases for compatibility */
+    --lume-teal: var(--lume-primary);
+    --lume-magenta: var(--lume-accent);
+    --lume-orange: var(--lume-ember);
+    --lume-text: var(--lume-mist);
+    --lume-text-dark: #141414;
+
+    /* shadcn tokens */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+  }
+}
+
+/* Lume branding components */
+.lume-mark {
+  inline-size: var(--lume-size);
+  block-size: var(--lume-size);
+  background-image: url("/assets/logo-no-wordmark.png");
+  background-size: cover;
+  background-position: center;
+  display: inline-block;
+  vertical-align: middle;
+  border-radius: 999px;
+}
+
+.lume-lockup {
+  display: inline-block;
+  inline-size: calc(var(--lume-size) * 4.5);
+  block-size: var(--lume-size);
+  background: url("/assets/logo.png") center/contain no-repeat;
+}
+
+.lume-word {
+  font-family: ui-serif, "SF Pro Display", "New York", "Times New Roman", Georgia, serif;
+  font-weight: 600;
+  font-size: calc(var(--lume-size) * 0.6);
+  letter-spacing: 0.01em;
+  line-height: 1;
+  display: inline-block;
+  vertical-align: middle;
+  background: linear-gradient(135deg, var(--lume-primary) 0%, var(--lume-accent) 50%, var(--lume-ember) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-rendering: optimizeLegibility;
+}
+
+.lume-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lume-gap);
+}
+
+@media (prefers-color-scheme: light) {
+  .lume-word { color: var(--lume-text-dark); }
+}
+
+.lume--sm { --lume-size: 40px; }
+.lume--lg { --lume-size: 96px; }
+.lume--xl { --lume-size: 128px; }
+
+@layer base {
+  :root {
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+}
+
+/* Status bar animations */
+@keyframes statusBarPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes statusBarSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Editor Theme */
+.editor-shell {
+  --editor-bg: #f5f7fb;
+  --editor-surface: rgba(255, 255, 255, 0.98);
+  --editor-surface-muted: rgba(246, 248, 255, 0.9);
+  --editor-border: rgba(15, 23, 42, 0.08);
+  --editor-border-strong: rgba(15, 23, 42, 0.14);
+  --editor-shadow: rgba(15, 23, 42, 0.08);
+  --editor-text: #0f172a;
+  --editor-text-muted: rgba(15, 23, 42, 0.62);
+  --editor-text-subtle: rgba(15, 23, 42, 0.45);
+  --editor-icon: rgba(15, 23, 42, 0.55);
+  --editor-accent: #2563eb;
+  --editor-accent-foreground: #ffffff;
+  --editor-button-hover: rgba(37, 99, 235, 0.12);
+  --editor-button-active: #2563eb;
+  --editor-canvas-bg: #ffffff;
+  --editor-canvas-border: rgba(148, 163, 184, 0.2);
+
+  background:
+    radial-gradient(circle at 12% 12%, rgba(37, 99, 235, 0.08), transparent 55%),
+    radial-gradient(circle at 90% 10%, rgba(14, 165, 233, 0.06), transparent 50%),
+    linear-gradient(180deg, rgba(248, 250, 255, 0.9) 0%, rgba(241, 245, 255, 0.92) 50%, rgba(236, 240, 255, 0.94) 100%);
+  color: var(--editor-text);
+  font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.dark .editor-shell {
+  --editor-bg: #0a1424;
+  --editor-surface: rgba(13, 21, 38, 0.92);
+  --editor-surface-muted: rgba(15, 23, 42, 0.78);
+  --editor-border: rgba(148, 163, 184, 0.18);
+  --editor-border-strong: rgba(148, 163, 184, 0.28);
+  --editor-shadow: rgba(8, 15, 35, 0.55);
+  --editor-text: #e2e8f0;
+  --editor-text-muted: rgba(148, 163, 184, 0.82);
+  --editor-text-subtle: rgba(148, 163, 184, 0.6);
+  --editor-icon: rgba(148, 163, 184, 0.7);
+  --editor-accent: #38bdf8;
+  --editor-accent-foreground: #0b1120;
+  --editor-button-hover: rgba(56, 189, 248, 0.18);
+  --editor-button-active: #38bdf8;
+  --editor-canvas-bg: #0f172a;
+  --editor-canvas-border: rgba(148, 163, 184, 0.26);
+
+  background:
+    radial-gradient(circle at 12% 12%, rgba(56, 189, 248, 0.18), transparent 55%),
+    radial-gradient(circle at 80% 8%, rgba(129, 140, 248, 0.15), transparent 55%),
+    linear-gradient(180deg, rgba(10, 19, 35, 0.95) 0%, rgba(10, 19, 35, 0.96) 40%, rgba(4, 11, 22, 0.98) 100%);
+  color: var(--editor-text);
+}
+
+.editor-panel {
+  background: var(--editor-surface);
+  color: var(--editor-text);
+  border-color: var(--editor-border-strong) !important;
+  box-shadow: 0 24px 48px -32px var(--editor-shadow);
+  backdrop-filter: blur(18px);
+}
+
+.editor-panel-muted {
+  background: var(--editor-surface-muted);
+  color: var(--editor-text);
+  border-color: var(--editor-border) !important;
+  backdrop-filter: blur(16px);
+}
+
+.editor-heading {
+  color: var(--editor-text);
+}
+
+.editor-subheading {
+  color: var(--editor-text-muted);
+}
+
+.editor-text-muted {
+  color: var(--editor-text-muted);
+}
+
+.editor-toolbar-button {
+  width: 2.25rem;
+  height: 2.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--editor-icon);
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease, box-shadow 200ms ease;
+  box-shadow: none;
+}
+
+.editor-toolbar-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.editor-toolbar-button:hover {
+  background: var(--editor-button-hover);
+  color: var(--editor-text);
+  border-color: var(--editor-border);
+}
+
+.editor-toolbar-button.is-active {
+  background: var(--editor-button-active);
+  color: var(--editor-accent-foreground);
+  border-color: var(--editor-button-active);
+  box-shadow: 0 14px 28px -18px var(--editor-shadow);
+}
+
+.editor-toolbar-button.is-disabled,
+.editor-toolbar-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.editor-input,
+.editor-textarea,
+.editor-select {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--editor-border);
+  background: var(--editor-surface-muted);
+  color: var(--editor-text);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+  padding: 0.625rem 0.75rem;
+}
+
+.editor-input:focus,
+.editor-textarea:focus,
+.editor-select:focus {
+  border-color: color-mix(in srgb, var(--editor-accent) 65%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--editor-accent) 24%, transparent);
+  outline: none;
+}
+
+.dark .editor-input,
+.dark .editor-textarea,
+.dark .editor-select {
+  background: rgba(23, 36, 56, 0.9);
+  border-color: rgba(148, 163, 184, 0.24);
+}
+
+.dark .editor-input:focus,
+.dark .editor-textarea:focus,
+.dark .editor-select:focus {
+  border-color: color-mix(in srgb, var(--editor-accent) 75%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--editor-accent) 32%, transparent);
+}
+
+.editor-section-heading {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--editor-text-muted);
+}
+
+.editor-checkbox {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--editor-accent);
+}
+
+.editor-divider {
+  border-color: var(--editor-border) !important;
+}
+
+/* Remove default borders from editor canvas images - inline styles will override for selection */
+.editor-shell [data-element-id] img {
+  border: none !important;
+  outline: none !important;
+}
+

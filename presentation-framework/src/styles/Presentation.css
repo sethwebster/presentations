@@ -29,20 +29,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4rem;
+  padding: 0;
 }
 
 .slide {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  position: absolute;
-  top: 0;
-  left: 0;
+  /* Dynamic canvas - scaled via inline transform */
+  position: relative;
+  width: var(--slide-width, 1280px);
+  height: var(--slide-height, 720px);
+  transform-origin: center center;
 }
 
 .slide h1 {
@@ -76,7 +71,6 @@
   font-size: 1.2rem;
   opacity: 0.5;
   font-weight: 300;
-  view-transition-name: slide-number;
 }
 
 .nav-arrow {
@@ -223,7 +217,6 @@
   display: flex;
   gap: 1rem;
   z-index: 1000;
-  view-transition-name: navigation-controls;
 }
 
 .nav-button {
@@ -265,7 +258,6 @@
   background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
   transition: width 0.3s ease;
   z-index: 1000;
-  view-transition-name: progress-bar;
 }
 
 /* Highlight text */
@@ -273,7 +265,6 @@
   color: var(--primary-color);
   font-weight: 700;
   display: inline-block;
-  view-transition-name: highlight-text;
 }
 
 .emphasis {
@@ -281,12 +272,7 @@
   opacity: 0.9;
 }
 
-/* View Transitions */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 0.8s;
-  animation-timing-function: ease-in-out;
-}
+/* View Transitions - removed root fallback to prevent fixed elements from fading */
 
 /* Fade animations */
 @keyframes fade-in {

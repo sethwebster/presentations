@@ -1,5 +1,4 @@
 import { computeScore } from '../autopilot/matching';
-import { authService } from './AuthService';
 import type { AdvanceDecision, AutoAdvanceParams, CountdownState } from '../types/services';
 
 /**
@@ -35,7 +34,7 @@ class AutoAdvanceService {
       return { shouldAdvance: false, reason: 'already_advanced' };
     }
 
-    if (!deckId || !authService.getToken()) {
+    if (!deckId) {
       return { shouldAdvance: false, reason: 'missing_credentials' };
     }
 
@@ -133,18 +132,11 @@ class AutoAdvanceService {
    * Advance to a slide via API
    */
   async advanceSlide(deckId: string, slideIndex: number): Promise<{ success: boolean; error?: string }> {
-    const token = authService.getToken();
-    if (!token) {
-      console.error('No token available');
-      return { success: false };
-    }
-
     try {
       const response = await fetch(`/api/control/advance/${deckId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ slide: slideIndex }),
       });

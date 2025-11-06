@@ -39,12 +39,12 @@ class NavigationService {
    * @returns Full viewer URL with parameters
    */
   getViewerURL(slideIndex: number): string {
-    const baseUrl = window.location.origin + window.location.pathname;
+    // Convert /present path to /watch for viewer URLs
+    const pathname = window.location.pathname;
+    const watchPath = pathname.replace('/present/', '/watch/');
+    const baseUrl = window.location.origin + watchPath;
     const params = new URLSearchParams(window.location.search);
     params.set('slide', (slideIndex + 1).toString());
-    params.set('viewer', 'true');
-    // Remove presenter key if present
-    params.delete('presenterKey');
     return `${baseUrl}?${params.toString()}`;
   }
 
@@ -53,11 +53,13 @@ class NavigationService {
    * @returns Deck ID or null if not available
    */
   getDeckId(): string | null {
+    if (typeof window === 'undefined') return null;
+    
     const params = new URLSearchParams(window.location.search);
     let deckId = params.get('deckId');
 
     // Generate from URL path if not provided
-    if (!deckId && typeof window !== 'undefined') {
+    if (!deckId) {
       const pathParts = window.location.pathname.split('/');
       const presentationName = pathParts[pathParts.length - 1];
       if (presentationName) {
@@ -66,6 +68,18 @@ class NavigationService {
     }
 
     return deckId;
+  }
+
+  /**
+   * Set deckId in URL (for navigation purposes)
+   * @param deckId - Deck ID to set
+   */
+  setDeckId(deckId: string): void {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    params.set('deckId', deckId);
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState({}, '', newUrl);
   }
 
   /**

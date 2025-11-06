@@ -5,8 +5,7 @@ import { authService } from '../../services/AuthService';
 
 describe('WelcomeToast', () => {
   beforeEach(() => {
-    // Access private field for testing using type assertion
-    (authService as any).authStateListeners.clear();
+    authService.resetForTests();
   });
 
   it('does not render initially', () => {
@@ -59,10 +58,10 @@ describe('WelcomeToast', () => {
   it('cleans up subscription on unmount', () => {
     const { unmount } = render(<WelcomeToast isPresenterMode={false} />);
 
-    expect((authService as any).authStateListeners.size).toBe(1);
+    expect(authService.getListenerCountForTests()).toBe(1);
 
     unmount();
 
-    expect((authService as any).authStateListeners.size).toBe(0);
+    expect(authService.getListenerCountForTests()).toBe(0);
   });
 });
