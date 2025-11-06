@@ -71,7 +71,8 @@ export function SlideThumbnail({
   };
 
   // Get background for the slide
-  const getBackground = () => {
+  // Use finalScaleFactor which represents the actual thumbnail scale
+  const getBackground = (thumbnailScale: number) => {
     if (slide.background) {
       if (typeof slide.background === 'string') return slide.background;
       if (slide.background.type === 'color') return slide.background.value as string;
@@ -85,8 +86,13 @@ export function SlideThumbnail({
             const offsetX = (value as any).offsetX ?? 0;
             const offsetY = (value as any).offsetY ?? 0;
             const scale = (value as any).scale ?? 100;
+
+            // Scale offsets from slide space to thumbnail space using actual scale factor
+            const scaledOffsetX = offsetX * thumbnailScale;
+            const scaledOffsetY = offsetY * thumbnailScale;
+
             const position = offsetX !== 0 || offsetY !== 0
-              ? `${offsetX}px ${offsetY}px`
+              ? `${scaledOffsetX}px ${scaledOffsetY}px`
               : ((value as any).position || 'center');
             const fit = (value as any).fit || 'cover';
             const repeat = (value as any).repeat || 'no-repeat';
@@ -125,7 +131,7 @@ export function SlideThumbnail({
       <div
         className="relative w-full h-full overflow-hidden bg-card"
         style={{
-          background: getBackground(),
+          background: getBackground(finalScaleFactor),
           border: useFixedSize ? '1px solid rgba(148, 163, 184, 0.2)' : 'none',
           borderRadius: useFixedSize ? '12px' : '0',
           boxShadow: useFixedSize ? '0 1px 3px 0 rgb(0 0 0 / 0.1)' : 'none',

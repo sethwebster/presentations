@@ -120,7 +120,7 @@ export class SaveManager {
 
     // Schedule autosave if enabled
     if (this.autosaveEnabled) {
-      this.scheduleSave(deckHash, 1000);
+      this.scheduleSave(deckHash, 200);
     }
   }
 

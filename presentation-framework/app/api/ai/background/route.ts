@@ -67,6 +67,12 @@ export async function POST(request: Request) {
     );
   }
 
+  console.log('[API /ai/background] Request received:', {
+    model: body.model,
+    quality: body.quality,
+    promptLength: body.prompt?.length,
+  });
+
   const userPrompt = body.prompt?.trim();
   if (!userPrompt) {
     return NextResponse.json(
@@ -78,9 +84,19 @@ export async function POST(request: Request) {
   const model = body.model || 'flux'; // Default to Flux
   const quality = body.quality || 'quick'; // Default to quick generation
 
+  console.log('[API /ai/background] Using model:', model, 'quality:', quality);
+
   // Calculate aspect ratio description from dimensions
-  const width = body.width ?? 1280;
-  const height = body.height ?? 720;
+  // Flux models require dimensions to be multiples of 8, with min 256 and max 1440
+  const roundToMultipleOf8 = (value: number) => {
+    const clamped = Math.max(256, Math.min(1440, value));
+    return Math.round(clamped / 8) * 8;
+  };
+  const width = roundToMultipleOf8(body.width ?? 1280);
+  const height = roundToMultipleOf8(body.height ?? 720);
+
+  console.log('[API /ai/background] Normalized dimensions:', { original: { width: body.width, height: body.height }, normalized: { width, height } });
+
   const aspectRatio = width / height;
   
   // Describe aspect ratio in a natural way
@@ -112,9 +128,21 @@ export async function POST(request: Request) {
   // Prioritize user intent with quality enhancement
   const composedPrompt = `${truncatedUserPrompt}. ${baseInstructions}`;
 
-  // For Flux models, create an enhanced prompt that emphasizes abstract/conceptual imagery
-  // CRITICAL: Never include any text/typography in images
-  const fluxPrompt = `${truncatedUserPrompt}, abstract conceptual visualization, artistic interpretation, dramatic lighting, highly detailed, ABSOLUTELY NO TEXT OF ANY KIND, no words, no letters, no typography, no labels, no captions, no signage, no logos, no watermarks, no written language, no numbers, no symbols, visually striking composition`;
+  // For Flux models, keep prompt concise and validate
+  const fluxPrompt = truncatedUserPrompt.trim();
+
+  // Ensure prompt is not empty
+  if (!fluxPrompt) {
+    return NextResponse.json(
+      { error: "Prompt cannot be empty for Flux models." },
+      { status: 400 }
+    );
+  }
+
+  console.log('[API /ai/background] Flux prompt:', {
+    length: fluxPrompt.length,
+    preview: fluxPrompt.substring(0, 100),
+  });
 
   // Map dimensions to supported sizes
   // gpt-image-1 supports: "1024x1024", "1024x1536", "1536x1024", and "auto"
@@ -148,7 +176,7 @@ export async function POST(request: Request) {
           await new Promise(resolve => setTimeout(resolve, delayMs));
         }
 
-        let imageBase64: string;
+        let imageBase64: string | undefined;
         let meta: any;
 
         if (model === 'flux') {
@@ -174,7 +202,7 @@ export async function POST(request: Request) {
               qualityLabel = 'polish';
               break;
             case 'heroic':
-              modelVariant = 'kontext-pro'; // Highest quality, cached
+              modelVariant = 'flux-kontext-pro'; // Highest quality, cached
               qualityLabel = 'heroic';
               break;
             default:
@@ -182,29 +210,135 @@ export async function POST(request: Request) {
               qualityLabel = 'quick';
           }
 
-          const fluxResponse = await fetch(
-            `https://api.fireworks.ai/inference/v1/workflows/accounts/fireworks/models/${modelVariant}/text_to_image`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Accept": "image/jpeg",
-                "Authorization": `Bearer ${fireworksApiKey}`,
-              },
-              body: JSON.stringify({
-                prompt: fluxPrompt, // Use enhanced prompt with abstract/conceptual instructions
-              }),
+          // Kontext Pro uses async workflow with polling
+          if (modelVariant === 'flux-kontext-pro') {
+            // Step 1: Submit the generation request
+            const requestBody = {
+              prompt: fluxPrompt,
+            };
+
+            console.log('[API /ai/background] Kontext Pro request:', {
+              model: modelVariant,
+              body: requestBody,
+              dimensions: { width, height },
+            });
+
+            const submitResponse = await fetch(
+              `https://api.fireworks.ai/inference/v1/workflows/accounts/fireworks/models/${modelVariant}`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Accept": "application/json",
+                  "Authorization": `Bearer ${fireworksApiKey}`,
+                },
+                body: JSON.stringify(requestBody),
+              }
+            );
+
+            if (!submitResponse.ok) {
+              const errorText = await submitResponse.text();
+              throw new Error(`Flux API error (${submitResponse.status}): ${errorText}`);
             }
-          );
 
-          if (!fluxResponse.ok) {
-            const errorText = await fluxResponse.text();
-            throw new Error(`Flux API error (${fluxResponse.status}): ${errorText}`);
+            const submitResult = await submitResponse.json();
+            const requestId = submitResult.request_id;
+
+            if (!requestId) {
+              throw new Error('No request ID returned from Kontext Pro');
+            }
+
+            console.log('[API /ai/background] Kontext Pro request submitted:', requestId);
+
+            // Step 2: Poll for the result
+            const resultEndpoint = `https://api.fireworks.ai/inference/v1/workflows/accounts/fireworks/models/${modelVariant}/get_result`;
+            const maxPollAttempts = 60; // 60 seconds max
+
+            for (let pollAttempt = 0; pollAttempt < maxPollAttempts; pollAttempt++) {
+              await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+
+              const resultResponse = await fetch(resultEndpoint, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Accept": "application/json",
+                  "Authorization": `Bearer ${fireworksApiKey}`,
+                },
+                body: JSON.stringify({ id: requestId })
+              });
+
+              if (!resultResponse.ok) {
+                const errorText = await resultResponse.text();
+                console.error(`[API /ai/background] Kontext Pro poll error:`, errorText);
+                continue; // Keep polling
+              }
+
+              const pollResult = await resultResponse.json();
+              const status = pollResult.status;
+
+              console.log(`[API /ai/background] Kontext Pro status: ${status}, attempt ${pollAttempt + 1}/${maxPollAttempts}`);
+
+              if (['Ready', 'Complete', 'Finished'].includes(status)) {
+                const imageData = pollResult.result?.sample;
+
+                if (typeof imageData === 'string' && imageData.startsWith('http')) {
+                  // Download from URL
+                  const imageResponse = await fetch(imageData);
+                  const imageBuffer = await imageResponse.arrayBuffer();
+                  imageBase64 = Buffer.from(imageBuffer).toString('base64');
+                } else if (imageData) {
+                  // Already base64
+                  imageBase64 = imageData;
+                } else {
+                  throw new Error('No image data in Kontext Pro result');
+                }
+                break;
+              }
+
+              if (['Failed', 'Error'].includes(status)) {
+                throw new Error(`Kontext Pro generation failed: ${pollResult.details || 'Unknown error'}`);
+              }
+
+              // Still in progress, continue polling
+              if (pollAttempt === maxPollAttempts - 1) {
+                throw new Error('Kontext Pro generation timed out after 60 seconds');
+              }
+            }
+          } else {
+            // Standard Flux models (schnell, dev) - synchronous
+            // Send ONLY prompt - no dimensions at all
+            const requestBody = {
+              prompt: fluxPrompt,
+            };
+
+            console.log('[API /ai/background] Flux request (prompt only):', {
+              model: modelVariant,
+              endpoint: `/workflows/accounts/fireworks/models/${modelVariant}/text_to_image`,
+              promptLength: fluxPrompt.length,
+            });
+
+            const fluxResponse = await fetch(
+              `https://api.fireworks.ai/inference/v1/workflows/accounts/fireworks/models/${modelVariant}/text_to_image`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Accept": "image/jpeg",
+                  "Authorization": `Bearer ${fireworksApiKey}`,
+                },
+                body: JSON.stringify(requestBody),
+              }
+            );
+
+            if (!fluxResponse.ok) {
+              const errorText = await fluxResponse.text();
+              throw new Error(`Flux API error (${fluxResponse.status}): ${errorText}`);
+            }
+
+            // Flux workflow returns binary image data
+            const imageBuffer = await fluxResponse.arrayBuffer();
+            imageBase64 = Buffer.from(imageBuffer).toString('base64');
           }
-
-          // Flux returns binary image data
-          const imageBuffer = await fluxResponse.arrayBuffer();
-          imageBase64 = Buffer.from(imageBuffer).toString('base64');
 
           meta = {
             provider: "fireworks",
@@ -265,6 +399,10 @@ export async function POST(request: Request) {
             quality: "high",
             revised_prompt: result.data[0].revised_prompt,
           };
+        }
+
+        if (!imageBase64) {
+          throw new Error('Image generation did not produce base64 data');
         }
 
         const dataUrl = `data:image/${model === 'flux' ? 'jpeg' : 'png'};base64,${imageBase64}`;

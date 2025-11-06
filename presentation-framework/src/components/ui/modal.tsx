@@ -43,19 +43,28 @@ const CloseIcon = () => (
   </svg>
 );
 
-const ModalOverlay = React.forwardRef<
+const ModalOverlay = React.memo(React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-40 bg-black/35 backdrop-blur-lg transition-all data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
+      "fixed inset-0 z-40 bg-black/35",
+      "backdrop-blur-lg backdrop-filter",
+      "will-change-opacity",
+      "transition-opacity duration-200 ease-out",
+      "data-[state=open]:animate-in data-[state=closed]:animate-out",
+      "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
       className
     )}
+    style={{
+      WebkitBackdropFilter: 'blur(16px)',
+      transform: 'translateZ(0)',
+    }}
     {...props}
   />
-));
+)));
 ModalOverlay.displayName = "ModalOverlay";
 
 interface ModalContentProps

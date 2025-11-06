@@ -1,4 +1,10 @@
 import '@testing-library/jest-dom';
+import { config } from 'dotenv';
+import path from 'path';
+
+// Load environment variables from .env.local for tests
+const envPath = path.resolve(process.cwd(), '.env.local');
+config({ path: envPath });
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {

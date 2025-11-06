@@ -611,6 +611,8 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
   }, [activeSlideId, setBackgroundFeedback]);
 
   const handleGenerateImage = useCallback(async (prompt: string, mode: 'background' | 'element', model: 'openai' | 'flux' = 'flux', quality: 'quick' | 'polish' | 'heroic' = 'quick', polishEnabled: boolean = false) => {
+    console.log('[Toolbar] handleGenerateImage called:', { mode, model, quality, polishEnabled });
+
     if (mode === 'background') {
       if (!activeSlideId) {
         setBackgroundFeedback({ error: 'Select a slide before generating a background.' });
@@ -625,11 +627,13 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
 
     try {
       setBackgroundFeedback({ isGenerating: true, error: null, success: null });
-      
+
       // Get slide dimensions from deck settings
       const slideWidth = deck?.settings?.slideSize?.width ?? 1280;
       const slideHeight = deck?.settings?.slideSize?.height ?? 720;
-      
+
+      console.log('[Toolbar] Calling imageService.generateBackground with:', { model, quality });
+
       // Use service for image generation
       const imageService = getImageGenerationService();
       const result = await imageService.generateBackground({
@@ -1837,64 +1841,68 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
         </ToolbarButton>
       </div>
 
-      <ImageBackgroundModal
-        open={showBackgroundModal}
-        onClose={() => {
-          setShowBackgroundModal(false);
-          setBackgroundStatus({ isGenerating: false, error: null, success: null });
-        }}
-        onGenerate={handleGenerateImage}
-        onUpload={(mode) => {
-          setBackgroundFeedback({ error: null, success: null });
-          triggerBackgroundUpload(mode);
-        }}
-        status={backgroundStatus}
-        libraryItems={imageLibraryItems}
-        onSelectFromLibrary={handleSelectLibraryImage}
-        onRefreshLibrary={handleLibraryRefresh}
-        libraryStatus={{
-          isLoading: isLibraryRefreshing,
-          isSyncing: isLibrarySyncing,
-          error: imageLibraryError,
-        }}
-        initialPrompt={(() => {
-          // Extract prompt from current slide's background if it exists
-          const currentSlide = deck?.slides?.[currentSlideIndex];
-          if (currentSlide?.background && typeof currentSlide.background === 'object' && currentSlide.background.type === 'image') {
-            // Check for prompt at background level (new format)
-            if ('prompt' in currentSlide.background && typeof currentSlide.background.prompt === 'string') {
-              return currentSlide.background.prompt;
+      {showBackgroundModal && (
+        <ImageBackgroundModal
+          open={showBackgroundModal}
+          onClose={() => {
+            setShowBackgroundModal(false);
+            setBackgroundStatus({ isGenerating: false, error: null, success: null });
+          }}
+          onGenerate={handleGenerateImage}
+          onUpload={(mode) => {
+            setBackgroundFeedback({ error: null, success: null });
+            triggerBackgroundUpload(mode);
+          }}
+          status={backgroundStatus}
+          libraryItems={imageLibraryItems}
+          onSelectFromLibrary={handleSelectLibraryImage}
+          onRefreshLibrary={handleLibraryRefresh}
+          libraryStatus={{
+            isLoading: isLibraryRefreshing,
+            isSyncing: isLibrarySyncing,
+            error: imageLibraryError,
+          }}
+          initialPrompt={(() => {
+            // Extract prompt from current slide's background if it exists
+            const currentSlide = deck?.slides?.[currentSlideIndex];
+            if (currentSlide?.background && typeof currentSlide.background === 'object' && currentSlide.background.type === 'image') {
+              // Check for prompt at background level (new format)
+              if ('prompt' in currentSlide.background && typeof currentSlide.background.prompt === 'string') {
+                return currentSlide.background.prompt;
+              }
+              // Also check in background.value for backwards compatibility
+              const bgValue = currentSlide.background.value;
+              if (bgValue && typeof bgValue === 'object' && 'prompt' in bgValue && typeof bgValue.prompt === 'string') {
+                return bgValue.prompt;
+              }
             }
-            // Also check in background.value for backwards compatibility
-            const bgValue = currentSlide.background.value;
-            if (bgValue && typeof bgValue === 'object' && 'prompt' in bgValue && typeof bgValue.prompt === 'string') {
-              return bgValue.prompt;
-            }
-          }
-          return undefined;
-        })()}
-      />
+            return undefined;
+          })()}
+        />
+      )}
 
-      <RefinePanel
-        open={showRefineModal}
-        onClose={() => {
-          setShowRefineModal(false);
-          setRefineStatus({ isProcessing: false, error: null });
-        }}
-        onRefine={handleRefine}
-        isProcessing={refineStatus.isProcessing}
-        error={refineStatus.error}
-        messages={refineMessages}
-        onMessageUpdate={(messages) => {
-          if (activeSlideId) {
-            setRefineMessagesBySlide(prev => {
-              const newMap = new Map(prev);
-              newMap.set(activeSlideId, messages);
-              return newMap;
-            });
-          }
-        }}
-      />
+      {showRefineModal && (
+        <RefinePanel
+          open={showRefineModal}
+          onClose={() => {
+            setShowRefineModal(false);
+            setRefineStatus({ isProcessing: false, error: null });
+          }}
+          onRefine={handleRefine}
+          isProcessing={refineStatus.isProcessing}
+          error={refineStatus.error}
+          messages={refineMessages}
+          onMessageUpdate={(messages) => {
+            if (activeSlideId) {
+              setRefineMessagesBySlide(prev => {
+                const newMap = new Map(prev);
+                newMap.set(activeSlideId, messages);
+                return newMap;
+              });
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

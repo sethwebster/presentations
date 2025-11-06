@@ -1,22 +1,12 @@
 import { NextResponse } from 'next/server';
-import type { DeckDefinition } from '@/rsc/types';
 import { auth } from '@/lib/auth';
-import { getRedis } from '@/lib/redis';
+import { listDecks } from '@/lib/deckApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const redis = getRedis();
-
 export async function GET() {
-  if (!redis) {
-    return NextResponse.json(
-      { error: 'Redis not configured' },
-      { status: 500 }
-    );
-  }
-
   // Get authenticated user session
   const session = await auth();
   if (!session?.user?.id) {
@@ -29,53 +19,34 @@ export async function GET() {
   const userId = session.user.id;
 
   try {
-    // Find all deck keys (pattern: deck:*:data)
-    const keys = await redis.keys('deck:*:data');
-    
-    // Extract deck IDs and fetch metadata for each
-    const decks = await Promise.all(
-      keys.map(async (key) => {
-        const deckId = key.replace('deck:', '').replace(':data', '');
-        try {
-          const deckDataJson = await redis.get(key);
-          if (deckDataJson) {
-            const deckData = JSON.parse(deckDataJson) as DeckDefinition;
-            
-            // Check if user has access to this deck
-            const hasAccess = 
-              deckData.meta?.ownerId === userId || // User is the owner
-              deckData.meta?.sharedWith?.includes(userId) || // User is in sharedWith list
-              (!deckData.meta?.ownerId && !deckData.meta?.sharedWith); // Legacy deck (no owner set) - allow access for now
-            
-            if (!hasAccess) {
-              return null; // Skip decks user doesn't have access to
-            }
-            
-            // Skip deleted decks
-            if (deckData.meta?.deletedAt) {
-              return null;
-            }
-            
-            return {
-              id: deckId,
-              slug: deckData.meta?.slug,
-              title: deckData.meta?.title || 'Untitled Presentation',
-              createdAt: deckData.meta?.createdAt || new Date().toISOString(),
-              updatedAt: deckData.meta?.updatedAt || new Date().toISOString(),
-              slideCount: deckData.slides?.length || 0,
-            };
-          }
-        } catch (err) {
-          console.error(`Error loading deck ${deckId}:`, err);
-          return null;
-        }
-        return null;
-      })
-    );
+    // Get all decks (supports both old and new formats)
+    const allDecks = await listDecks();
 
-    // Filter out nulls and sort by updatedAt (most recent first)
-    const validDecks = decks
-      .filter((deck): deck is NonNullable<typeof deck> => deck !== null)
+    // Filter decks by access permissions
+    const accessibleDecks = allDecks.filter((deck) => {
+      // User owns the deck
+      if (deck.ownerId === userId) return true;
+
+      // User is in sharedWith list
+      if (deck.sharedWith?.includes(userId)) return true;
+
+      // Legacy deck with no owner - allow access for now
+      if (!deck.ownerId && !deck.sharedWith) return true;
+
+      return false;
+    });
+
+    // Filter out deleted decks and format response
+    const validDecks = accessibleDecks
+      .filter((deck) => !deck.deletedAt)
+      .map((deck) => ({
+        id: deck.id,
+        slug: deck.slug,
+        title: deck.title || 'Untitled Presentation',
+        createdAt: deck.createdAt || new Date().toISOString(),
+        updatedAt: deck.updatedAt || new Date().toISOString(),
+        slideCount: 0, // Will be populated from meta in future if needed
+      }))
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
     return NextResponse.json(validDecks, {

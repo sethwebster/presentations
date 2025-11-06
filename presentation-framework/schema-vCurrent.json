@@ -1,0 +1,1084 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://presentations.example.com/schemas/deck-definition-vCurrent.json",
+  "title": "DeckDefinition Schema",
+  "description": "JSON Schema for presentation deck definitions. Defines the complete structure of a presentation including metadata, slides, assets, and configuration.",
+  "type": "object",
+  "required": ["meta", "slides"],
+  "additionalProperties": false,
+  "properties": {
+    "meta": {
+      "$ref": "#/definitions/DeckMeta",
+      "description": "Presentation metadata including title, authors, and ownership information"
+    },
+    "slides": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/SlideDefinition"
+      },
+      "description": "Array of slide definitions that make up the presentation"
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/AssetDefinition"
+      },
+      "description": "Optional array of assets (images, videos, fonts, etc.) used in the presentation"
+    },
+    "provenance": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ProvenanceEntry"
+      },
+      "description": "Optional array of provenance entries tracking changes and history"
+    },
+    "theme": {
+      "type": "object",
+      "description": "Optional global theme configuration object"
+    },
+    "settings": {
+      "$ref": "#/definitions/DeckSettings",
+      "description": "Optional deck-wide settings for layout, theme, export, sharing, and behavior"
+    }
+  },
+  "definitions": {
+    "DeckMeta": {
+      "type": "object",
+      "required": ["id", "title"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the presentation"
+        },
+        "slug": {
+          "type": "string",
+          "description": "URL-friendly slug for presentation links (separate from internal ID)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Display title of the presentation"
+        },
+        "description": {
+          "type": "string",
+          "description": "Long-form description of the presentation content"
+        },
+        "authors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "role": {
+                "type": "string"
+              }
+            },
+            "required": ["name"]
+          },
+          "description": "Array of presentation authors with optional email and role"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Tags for categorizing and searching presentations"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when the presentation was created"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when the presentation was last updated"
+        },
+        "durationMinutes": {
+          "type": "number",
+          "description": "Estimated duration of the presentation in minutes"
+        },
+        "coverImage": {
+          "type": "string",
+          "description": "URL or path to the presentation cover image"
+        },
+        "subject": {
+          "type": "string",
+          "description": "Subject or topic of the presentation"
+        },
+        "keywords": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Keywords for SEO and searchability"
+        },
+        "category": {
+          "type": "string",
+          "description": "Category classification of the presentation"
+        },
+        "language": {
+          "type": "string",
+          "pattern": "^[a-z]{2}(-[A-Z]{2})?$",
+          "description": "ISO 639-1 language code (e.g., 'en', 'es', 'fr')"
+        },
+        "revision": {
+          "type": "number",
+          "description": "Revision number for version tracking"
+        },
+        "version": {
+          "type": "string",
+          "description": "Semantic version string"
+        },
+        "company": {
+          "type": "string",
+          "description": "Company or organization name"
+        },
+        "manager": {
+          "type": "string",
+          "description": "Manager or supervisor name"
+        },
+        "comments": {
+          "type": "string",
+          "description": "General comments about the presentation"
+        },
+        "customProperties": {
+          "type": "object",
+          "description": "Custom key-value properties for extensibility"
+        },
+        "presenterPasswordHash": {
+          "type": "string",
+          "description": "Hashed presenter password set by deck owner/creator"
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "Owner/Creator user ID (from NextAuth session)"
+        },
+        "sharedWith": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of user IDs with whom the presentation is shared"
+        },
+        "public": {
+          "type": "boolean",
+          "description": "If true, presentation is visible on user's public profile"
+        },
+        "deletedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp if presentation is soft-deleted"
+        },
+        "aiGeneration": {
+          "type": "object",
+          "properties": {
+            "outline": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "children": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["id", "title"]
+                    }
+                  }
+                },
+                "required": ["id", "title"]
+              },
+              "description": "Original outline used to generate the deck"
+            },
+            "originalTitle": {
+              "type": "string",
+              "description": "Original title provided by user (if provided, otherwise generated)"
+            },
+            "stylisticNotes": {
+              "type": "string",
+              "description": "Stylistic notes provided by user for generation"
+            },
+            "generatedAt": {
+              "type": "string",
+              "format": "date-time",
+              "description": "ISO 8601 timestamp when the deck was generated"
+            },
+            "model": {
+              "type": "string",
+              "description": "AI model used for generation"
+            }
+          },
+          "required": ["outline", "generatedAt"],
+          "description": "AI Generation metadata - stores original conversation for regeneration"
+        }
+      }
+    },
+    "SlideDefinition": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the slide"
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional slide title"
+        },
+        "layout": {
+          "type": "string",
+          "description": "Layout template name to apply to the slide"
+        },
+        "masterSlideId": {
+          "type": "string",
+          "description": "Reference to master slide template"
+        },
+        "layers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LayerDefinition"
+          },
+          "description": "Organized layers of elements on the slide"
+        },
+        "elements": {
+          "type": "array",
+          "description": "Flat array of elements on the slide (text, images, shapes, etc.)"
+        },
+        "background": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "enum": ["color", "gradient", "image", "video"]
+                },
+                "value": {
+                  "oneOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object"
+                    }
+                  ]
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["type", "value"]
+            }
+          ],
+          "description": "Slide background - can be a color string or an object with type, value, and opacity"
+        },
+        "timeline": {
+          "$ref": "#/definitions/TimelineDefinition",
+          "description": "Timeline with animation and camera tracks"
+        },
+        "transitions": {
+          "$ref": "#/definitions/SlideTransitions",
+          "description": "Slide transition animations for entering, exiting, and between transitions"
+        },
+        "notes": {
+          "description": "Notes and presenter information - can be a string, object, or null"
+        },
+        "zoomFrame": {
+          "$ref": "#/definitions/ZoomFrame",
+          "description": "Zoom frame for zoom-based navigation"
+        },
+        "hidden": {
+          "type": "boolean",
+          "description": "If true, slide is skipped in presentation"
+        },
+        "skipInNavigation": {
+          "type": "boolean",
+          "description": "If true, slide doesn't show in navigation menu"
+        },
+        "skipInPrint": {
+          "type": "boolean",
+          "description": "If true, slide is not included when printing"
+        },
+        "duration": {
+          "type": "number",
+          "description": "Auto-advance delay in seconds (if auto-advance is enabled)"
+        },
+        "showSlideNumber": {
+          "type": "boolean",
+          "description": "Whether to display the slide number"
+        },
+        "customSlideNumber": {
+          "type": "string",
+          "description": "Custom slide number to override default numbering"
+        },
+        "style": {
+          "type": "object",
+          "properties": {
+            "background": {},
+            "themeOverride": {
+              "type": "object"
+            }
+          },
+          "description": "Style overrides specific to this slide"
+        },
+        "section": {
+          "type": "string",
+          "description": "Section/group name for organizing slides"
+        },
+        "sectionIndex": {
+          "type": "number",
+          "description": "Order/index within the section"
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Custom metadata for the slide"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Tags for categorizing the slide"
+        },
+        "thumbnail": {
+          "type": "string",
+          "description": "Custom thumbnail image URL for the slide"
+        }
+      }
+    },
+    "LayerDefinition": {
+      "type": "object",
+      "required": ["id", "order", "elements"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the layer"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name for the layer in the layers panel"
+        },
+        "order": {
+          "type": "number",
+          "description": "Z-order/stacking order of the layer"
+        },
+        "elements": {
+          "type": "array",
+          "description": "Elements contained in this layer"
+        }
+      }
+    },
+    "ZoomFrame": {
+      "type": "object",
+      "required": ["x", "y", "width", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "type": "number",
+          "description": "X coordinate of the zoom frame"
+        },
+        "y": {
+          "type": "number",
+          "description": "Y coordinate of the zoom frame"
+        },
+        "width": {
+          "type": "number",
+          "description": "Width of the zoom frame"
+        },
+        "height": {
+          "type": "number",
+          "description": "Height of the zoom frame"
+        },
+        "depth": {
+          "type": "number",
+          "description": "Depth for 3D positioning"
+        }
+      }
+    },
+    "SlideTransitions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "in": {
+          "description": "Animation when slide enters"
+        },
+        "out": {
+          "description": "Animation when slide exits"
+        },
+        "between": {
+          "description": "Animation between slides"
+        }
+      }
+    },
+    "TimelineDefinition": {
+      "type": "object",
+      "required": ["tracks"],
+      "additionalProperties": false,
+      "properties": {
+        "tracks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TimelineTrackDefinition"
+          },
+          "description": "Array of animation, camera, audio, or custom tracks"
+        }
+      }
+    },
+    "TimelineTrackDefinition": {
+      "type": "object",
+      "required": ["id", "trackType", "segments"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the track"
+        },
+        "trackType": {
+          "enum": ["animation", "camera", "audio", "custom"],
+          "description": "Type of timeline track"
+        },
+        "segments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TimelineSegmentDefinition"
+          },
+          "description": "Array of timeline segments"
+        }
+      }
+    },
+    "TimelineSegmentDefinition": {
+      "type": "object",
+      "required": ["id", "start", "duration", "targets", "animation"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the segment"
+        },
+        "start": {
+          "type": "number",
+          "description": "Start time in milliseconds"
+        },
+        "duration": {
+          "type": "number",
+          "description": "Duration in milliseconds"
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of element IDs targeted by this segment"
+        },
+        "animation": {
+          "$ref": "#/definitions/AnimationDefinition",
+          "description": "Animation to apply during this segment"
+        },
+        "trigger": {
+          "enum": ["auto", "interaction", "voice", "custom"],
+          "description": "What triggers this segment to play"
+        }
+      }
+    },
+    "AnimationDefinition": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the animation"
+        },
+        "type": {
+          "type": "string",
+          "description": "Animation type (e.g., 'fade', 'slide', 'bounce', etc.)"
+        },
+        "duration": {
+          "type": "number",
+          "description": "Duration in milliseconds"
+        },
+        "delay": {
+          "type": "number",
+          "description": "Delay before animation starts in milliseconds"
+        },
+        "easing": {
+          "type": "string",
+          "description": "Easing function (e.g., 'ease-in-out', 'linear')"
+        },
+        "repeat": {
+          "type": "number",
+          "description": "Number of times to repeat the animation"
+        },
+        "parameters": {
+          "type": "object",
+          "description": "Custom parameters for the animation"
+        },
+        "trigger": {
+          "enum": ["on-load", "on-click", "on-delay", "on-word"],
+          "description": "What triggers the animation to start"
+        },
+        "triggerContext": {
+          "type": "object",
+          "description": "Context for the trigger (e.g., delay value, word to trigger on)"
+        },
+        "motionPath": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "enum": ["line", "arc", "spiral", "bezier"]
+            },
+            "points": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  },
+                  "controlX": {
+                    "type": "number"
+                  },
+                  "controlY": {
+                    "type": "number"
+                  }
+                },
+                "required": ["x", "y"]
+              }
+            }
+          },
+          "description": "Motion path for path-based animations"
+        }
+      }
+    },
+    "AssetDefinition": {
+      "type": "object",
+      "required": ["id", "path", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the asset"
+        },
+        "path": {
+          "type": "string",
+          "description": "File path or URL to the asset"
+        },
+        "type": {
+          "enum": ["image", "audio", "video", "font", "data", "other"],
+          "description": "Type of asset"
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Custom metadata for the asset (size, duration, etc.)"
+        }
+      }
+    },
+    "ProvenanceEntry": {
+      "type": "object",
+      "required": ["id", "timestamp", "actor", "action"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the provenance entry"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of the action"
+        },
+        "actor": {
+          "enum": ["user", "ai", "system"],
+          "description": "Who or what performed the action"
+        },
+        "action": {
+          "type": "string",
+          "description": "Description of the action performed"
+        },
+        "details": {
+          "type": "object",
+          "description": "Additional details about the action"
+        }
+      }
+    },
+    "DeckSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "slideSize": {
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "number"
+            },
+            "height": {
+              "type": "number"
+            },
+            "preset": {
+              "enum": ["standard", "ultrawide", "cinema", "square", "custom"]
+            },
+            "units": {
+              "enum": ["pixels", "points", "inches", "centimeters"]
+            }
+          },
+          "description": "Slide dimensions and units"
+        },
+        "orientation": {
+          "enum": ["landscape", "portrait"],
+          "description": "Slide orientation"
+        },
+        "navigation": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "enum": ["linear", "freeform", "zoom"],
+              "description": "Navigation mode for the presentation"
+            },
+            "overviewSlideId": {
+              "type": "string",
+              "description": "Slide ID to show in overview"
+            }
+          },
+          "description": "Navigation configuration"
+        },
+        "theme": {
+          "type": "object",
+          "properties": {
+            "colors": {
+              "type": "object",
+              "properties": {
+                "background": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "accent": {
+                  "type": "string"
+                },
+                "link": {
+                  "type": "string"
+                },
+                "visitedLink": {
+                  "type": "string"
+                },
+                "highlight": {
+                  "type": "string"
+                },
+                "custom": {
+                  "type": "object"
+                }
+              },
+              "description": "Color palette for the presentation"
+            },
+            "typography": {
+              "type": "object",
+              "properties": {
+                "fontFamily": {
+                  "type": "string"
+                },
+                "headingFont": {
+                  "type": "string"
+                },
+                "bodyFont": {
+                  "type": "string"
+                },
+                "monospaceFont": {
+                  "type": "string"
+                },
+                "fontSizeScale": {
+                  "type": "number",
+                  "description": "Base scale multiplier"
+                },
+                "fontSizes": {
+                  "type": "object"
+                }
+              },
+              "description": "Typography configuration"
+            },
+            "masterSlides": {
+              "type": "array",
+              "description": "Master slide templates"
+            },
+            "defaultMasterSlideId": {
+              "type": "string",
+              "description": "ID of the default master slide"
+            }
+          },
+          "description": "Theme configuration including colors, fonts, and master slides"
+        },
+        "grid": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "size": {
+              "type": "number"
+            },
+            "snapToGrid": {
+              "type": "boolean"
+            },
+            "color": {
+              "type": "string"
+            },
+            "opacity": {
+              "type": "number"
+            },
+            "style": {
+              "enum": ["dots", "lines", "cross"]
+            }
+          },
+          "required": ["enabled", "size", "snapToGrid"],
+          "description": "Grid settings for the editor"
+        },
+        "ruler": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "units": {
+              "enum": ["pixels", "points", "inches", "centimeters"]
+            },
+            "showGuides": {
+              "type": "boolean"
+            },
+            "showMargins": {
+              "type": "boolean"
+            }
+          },
+          "required": ["enabled", "units"],
+          "description": "Ruler settings for the editor"
+        },
+        "defaultBackground": {
+          "description": "Default background for new slides"
+        },
+        "defaultTransition": {
+          "$ref": "#/definitions/AnimationDefinition",
+          "description": "Default transition animation"
+        },
+        "presentation": {
+          "type": "object",
+          "properties": {
+            "loop": {
+              "type": "boolean",
+              "description": "Loop presentation when it reaches the end"
+            },
+            "autoAdvance": {
+              "type": "boolean",
+              "description": "Automatically advance slides"
+            },
+            "autoAdvanceDelay": {
+              "type": "number",
+              "description": "Auto-advance delay in seconds"
+            },
+            "skipHiddenSlides": {
+              "type": "boolean",
+              "description": "Skip hidden slides during presentation"
+            },
+            "showSlideNumbers": {
+              "type": "boolean",
+              "description": "Show slide numbers during presentation"
+            },
+            "showPresenterNotes": {
+              "type": "boolean",
+              "description": "Show presenter notes"
+            },
+            "startSlideIndex": {
+              "type": "number"
+            },
+            "endSlideIndex": {
+              "type": "number"
+            }
+          },
+          "description": "Presentation behavior settings"
+        },
+        "autopilot": {
+          "type": "object",
+          "description": "Autopilot/Voice control configuration"
+        },
+        "branding": {
+          "type": "object",
+          "properties": {
+            "logo": {
+              "type": "object",
+              "properties": {
+                "src": {
+                  "type": "string"
+                },
+                "alt": {
+                  "type": "string"
+                },
+                "width": {
+                  "type": "number"
+                },
+                "height": {
+                  "type": "number"
+                },
+                "style": {
+                  "type": "object"
+                },
+                "position": {
+                  "enum": ["top-left", "top-right", "bottom-left", "bottom-right", "center"]
+                }
+              },
+              "required": ["src"]
+            },
+            "footer": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "showDate": {
+                  "type": "boolean"
+                },
+                "showSlideNumber": {
+                  "type": "boolean"
+                },
+                "style": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "description": "Branding configuration with logo and footer"
+        },
+        "export": {
+          "type": "object",
+          "properties": {
+            "format": {
+              "enum": ["pdf", "png", "pptx", "key", "html"]
+            },
+            "quality": {
+              "enum": ["low", "medium", "high", "print"]
+            },
+            "includeNotes": {
+              "type": "boolean"
+            },
+            "includeHiddenSlides": {
+              "type": "boolean"
+            },
+            "pageRange": {
+              "type": "string",
+              "description": "Page range (e.g., '1-5,10,15-20')"
+            },
+            "backgroundColor": {
+              "type": "string"
+            },
+            "transparentBackground": {
+              "type": "boolean"
+            },
+            "dpi": {
+              "type": "number"
+            }
+          },
+          "description": "Export settings"
+        },
+        "sharing": {
+          "type": "object",
+          "properties": {
+            "public": {
+              "type": "boolean"
+            },
+            "allowComments": {
+              "type": "boolean"
+            },
+            "allowEdit": {
+              "type": "boolean"
+            },
+            "allowCopy": {
+              "type": "boolean"
+            },
+            "allowDownload": {
+              "type": "boolean"
+            },
+            "accessLevel": {
+              "enum": ["viewer", "commenter", "editor", "owner"]
+            },
+            "collaborators": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "enum": ["viewer", "commenter", "editor"]
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": ["email", "role"]
+              }
+            },
+            "linkSharing": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "accessLevel": {
+                  "enum": ["viewer", "commenter", "editor"]
+                },
+                "requireSignIn": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "description": "Sharing and collaboration settings"
+        },
+        "versionControl": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "maxVersions": {
+              "type": "number"
+            },
+            "autoSaveVersions": {
+              "type": "boolean"
+            }
+          },
+          "required": ["enabled"],
+          "description": "Version control settings"
+        },
+        "comments": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "requireModeration": {
+              "type": "boolean"
+            },
+            "notificationSettings": {
+              "type": "object"
+            }
+          },
+          "required": ["enabled"],
+          "description": "Comments and review settings"
+        },
+        "accessibility": {
+          "type": "object",
+          "properties": {
+            "altTextRequired": {
+              "type": "boolean"
+            },
+            "readingOrder": {
+              "enum": ["visual", "logical"]
+            },
+            "highContrast": {
+              "type": "boolean"
+            },
+            "screenReaderOptimized": {
+              "type": "boolean"
+            }
+          },
+          "description": "Accessibility settings"
+        },
+        "regional": {
+          "type": "object",
+          "properties": {
+            "locale": {
+              "type": "string",
+              "description": "Locale code (e.g., 'en-US', 'fr-FR')"
+            },
+            "dateFormat": {
+              "type": "string"
+            },
+            "timeFormat": {
+              "enum": ["12h", "24h"]
+            },
+            "currency": {
+              "type": "string"
+            },
+            "numberFormat": {
+              "type": "string"
+            }
+          },
+          "description": "Regional and localization settings"
+        },
+        "print": {
+          "type": "object",
+          "properties": {
+            "layout": {
+              "enum": ["fullPage", "notes", "handouts", "outline"]
+            },
+            "slidesPerPage": {
+              "type": "number"
+            },
+            "scale": {
+              "type": "number"
+            },
+            "orientation": {
+              "enum": ["portrait", "landscape"]
+            },
+            "margins": {
+              "type": "object",
+              "properties": {
+                "top": {
+                  "type": "number"
+                },
+                "right": {
+                  "type": "number"
+                },
+                "bottom": {
+                  "type": "number"
+                },
+                "left": {
+                  "type": "number"
+                }
+              },
+              "required": ["top", "right", "bottom", "left"]
+            },
+            "includeBackground": {
+              "type": "boolean"
+            },
+            "grayscale": {
+              "type": "boolean"
+            }
+          },
+          "description": "Print settings"
+        }
+      }
+    }
+  }
+}

@@ -36,6 +36,12 @@ export function RedisAdapter(): Adapter | undefined {
         return null;
       }
       const user = JSON.parse(userData);
+
+      // Convert emailVerified from ISO string back to Date object if needed
+      if (user.emailVerified && typeof user.emailVerified === 'string') {
+        user.emailVerified = new Date(user.emailVerified);
+      }
+
       return user;
     } catch (error) {
       console.error('[RedisAdapter] Redis error in getUser:', error);
@@ -391,6 +397,12 @@ export function RedisAdapter(): Adapter | undefined {
           return null;
         }
         const session = JSON.parse(sessionData);
+
+        // Convert expires from ISO string back to Date object
+        if (session.expires && typeof session.expires === 'string') {
+          session.expires = new Date(session.expires);
+        }
+
         const user = await getUserById(session.userId);
         if (!user) {
           return null;
@@ -406,7 +418,19 @@ export function RedisAdapter(): Adapter | undefined {
         const sessionData = await redisClient.get(`auth:session:${sessionToken}`);
         if (!sessionData) return null;
         const session = JSON.parse(sessionData);
+
+        // Convert expires from ISO string back to Date object if needed
+        if (session.expires && typeof session.expires === 'string') {
+          session.expires = new Date(session.expires);
+        }
+
         const updated = { ...session, ...data };
+
+        // Ensure updated.expires is a Date object
+        if (updated.expires && typeof updated.expires === 'string') {
+          updated.expires = new Date(updated.expires);
+        }
+
         const ttl = Math.floor((updated.expires.getTime() - Date.now()) / 1000);
         await redisClient.set(`auth:session:${sessionToken}`, JSON.stringify(updated), 'EX', ttl);
         return updated;

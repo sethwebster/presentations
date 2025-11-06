@@ -96,8 +96,13 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
               const offsetX = (value as any).offsetX ?? 0;
               const offsetY = (value as any).offsetY ?? 0;
               const scale = (value as any).scale ?? 100;
+
+              // Scale offsets from slide space to thumbnail space
+              const scaledOffsetX = offsetX * scaleFactor;
+              const scaledOffsetY = offsetY * scaleFactor;
+
               const position = offsetX !== 0 || offsetY !== 0
-                ? `${offsetX}px ${offsetY}px`
+                ? `${scaledOffsetX}px ${scaledOffsetY}px`
                 : ((value as any).position || 'center');
               const fit = (value as any).fit || 'cover';
               const repeat = (value as any).repeat || 'no-repeat';
@@ -168,82 +173,84 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                       position: { x: e.clientX, y: e.clientY },
                     });
                   }}
-                  className="cursor-pointer"
+                  className="flex justify-center cursor-pointer"
                 >
-                <div
-                  className={cn(
-                    'relative mx-auto mt-1 rounded-xl border-2 transition-all duration-200 ease-out overflow-hidden',
-                    childIsSelected
-                      ? 'shadow-[0_8px_24px_rgba(22,194,199,0.18)]'
-                      : 'hover:border-[var(--lume-primary)]/30 hover:shadow-[0_6px_18px_rgba(22,194,199,0.12)]',
-                    'border-transparent'
-                  )}
-                  style={
-                    childIsSelected
-                      ? { ...frameSizeStyle, borderColor: 'var(--lume-primary, #16C2C7)' }
-                      : frameSizeStyle
-                  }
-                >
-                  <div
-                    className="relative w-full h-full overflow-hidden rounded-xl bg-card shadow-sm"
-                    style={{
-                      background: getBackground(childSlide),
-                      border: '1px solid rgba(148, 163, 184, 0.2)',
-                      width: '100%',
-                      height: '100%',
-                    }}
-                  >
+                  <div className="flex flex-col items-center">
                     <div
-                      className="absolute left-0 top-0"
-                      style={{
-                        width: `${baseSlideWidth}px`,
-                        height: `${baseSlideHeight}px`,
-                        transform: `scale(${scaleFactor})`,
-                        transformOrigin: 'top left',
-                        pointerEvents: 'none',
-                      }}
+                      className={cn(
+                        'relative mt-1 rounded-xl border-2 transition-all duration-200 ease-out overflow-hidden',
+                        childIsSelected
+                          ? 'shadow-[0_8px_24px_rgba(22,194,199,0.18)]'
+                          : 'hover:border-[var(--lume-primary)]/30 hover:shadow-[0_6px_18px_rgba(22,194,199,0.12)]',
+                        'border-transparent'
+                      )}
+                      style={
+                        childIsSelected
+                          ? { ...frameSizeStyle, borderColor: 'var(--lume-primary, #16C2C7)' }
+                          : frameSizeStyle
+                      }
                     >
                       <div
-                        className="relative [&_*]:pointer-events-none [&_*]:select-none"
-                        style={{ width: `${baseSlideWidth}px`, height: `${baseSlideHeight}px`, pointerEvents: 'none' }}
+                        className="relative w-full h-full overflow-hidden shadow-sm rounded-xl bg-card"
+                        style={{
+                          background: getBackground(childSlide),
+                          border: '1px solid rgba(148, 163, 184, 0.2)',
+                          width: '100%',
+                          height: '100%',
+                        }}
                       >
-                        {childSlide.elements?.map((element) => (
-                          <ElementRenderer
-                            key={element.id}
-                            element={element}
-                            slideId={childSlide.id}
-                            disableInteractions={true}
-                          />
-                        ))}
-                        {childSlide.layers
-                          ?.sort((a, b) => a.order - b.order)
-                          .map((layer) =>
-                            layer.elements.map((element) => (
+                        <div
+                          className="absolute top-0 left-0"
+                          style={{
+                            width: `${baseSlideWidth}px`,
+                            height: `${baseSlideHeight}px`,
+                            transform: `scale(${scaleFactor})`,
+                            transformOrigin: 'top left',
+                            pointerEvents: 'none',
+                          }}
+                        >
+                          <div
+                            className="relative [&_*]:pointer-events-none [&_*]:select-none"
+                            style={{ width: `${baseSlideWidth}px`, height: `${baseSlideHeight}px`, pointerEvents: 'none' }}
+                          >
+                            {childSlide.elements?.map((element) => (
                               <ElementRenderer
                                 key={element.id}
                                 element={element}
                                 slideId={childSlide.id}
                                 disableInteractions={true}
                               />
-                            ))
-                          )}
+                            ))}
+                            {childSlide.layers
+                              ?.sort((a, b) => a.order - b.order)
+                              .map((layer) =>
+                                layer.elements.map((element) => (
+                                  <ElementRenderer
+                                    key={element.id}
+                                    element={element}
+                                    slideId={childSlide.id}
+                                    disableInteractions={true}
+                                  />
+                                ))
+                              )}
+                          </div>
+                        </div>
                       </div>
+                    </div>
+
+                    <div
+                      className={cn(
+                        'mt-1 inline-flex min-w-[2.25rem] items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold transition-colors',
+                        childIsSelected
+                          ? 'text-white'
+                          : 'bg-muted text-muted-foreground'
+                      )}
+                      style={childIsSelected ? { backgroundColor: 'var(--lume-primary, #16C2C7)', pointerEvents: 'none' } : { pointerEvents: 'none' }}
+                    >
+                      {childGlobalIndex + 1}
                     </div>
                   </div>
                 </div>
-
-                <div
-                  className={cn(
-                    'mt-1 inline-flex min-w-[2.25rem] items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold transition-colors',
-                    childIsSelected
-                      ? 'text-white'
-                      : 'bg-muted text-muted-foreground'
-                  )}
-                  style={childIsSelected ? { backgroundColor: 'var(--lume-primary, #16C2C7)', pointerEvents: 'none' } : { pointerEvents: 'none' }}
-                >
-                  {childGlobalIndex + 1}
-                </div>
-              </div>
             ),
           };
         }) : [],
@@ -262,86 +269,88 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                 position: { x: e.clientX, y: e.clientY },
               });
             }}
-            className="cursor-pointer"
+            className="flex justify-center cursor-pointer"
           >
-            <div
-              className={cn(
-                'relative mx-auto mt-1 rounded-xl border-2 transition-all duration-200 ease-out overflow-hidden',
-                isSelected
-                  ? 'shadow-[0_8px_24px_rgba(22,194,199,0.18)]'
-                  : 'hover:border-[var(--lume-primary)]/30 hover:shadow-[0_6px_18px_rgba(22,194,199,0.12)]',
-                'border-transparent'
-              )}
-              style={
-                isSelected
-                  ? { ...frameSizeStyle, borderColor: 'var(--lume-primary, #16C2C7)' }
-                  : frameSizeStyle
-              }
-            >
+            <div className="flex flex-col items-center">
               <div
-                className="relative w-full h-full overflow-hidden rounded-xl bg-card shadow-sm"
-                style={{
-                  background: getBackground(slide),
-                  border: '1px solid rgba(148, 163, 184, 0.2)',
-                  width: '100%',
-                  height: '100%',
-                }}
+                className={cn(
+                  'relative mt-1 rounded-xl border-2 transition-all duration-200 ease-out overflow-hidden',
+                  isSelected
+                    ? 'shadow-[0_8px_24px_rgba(22,194,199,0.18)]'
+                    : 'hover:border-[var(--lume-primary)]/30 hover:shadow-[0_6px_18px_rgba(22,194,199,0.12)]',
+                  'border-transparent'
+                )}
+                style={
+                  isSelected
+                    ? { ...frameSizeStyle, borderColor: 'var(--lume-primary, #16C2C7)' }
+                    : frameSizeStyle
+                }
               >
                 <div
-                  className="absolute left-0 top-0"
+                  className="relative w-full h-full overflow-hidden shadow-sm rounded-xl bg-card"
                   style={{
-                    width: `${baseSlideWidth}px`,
-                    height: `${baseSlideHeight}px`,
-                    transform: `scale(${scaleFactor})`,
-                    transformOrigin: 'top left',
-                    pointerEvents: 'none',
+                    background: getBackground(slide),
+                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    width: '100%',
+                    height: '100%',
                   }}
                 >
                   <div
-                    className="relative [&_*]:pointer-events-none [&_*]:select-none"
-                    style={{ width: `${baseSlideWidth}px`, height: `${baseSlideHeight}px`, pointerEvents: 'none' }}
+                    className="absolute top-0 left-0"
+                    style={{
+                      width: `${baseSlideWidth}px`,
+                      height: `${baseSlideHeight}px`,
+                      transform: `scale(${scaleFactor})`,
+                      transformOrigin: 'top left',
+                      pointerEvents: 'none',
+                    }}
                   >
-                    {slide.elements?.map((element) => (
-                      <ElementRenderer
-                        key={element.id}
-                        element={element}
-                        slideId={slide.id}
-                        disableInteractions={true}
-                      />
-                    ))}
-                    {slide.layers
-                      ?.sort((a, b) => a.order - b.order)
-                      .map((layer) =>
-                        layer.elements.map((element) => (
-                          <ElementRenderer
-                            key={element.id}
-                            element={element}
-                            slideId={slide.id}
-                            disableInteractions={true}
-                          />
-                        ))
-                      )}
+                    <div
+                      className="relative [&_*]:pointer-events-none [&_*]:select-none"
+                      style={{ width: `${baseSlideWidth}px`, height: `${baseSlideHeight}px`, pointerEvents: 'none' }}
+                    >
+                      {slide.elements?.map((element) => (
+                        <ElementRenderer
+                          key={element.id}
+                          element={element}
+                          slideId={slide.id}
+                          disableInteractions={true}
+                        />
+                      ))}
+                      {slide.layers
+                        ?.sort((a, b) => a.order - b.order)
+                        .map((layer) =>
+                          layer.elements.map((element) => (
+                            <ElementRenderer
+                              key={element.id}
+                              element={element}
+                              slideId={slide.id}
+                              disableInteractions={true}
+                            />
+                          ))
+                        )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div
-              className={cn(
-                'mt-1 inline-flex min-w-[2.25rem] items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold transition-colors',
-                isSelected
-                  ? 'text-white'
-                  : 'bg-muted text-muted-foreground'
-              )}
-              style={isSelected ? { backgroundColor: 'var(--lume-primary, #16C2C7)', pointerEvents: 'none' } : { pointerEvents: 'none' }}
-            >
-              {globalIndex + 1}
+              <div
+                className={cn(
+                  'mt-1 inline-flex min-w-[2.25rem] items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold transition-colors',
+                  isSelected
+                    ? 'text-white'
+                    : 'bg-muted text-muted-foreground'
+                )}
+                style={isSelected ? { backgroundColor: 'var(--lume-primary, #16C2C7)', pointerEvents: 'none' } : { pointerEvents: 'none' }}
+              >
+                {globalIndex + 1}
+              </div>
             </div>
           </div>
         ),
       };
     });
-  }, [deck?.slides, deck?.settings, selectedSlideId, expandedSlides]);
+  }, [deck?.slides, deck?.settings?.slideSize?.width, deck?.settings?.slideSize?.height, deck?.settings?.defaultBackground, selectedSlideId, expandedSlides, editor]);
 
   const currentSlide = deck?.slides[currentSlideIndex];
   if (!currentSlide) {
@@ -672,11 +681,13 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
               </Button>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex justify-center flex-1 px-4 overflow-y-auto">
               {!deck || deck.slides.length === 0 ? (
                 <p className="text-xs italic text-muted-foreground">No slides yet</p>
               ) : (
-                <ReorderableList
+                <div className="">
+                  <ReorderableList
+                  itemClassName=''
                   items={slideItems}
                   onReorder={(fromIndex, toIndex) => {
                     // Get the actual slide IDs
@@ -720,8 +731,9 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                     });
                   }}
                   enableNesting={true}
-                  className="mt-4"
+                  className=""
                 />
+                </div>
               )}
             </div>
           </div>

@@ -57,6 +57,14 @@ export class ImageLibraryService {
   private hydratePromise: Promise<void> | null = null;
   private hasHydratedFromServer = false;
 
+  // Cache server snapshot to avoid infinite loop in useSyncExternalStore
+  private readonly cachedServerSnapshot: ImageLibraryState = {
+    items: [],
+    isSyncing: false,
+    lastSyncAt: null,
+    lastSyncError: null,
+  };
+
   constructor() {
     if (isBrowser) {
       this.loadFromStorage();
@@ -75,12 +83,9 @@ export class ImageLibraryService {
     return this.state;
   };
 
-  getServerSnapshot = (): ImageLibraryState => ({
-    items: [],
-    isSyncing: false,
-    lastSyncAt: null,
-    lastSyncError: null,
-  });
+  getServerSnapshot = (): ImageLibraryState => {
+    return this.cachedServerSnapshot;
+  };
 
   addItem = (input: AddImageLibraryItemInput): ImageLibraryItem => {
     const now = new Date().toISOString();
