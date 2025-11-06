@@ -14,3 +14,5 @@ export { NewPresentationModal } from './NewPresentationModal';
 export { AuthWarningBanner } from './AuthWarningBanner';
 export { EditorLoadingState } from './EditorLoadingState';
 export { EditorErrorState } from './EditorErrorState';
+export { DeckDataLoader } from './DeckDataLoader';
+export { EditorInitializer } from './EditorInitializer';

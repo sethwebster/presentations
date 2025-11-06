@@ -7,68 +7,36 @@ import { AIPresentationWizard } from '@/components/ai/AIPresentationWizard';
 import {
   NewPresentationModal,
   AuthWarningBanner,
-  EditorLoadingState,
-  EditorErrorState,
 } from './_components';
 
+/**
+ * Editor page component that handles modals and overlays.
+ *
+ * Note: Deck data loading has been moved to server-side (layout.tsx).
+ * This component now only handles:
+ * - New presentation modal (/editor/new)
+ * - AI presentation wizard
+ * - Authentication warning banner
+ */
 export default function EditorPage() {
   const params = useParams<{ deckId: string }>();
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
   const deckId = params?.deckId;
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showNewModal, setShowNewModal] = useState(false);
+  const [showNewModal, setShowNewModal] = useState(deckId === 'new');
   const [showAIWizard, setShowAIWizard] = useState(false);
   const [showAuthWarning, setShowAuthWarning] = useState(false);
 
+  // Check authentication status
   useEffect(() => {
-    if (!deckId) {
-      setError('Deck ID is required');
-      setLoading(false);
-      return;
-    }
-
-    // Handle /editor/new - show modal to choose creation method
-    if (deckId === 'new') {
-      setShowNewModal(true);
-      setLoading(false);
-      return;
-    }
-
-    // Load deck data (or create new if doesn't exist)
-    const loadDeck = async () => {
-      try {
-        const response = await fetch(`/api/editor/${deckId}`);
-        if (!response.ok && response.status !== 404) {
-          throw new Error(`Failed to load deck: ${response.statusText}`);
-        }
-        // If 404, deck will be created with empty structure in API route
-        setLoading(false);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load deck');
-        setLoading(false);
-      }
-    };
-
-    loadDeck();
-  }, [deckId]);
-
-  // Check authentication status after loading
-  useEffect(() => {
-    if (!loading && deckId !== 'new' && sessionStatus !== 'loading') {
-      console.log('[Editor Page DEBUG] Session status:', sessionStatus);
-      console.log('[Editor Page DEBUG] Session:', session);
-      console.log('[Editor Page DEBUG] User ID:', session?.user?.id);
-      console.log('[Editor Page DEBUG] User email:', session?.user?.email);
-
+    if (deckId !== 'new' && sessionStatus !== 'loading') {
       if (!session?.user?.id) {
         setShowAuthWarning(true);
       } else {
         setShowAuthWarning(false);
       }
     }
-  }, [loading, deckId, session, sessionStatus]);
+  }, [deckId, session, sessionStatus]);
 
   const handleStartFromScratch = () => {
     // Generate a new unique ID
@@ -82,14 +50,6 @@ export default function EditorPage() {
     setShowNewModal(false);
     setShowAIWizard(true);
   };
-
-  if (loading) {
-    return <EditorLoadingState />;
-  }
-
-  if (error) {
-    return <EditorErrorState error={error} />;
-  }
 
   if (!deckId) {
     return null;
