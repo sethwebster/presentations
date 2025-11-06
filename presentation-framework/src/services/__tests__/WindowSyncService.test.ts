@@ -1,19 +1,26 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { windowSyncService } from '../WindowSyncService';
 
+// Helper to access private properties for testing
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getServiceInternal(): any {
+  return windowSyncService;
+}
+
 describe('WindowSyncService', () => {
   beforeEach(() => {
     windowSyncService.cleanup();
-    windowSyncService.listeners.clear();
+    getServiceInternal().listeners.clear();
   });
 
   describe('subscribe', () => {
     it('initializes BroadcastChannel on first subscription', () => {
-      expect(windowSyncService.channel).toBe(null);
+      const internal = getServiceInternal();
+      expect(internal.channel).toBe(null);
 
       const unsubscribe = windowSyncService.subscribe(() => {});
 
-      expect(windowSyncService.channel).not.toBe(null);
+      expect(internal.channel).not.toBe(null);
       unsubscribe();
     });
 
@@ -21,8 +28,9 @@ describe('WindowSyncService', () => {
       const listener = vi.fn();
       windowSyncService.subscribe(listener);
 
+      const internal = getServiceInternal();
       const testMessage = { type: 'TEST', data: 'hello' };
-      windowSyncService.channel.onmessage({ data: testMessage });
+      internal.channel?.onmessage?.(new MessageEvent('message', { data: testMessage }));
 
       expect(listener).toHaveBeenCalledWith(testMessage);
     });
@@ -34,8 +42,9 @@ describe('WindowSyncService', () => {
       windowSyncService.subscribe(listener1);
       windowSyncService.subscribe(listener2);
 
+      const internal = getServiceInternal();
       const testMessage = { type: 'TEST' };
-      windowSyncService.channel.onmessage({ data: testMessage });
+      internal.channel?.onmessage?.(new MessageEvent('message', { data: testMessage }));
 
       expect(listener1).toHaveBeenCalledWith(testMessage);
       expect(listener2).toHaveBeenCalledWith(testMessage);
@@ -47,7 +56,8 @@ describe('WindowSyncService', () => {
 
       unsubscribe();
 
-      windowSyncService.channel?.onmessage({ data: { type: 'TEST' } });
+      const internal = getServiceInternal();
+      internal.channel?.onmessage?.(new MessageEvent('message', { data: { type: 'TEST' } }));
 
       expect(listener).not.toHaveBeenCalled();
     });
@@ -56,18 +66,20 @@ describe('WindowSyncService', () => {
       const unsub1 = windowSyncService.subscribe(() => {});
       const unsub2 = windowSyncService.subscribe(() => {});
 
+      const internal = getServiceInternal();
       unsub1();
-      expect(windowSyncService.channel).not.toBe(null);
+      expect(internal.channel).not.toBe(null);
 
       unsub2();
-      expect(windowSyncService.channel).toBe(null);
+      expect(internal.channel).toBe(null);
     });
   });
 
   describe('broadcastSlideChange', () => {
     it('posts message to channel', () => {
       windowSyncService.init();
-      const postMessageSpy = vi.spyOn(windowSyncService.channel, 'postMessage');
+      const internal = getServiceInternal();
+      const postMessageSpy = vi.spyOn(internal.channel!, 'postMessage');
 
       windowSyncService.broadcastSlideChange(5);
 
@@ -83,10 +95,10 @@ describe('WindowSyncService', () => {
       const mockWindow = {
         focus: vi.fn(),
         closed: false,
-      };
+      } as Partial<Window> as Window;
 
       const originalOpen = window.open;
-      window.open = vi.fn(() => mockWindow);
+      window.open = vi.fn(() => mockWindow) as typeof window.open;
 
       const onStatusChange = vi.fn();
       windowSyncService.openPresenterWindow('http://test.com', onStatusChange);
@@ -107,12 +119,13 @@ describe('WindowSyncService', () => {
       const mockWindow = {
         focus: vi.fn(),
         closed: false,
-      };
+      } as Partial<Window> as Window;
 
-      windowSyncService.presenterWindow = mockWindow;
+      const internal = getServiceInternal();
+      internal.presenterWindow = mockWindow;
 
       const originalOpen = window.open;
-      window.open = vi.fn();
+      window.open = vi.fn() as typeof window.open;
 
       windowSyncService.openPresenterWindow('http://test.com', () => {});
 

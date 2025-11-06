@@ -1,7 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { reactionService } from '../ReactionService';
 
-global.fetch = vi.fn();
+// Helper to access private properties for testing
+type ReactionServicePrivate = {
+  lastReactionTime: number;
+};
+
+const getPrivate = () => reactionService as unknown as ReactionServicePrivate;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockFetch = vi.fn() as any;
+global.fetch = mockFetch;
 
 describe('ReactionService', () => {
   beforeEach(() => {
@@ -15,24 +24,24 @@ describe('ReactionService', () => {
     });
 
     it('returns true within rate limit window', () => {
-      reactionService.lastReactionTime = Date.now();
+      getPrivate().lastReactionTime = Date.now();
       expect(reactionService.isRateLimited()).toBe(true);
     });
 
     it('returns false after rate limit expires', () => {
-      reactionService.lastReactionTime = Date.now() - 300;
+      getPrivate().lastReactionTime = Date.now() - 300;
       expect(reactionService.isRateLimited()).toBe(false);
     });
   });
 
   describe('sendReaction', () => {
     it('sends reaction to API', async () => {
-      fetch.mockResolvedValueOnce({ ok: true });
+      mockFetch.mockResolvedValueOnce({ ok: true } as Response);
 
       const result = await reactionService.sendReaction('deck-123', '👏');
 
       expect(result.success).toBe(true);
-      expect(fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         '/api/react/deck-123',
         expect.objectContaining({
           method: 'POST',
@@ -42,17 +51,17 @@ describe('ReactionService', () => {
     });
 
     it('enforces rate limiting', async () => {
-      fetch.mockResolvedValue({ ok: true });
+      mockFetch.mockResolvedValue({ ok: true } as Response);
 
       await reactionService.sendReaction('deck-123', '👏');
       const result = await reactionService.sendReaction('deck-123', '❤️');
 
       expect(result.rateLimited).toBe(true);
-      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
     it('handles fetch errors', async () => {
-      fetch.mockRejectedValueOnce(new Error('Network error'));
+      mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
       const result = await reactionService.sendReaction('deck-123', '👏');
 
@@ -61,10 +70,10 @@ describe('ReactionService', () => {
     });
 
     it('returns error when no deckId', async () => {
-      const result = await reactionService.sendReaction(null, '👏');
+      const result = await reactionService.sendReaction('', '👏');
 
       expect(result.success).toBe(false);
-      expect(fetch).not.toHaveBeenCalled();
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 
@@ -124,12 +133,12 @@ describe('ReactionService', () => {
 
   describe('reset', () => {
     it('clears all state', () => {
-      reactionService.lastReactionTime = 12345;
+      getPrivate().lastReactionTime = 12345;
       reactionService.markReactionAsSeen('test-id');
 
       reactionService.reset();
 
-      expect(reactionService.lastReactionTime).toBe(0);
+      expect(getPrivate().lastReactionTime).toBe(0);
       expect(reactionService.hasSeenReaction('test-id')).toBe(false);
     });
   });

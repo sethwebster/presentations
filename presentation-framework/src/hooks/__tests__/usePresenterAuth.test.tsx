@@ -37,10 +37,10 @@ describe('usePresenterAuth', () => {
   });
 
   it('login calls authService and returns result', async () => {
-    fetch.mockResolvedValueOnce({
+    vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ token: 'new-token' }),
-    });
+    } as Response);
 
     const { result } = renderHook(() => usePresenterAuth());
 

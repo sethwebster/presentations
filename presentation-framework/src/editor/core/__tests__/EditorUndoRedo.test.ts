@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getEditor, Editor } from '../Editor';
 import type { DeckDefinition, ElementDefinition, SlideDefinition } from '@/rsc/types';
 
@@ -41,6 +41,7 @@ describe('Editor Undo/Redo', () => {
       const element: ElementDefinition = {
         id: 'el1',
         type: 'text',
+        content: 'Test text',
         bounds: { x: 10, y: 20, width: 100, height: 50 },
       };
 
@@ -63,6 +64,7 @@ describe('Editor Undo/Redo', () => {
       const element: ElementDefinition = {
         id: 'el1',
         type: 'text',
+        content: 'Test text',
         bounds: { x: 10, y: 20, width: 100, height: 50 },
       };
 
@@ -87,6 +89,7 @@ describe('Editor Undo/Redo', () => {
       const element: ElementDefinition = {
         id: 'el1',
         type: 'text',
+        content: 'Test text',
         bounds: { x: 10, y: 20, width: 100, height: 50 },
       };
 
@@ -94,15 +97,21 @@ describe('Editor Undo/Redo', () => {
       editor.updateElement('el1', { bounds: { x: 50, y: 60, width: 100, height: 50 } });
 
       const state1 = editor.getState();
-      expect(state1.deck?.slides[0].elements[0].bounds?.x).toBe(50);
+      const slide1 = state1.deck!.slides[0]!;
+      const element1 = slide1.elements![0]!;
+      expect(element1.bounds!.x).toBe(50);
 
       editor.undo();
       const state2 = editor.getState();
-      expect(state2.deck?.slides[0].elements[0].bounds?.x).toBe(10);
+      const slide2 = state2.deck!.slides[0]!;
+      const element2 = slide2.elements![0]!;
+      expect(element2.bounds!.x).toBe(10);
 
       editor.redo();
       const state3 = editor.getState();
-      expect(state3.deck?.slides[0].elements[0].bounds?.x).toBe(50);
+      const slide3 = state3.deck!.slides[0]!;
+      const element3 = slide3.elements![0]!;
+      expect(element3.bounds!.x).toBe(50);
     });
   });
 
@@ -157,7 +166,7 @@ describe('Editor Undo/Redo', () => {
 
       await editor.loadDeck('test-deck');
 
-      editor.addElement({ id: 'el1', type: 'text', bounds: { x: 0, y: 0, width: 100, height: 50 } });
+      editor.addElement({ id: 'el1', type: 'text', content: 'Test text', bounds: { x: 0, y: 0, width: 100, height: 50 } });
 
       // Wait for debounced save
       await new Promise(resolve => setTimeout(resolve, 2500));
@@ -209,8 +218,8 @@ describe('Editor Undo/Redo', () => {
     it('should clear redo stack on new command', async () => {
       await editor.loadDeck('test-deck');
 
-      editor.addElement({ id: 'el1', type: 'text', bounds: { x: 0, y: 0, width: 100, height: 50 } });
-      editor.addElement({ id: 'el2', type: 'text', bounds: { x: 0, y: 0, width: 100, height: 50 } });
+      editor.addElement({ id: 'el1', type: 'text', content: 'Test text', bounds: { x: 0, y: 0, width: 100, height: 50 } });
+      editor.addElement({ id: 'el2', type: 'text', content: 'Test text', bounds: { x: 0, y: 0, width: 100, height: 50 } });
       editor.undo(); // Undo el2, move it to redo stack
       editor.undo(); // Undo el1, move it to redo stack
 
@@ -218,7 +227,7 @@ describe('Editor Undo/Redo', () => {
       expect(state.redoStack).toHaveLength(2);
 
       // New command should clear redo stack
-      editor.addElement({ id: 'el3', type: 'text', bounds: { x: 0, y: 0, width: 100, height: 50 } });
+      editor.addElement({ id: 'el3', type: 'text', content: 'Test text', bounds: { x: 0, y: 0, width: 100, height: 50 } });
       state = editor.getState();
       expect(state.redoStack).toHaveLength(0);
       expect(state.undoStack).toHaveLength(3);

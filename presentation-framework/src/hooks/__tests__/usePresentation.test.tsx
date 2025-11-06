@@ -14,11 +14,11 @@ vi.mock('../../services/NavigationService', () => ({
 describe('usePresentation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    navigationService.getInitialSlide.mockReturnValue(0);
+    vi.mocked(navigationService.getInitialSlide).mockReturnValue(0);
   });
 
   it('initializes with slide from NavigationService', () => {
-    navigationService.getInitialSlide.mockReturnValue(5);
+    vi.mocked(navigationService.getInitialSlide).mockReturnValue(5);
 
     const { result } = renderHook(() => usePresentation(10));
 

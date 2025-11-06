@@ -232,7 +232,19 @@ export async function listDecks(): Promise<
   }
 
   try {
-    const deckMap = new Map<string, { id: string; title: string; updatedAt: string }>();
+    const deckMap = new Map<
+      string,
+      {
+        id: string;
+        title: string;
+        updatedAt: string;
+        slug?: string;
+        ownerId?: string;
+        sharedWith?: string[];
+        deletedAt?: string;
+        createdAt?: string;
+      }
+    >();
 
     // Get the keyPrefix if set (for test isolation)
     const keyPrefix = (redis as any).options?.keyPrefix || '';

@@ -1,8 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { presentationLoaderService } from '../PresentationLoaderService';
 
+type MockPresentation = {
+  getSlides: (assetsPath: string) => Array<{ id: string; content: string }>;
+  customStyles?: string;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MockPresentations = Record<string, any>;
+
 describe('PresentationLoaderService', () => {
-  let mockPresentations;
+  let mockPresentations: MockPresentations;
 
   beforeEach(() => {
     presentationLoaderService.clearCache();
@@ -10,7 +18,7 @@ describe('PresentationLoaderService', () => {
     // Create fresh mock for each test
     mockPresentations = {
       'test-deck': vi.fn(async () => ({
-        getSlides: (assetsPath) => [
+        getSlides: (assetsPath: string) => [
           { id: 'slide-1', content: 'Test 1' },
           { id: 'slide-2', content: 'Test 2' },
         ],
@@ -107,7 +115,7 @@ describe('PresentationLoaderService', () => {
       const cached = presentationLoaderService.getCached('test-deck');
 
       expect(cached).not.toBe(null);
-      expect(cached.slides).toHaveLength(2);
+      expect(cached?.slides).toHaveLength(2);
     });
   });
 

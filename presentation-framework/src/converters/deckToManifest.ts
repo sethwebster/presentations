@@ -6,9 +6,9 @@
  * storing the actual binary data in an AssetStore.
  */
 
-import type { DeckDefinition } from '../rsc/types';
-import type { ManifestV1, ElementDefinition } from '../types/ManifestV1';
-import { AssetStore } from '../repositories/AssetStore';
+import type { DeckDefinition, ElementDefinition as RscElementDefinition } from '../rsc/types';
+import type { ManifestV1, ElementDefinition as ManifestElementDefinition } from '../types/ManifestV1';
+import type { IAssetStore } from '../repositories/AssetStore';
 import type { AssetReference } from '../types/AssetInfo';
 import { createAssetReference } from '../types/AssetInfo';
 import {
@@ -35,7 +35,7 @@ import {
  */
 export async function convertDeckToManifest(
   deck: DeckDefinition,
-  assetStore: AssetStore
+  assetStore: IAssetStore
 ): Promise<ManifestV1> {
   // Track processed assets to avoid duplicate uploads
   const assetCache = new Map<string, AssetReference>();
@@ -159,17 +159,18 @@ export async function convertDeckToManifest(
 
   /**
    * Process an element and replace any embedded assets
+   * Takes RscElementDefinition (with string src) and returns ManifestElementDefinition (with AssetReference src)
    */
   async function processElement(
-    element: ElementDefinition
-  ): Promise<ElementDefinition> {
+    element: RscElementDefinition
+  ): Promise<ManifestElementDefinition> {
     // Handle image elements
     if (element.type === 'image') {
       const src = await processAssetValue(element.src);
       return {
         ...element,
         src: src as AssetReference,
-      };
+      } as ManifestElementDefinition;
     }
 
     // Handle media elements
@@ -178,7 +179,7 @@ export async function convertDeckToManifest(
       return {
         ...element,
         src: src as AssetReference,
-      };
+      } as ManifestElementDefinition;
     }
 
     // Handle group elements (recursively process children)
@@ -187,7 +188,7 @@ export async function convertDeckToManifest(
       return {
         ...element,
         children,
-      };
+      } as ManifestElementDefinition;
     }
 
     // Handle custom elements with potential image props
@@ -201,10 +202,10 @@ export async function convertDeckToManifest(
       return {
         ...element,
         props,
-      };
+      } as ManifestElementDefinition;
     }
 
-    return element;
+    return element as ManifestElementDefinition;
   }
 
   // Convert meta with asset references

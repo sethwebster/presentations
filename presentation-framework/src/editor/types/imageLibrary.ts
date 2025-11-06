@@ -13,6 +13,7 @@ export interface ImageLibraryMetadata {
   prompt?: string;
   provider?: string;
   quality?: string;
+  qualityLevel?: number;
   usage?: ImageLibraryUsageContext;
   originalFileName?: string;
   mimeType?: string;

@@ -8,12 +8,13 @@ import type { DeckDefinition } from '../../rsc/types';
 import type { AssetInfo, AssetReference } from '../../types/AssetInfo';
 import { createAssetReference } from '../../types/AssetInfo';
 import { hashBytes } from '../../utils/hash';
+import type { IAssetStore } from '../../repositories/AssetStore';
 
 /**
  * In-memory AssetStore implementation for testing
- * Matches the signature of the real AssetStore class
+ * Implements the IAssetStore interface
  */
-class InMemoryAssetStore {
+class InMemoryAssetStore implements IAssetStore {
   private assets = new Map<string, Uint8Array>();
   private metadata = new Map<string, AssetInfo>();
 
@@ -218,7 +219,9 @@ describe('convertDeckToManifest', () => {
 
     const imageElement = manifest.slides[0].elements![0];
     expect(imageElement.type).toBe('image');
-    expect(imageElement.src).toMatch(/^asset:\/\/sha256:[a-f0-9]{64}$/);
+    if (imageElement.type === 'image') {
+      expect(imageElement.src).toMatch(/^asset:\/\/sha256:[a-f0-9]{64}$/);
+    }
     expect(assetStore.size()).toBe(1);
   });
 
@@ -266,11 +269,16 @@ describe('convertDeckToManifest', () => {
 
     // All references should point to the same asset
     const coverRef = manifest.meta.coverImage as AssetReference;
-    const img1Ref = manifest.slides[0].elements![0].src as AssetReference;
-    const img2Ref = manifest.slides[1].elements![0].src as AssetReference;
+    const img1Element = manifest.slides[0].elements![0];
+    const img2Element = manifest.slides[1].elements![0];
 
-    expect(coverRef).toBe(img1Ref);
-    expect(img1Ref).toBe(img2Ref);
+    if (img1Element.type === 'image' && img2Element.type === 'image') {
+      const img1Ref = img1Element.src as AssetReference;
+      const img2Ref = img2Element.src as AssetReference;
+
+      expect(coverRef).toBe(img1Ref);
+      expect(img1Ref).toBe(img2Ref);
+    }
 
     // Asset registry should have one entry
     const assetRefs = Object.keys(manifest.assets);
@@ -384,7 +392,11 @@ describe('convertDeckToManifest', () => {
 
     // URLs should be preserved as-is
     expect(manifest.meta.coverImage).toBe('https://example.com/cover.jpg');
-    expect(manifest.slides[0].elements![0].src).toBe('https://example.com/image.jpg');
+
+    const imgElement = manifest.slides[0].elements![0];
+    if (imgElement.type === 'image') {
+      expect(imgElement.src).toBe('https://example.com/image.jpg');
+    }
 
     // No assets should be stored
     expect(assetStore.size()).toBe(0);
@@ -417,7 +429,9 @@ describe('convertDeckToManifest', () => {
 
     const mediaElement = manifest.slides[0].elements![0];
     expect(mediaElement.type).toBe('media');
-    expect(mediaElement.src).toBe('https://example.com/video.mp4');
+    if (mediaElement.type === 'media') {
+      expect(mediaElement.src).toBe('https://example.com/video.mp4');
+    }
   });
 
   it('should handle group elements with nested images', async () => {
@@ -462,11 +476,16 @@ describe('convertDeckToManifest', () => {
 
     const groupElement = manifest.slides[0].elements![0];
     expect(groupElement.type).toBe('group');
-    expect(groupElement.children).toHaveLength(2);
 
-    const imageInGroup = groupElement.children![0];
-    expect(imageInGroup.type).toBe('image');
-    expect(imageInGroup.src).toMatch(/^asset:\/\/sha256:[a-f0-9]{64}$/);
+    if (groupElement.type === 'group') {
+      expect(groupElement.children).toHaveLength(2);
+
+      const imageInGroup = groupElement.children[0];
+      expect(imageInGroup.type).toBe('image');
+      if (imageInGroup.type === 'image') {
+        expect(imageInGroup.src).toMatch(/^asset:\/\/sha256:[a-f0-9]{64}$/);
+      }
+    }
 
     expect(assetStore.size()).toBe(1);
   });
@@ -620,10 +639,14 @@ describe('convertDeckToManifest', () => {
 
     const customElement = manifest.slides[0].elements![0];
     expect(customElement.type).toBe('custom');
-    expect(customElement.componentName).toBe('Avatar');
-    expect(customElement.props!.name).toBe('John Doe');
-    expect(customElement.props!.avatarUrl).toMatch(/^asset:\/\/sha256:[a-f0-9]{64}$/);
-    expect(customElement.props!.size).toBe('large');
+
+    if (customElement.type === 'custom') {
+      expect(customElement.componentName).toBe('Avatar');
+      expect(customElement.props!.name).toBe('John Doe');
+      expect(customElement.props!.avatarUrl).toMatch(/^asset:\/\/sha256:[a-f0-9]{64}$/);
+      expect(customElement.props!.size).toBe('large');
+    }
+
     expect(assetStore.size()).toBe(1);
   });
 
@@ -657,7 +680,11 @@ describe('convertDeckToManifest', () => {
 
     // Asset references should be preserved
     expect(manifest.meta.coverImage).toBe(assetRef);
-    expect(manifest.slides[0].elements![0].src).toBe(assetRef);
+
+    const imgElement = manifest.slides[0].elements![0];
+    if (imgElement.type === 'image') {
+      expect(imgElement.src).toBe(assetRef);
+    }
 
     // Asset should be in registry
     expect(manifest.assets[assetRef]).toBe(assetRef);

@@ -196,7 +196,7 @@ export async function POST(request: Request) {
           await new Promise(resolve => setTimeout(resolve, delayMs));
         }
 
-        let imageBase64: string;
+        let imageBase64: string | undefined;
         let meta: any;
 
         if (model === 'flux') {
@@ -422,6 +422,10 @@ export async function POST(request: Request) {
             actualSize: size,
             quality: "high",
           };
+        }
+
+        if (!imageBase64) {
+          throw new Error('Image refinement did not produce base64 data');
         }
 
         const dataUrl = `data:image/${model === 'flux' ? 'jpeg' : 'png'};base64,${imageBase64}`;

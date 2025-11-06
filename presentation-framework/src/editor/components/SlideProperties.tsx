@@ -282,7 +282,7 @@ export function SlideProperties() {
     // This prevents JSON.stringify errors on subsequent edits
     console.log('[SlideProperties] Triggering immediate save after image upload');
     setTimeout(() => {
-      editor.save();
+      editor.saveDeck();
     }, 100);
   }, [updateImageBackground, addImageToLibrary, deckId, editor]);
 
@@ -410,7 +410,7 @@ export function SlideProperties() {
       // This prevents JSON.stringify errors on subsequent edits
       console.log('[SlideProperties] Triggering immediate save after AI image generation');
       setTimeout(() => {
-        editor.save();
+        editor.saveDeck();
       }, 100);
 
       // If polish is enabled, generate polish version in background and swap when ready
@@ -774,7 +774,7 @@ export function SlideProperties() {
     // This prevents JSON.stringify errors on subsequent edits
     console.log('[SlideProperties] Triggering immediate save after selecting library image');
     setTimeout(() => {
-      editor.save();
+      editor.saveDeck();
     }, 100);
   }, [updateImageBackground, editor]);
 
@@ -1616,7 +1616,6 @@ export function SlideProperties() {
             onClick={() => {
               setShowRefineModal(false);
               setRefineRequest('');
-              setRefineModel('flux');
               setRefineQualityLevel(0);
               setImageStatus({ isGenerating: false, error: null, success: null });
             }}

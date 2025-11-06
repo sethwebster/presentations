@@ -1,7 +1,49 @@
+import type Redis from 'ioredis';
 import { getRedis } from '../lib/redis';
 import { hashBytes } from '../utils/hash';
 import { metrics, incrementCounter, measureLatency } from '../lib/metrics';
 import type { AssetInfo } from '../types/AssetInfo';
+
+/**
+ * Interface for asset storage implementations
+ */
+export interface IAssetStore {
+  /**
+   * Store an asset by its content hash.
+   * @param bytes - The binary asset data
+   * @param info - Partial metadata (sha256, byteSize, createdAt will be auto-populated)
+   * @returns The SHA-256 hash of the asset
+   */
+  put(bytes: Uint8Array, info: Partial<AssetInfo>): Promise<string>;
+
+  /**
+   * Retrieve an asset by its SHA-256 hash.
+   * @param sha - The SHA-256 hash of the asset
+   * @returns The binary asset data, or null if not found
+   */
+  get(sha: string): Promise<Uint8Array | null>;
+
+  /**
+   * Retrieve metadata for an asset.
+   * @param sha - The SHA-256 hash of the asset
+   * @returns The asset metadata, or null if not found
+   */
+  info(sha: string): Promise<AssetInfo | null>;
+
+  /**
+   * Check if an asset exists in the store.
+   * @param sha - The SHA-256 hash of the asset
+   * @returns True if the asset exists, false otherwise
+   */
+  exists(sha: string): Promise<boolean>;
+
+  /**
+   * Delete an asset and its metadata.
+   * @param sha - The SHA-256 hash of the asset to delete
+   * @returns True if the asset was deleted, false if it didn't exist
+   */
+  delete(sha: string): Promise<boolean>;
+}
 
 /**
  * Content-addressed binary storage for assets using Redis.
@@ -31,14 +73,15 @@ import type { AssetInfo } from '../types/AssetInfo';
  * // retrieved => Uint8Array (same as imageBytes)
  * ```
  */
-export class AssetStore {
-  private redis;
+export class AssetStore implements IAssetStore {
+  private redis: Redis;
 
   constructor() {
-    this.redis = getRedis();
-    if (!this.redis) {
+    const redisClient = getRedis();
+    if (!redisClient) {
       throw new Error('[AssetStore] Redis client is not available');
     }
+    this.redis = redisClient;
   }
 
   /**
@@ -69,7 +112,7 @@ export class AssetStore {
     }
 
     // Record asset size metric
-    incrementCounter(metrics.assetPutBytes, bytes.length, { sha: sha.substring(0, 8) });
+    metrics.assetPutBytes.record(bytes.length, { sha: sha.substring(0, 8) });
     incrementCounter(metrics.assetPutCount, 1);
 
     // Convert Uint8Array to Buffer for Redis storage

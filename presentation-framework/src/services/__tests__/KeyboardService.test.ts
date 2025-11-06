@@ -1,10 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { keyboardService } from '../KeyboardService';
 
+// Helper to access private properties for testing
+type KeyboardServicePrivate = {
+  lastEscapeTime: number;
+  doubleEscapeListeners: Set<() => void>;
+  emitDoubleEscape: () => void;
+};
+
+const getPrivate = () => keyboardService as unknown as KeyboardServicePrivate;
+
 describe('KeyboardService', () => {
   beforeEach(() => {
-    keyboardService.lastEscapeTime = 0;
-    keyboardService.doubleEscapeListeners.clear();
+    getPrivate().lastEscapeTime = 0;
+    getPrivate().doubleEscapeListeners.clear();
   });
 
   describe('checkDoubleEscape', () => {
@@ -53,11 +62,11 @@ describe('KeyboardService', () => {
       const listener = vi.fn();
       const unsubscribe = keyboardService.onDoubleEscape(listener);
 
-      keyboardService.emitDoubleEscape();
+      getPrivate().emitDoubleEscape();
       expect(listener).toHaveBeenCalledTimes(1);
 
       unsubscribe();
-      keyboardService.emitDoubleEscape();
+      getPrivate().emitDoubleEscape();
       expect(listener).toHaveBeenCalledTimes(1); // Still 1, not called again
     });
   });
