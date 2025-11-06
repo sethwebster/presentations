@@ -4,7 +4,7 @@ import type { PresentationModule } from '../types/presentation';
 // This allows Vite to statically analyze and bundle the imports
 
 export const presentations: Record<string, () => Promise<PresentationModule>> = {
-  'jsconf-2025-react-foundation': () => import('./jsconf-2025-react-foundation'),
+  'jsconf-rsc': () => import('./jsconf-rsc'),
   'demo-rsc-deck': () => import('./demo-rsc'),
 };
 
