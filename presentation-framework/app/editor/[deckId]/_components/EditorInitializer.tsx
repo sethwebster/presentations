@@ -28,13 +28,47 @@ export function EditorInitializer({
 
   useEffect(() => {
     // Initialize editor with server-fetched deck
+    const deckId = initialDeck.meta.id;
     console.log('[EditorInitializer] Initializing editor with server data:', {
-      deckId: initialDeck.meta.id,
+      deckId,
       slides: initialDeck.slides.length,
       userId,
     });
 
-    editor.setDeck(initialDeck);
+    // Try to restore last selected slide from localStorage
+    let selectedSlideId: string | null = null;
+    let currentSlideIndex = 0;
+
+    try {
+      const savedSlideId = localStorage.getItem(`editor:${deckId}:lastSelectedSlideId`);
+      if (savedSlideId) {
+        const slideIndex = initialDeck.slides.findIndex(slide => slide.id === savedSlideId);
+        if (slideIndex >= 0) {
+          selectedSlideId = savedSlideId;
+          currentSlideIndex = slideIndex;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load last selected slide from localStorage:', e);
+    }
+
+    // Fallback to first slide if no saved selection found
+    if (!selectedSlideId && initialDeck.slides.length > 0) {
+      selectedSlideId = initialDeck.slides[0]?.id || null;
+      currentSlideIndex = 0;
+    }
+
+    // Initialize editor state with both deck AND deckId (required for saving)
+    // Using setState directly to match what loadDeck does
+    (editor as any).setState({
+      deck: initialDeck,
+      deckId,
+      currentSlideIndex,
+      selectedSlideId,
+      selectedElementIds: new Set(),
+      keyObjectId: null,
+      isLoading: false,
+    });
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialDeck.meta.id]); // Only reinitialize if deckId changes
