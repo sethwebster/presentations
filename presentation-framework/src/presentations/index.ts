@@ -5,6 +5,7 @@ import type { PresentationModule } from '../types/presentation';
 
 export const presentations: Record<string, () => Promise<PresentationModule>> = {
   'jsconf-2025-react-foundation': () => import('./jsconf-2025-react-foundation'),
+  'demo-rsc-deck': () => import('./demo-rsc'),
 };
 
 export async function loadPresentation(name: string): Promise<PresentationModule> {

@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react';
+import React from 'react';
+
+const { useState, useEffect } = React;
 import { SlideData } from '../types/presentation';
 import '../styles/Presentation.css';
+import '../styles/RscAnimations.css';
 
 interface PresentationThumbnailProps {
   slides: SlideData[];
@@ -38,8 +41,19 @@ export function PresentationThumbnail({
 
   useCustomStyles(customStyles);
 
+  const currentSlide = slides && slides.length > 0 ? slides[currentIndex] : null;
+
+  // Debug: Log slide content
+  useEffect(() => {
+    if (currentSlide?.content) {
+      console.log(`Slide ${currentIndex} content type:`, typeof currentSlide.content, currentSlide.content);
+    } else if (currentSlide) {
+      console.warn(`Slide ${currentIndex} has no content`);
+    }
+  }, [currentIndex, currentSlide]);
+
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (slides.length <= 1) return;
+    if (!isHovered || !slides || slides.length <= 1) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -50,7 +64,24 @@ export function PresentationThumbnail({
     setCurrentIndex(clampedIndex);
   };
 
-  const currentSlide = slides[currentIndex];
+  if (!slides || slides.length === 0) {
+    return (
+      <div className="relative w-full aspect-video overflow-hidden flex items-center justify-center"
+           style={{ background: 'var(--lume-midnight)' }}>
+        <div className="text-4xl opacity-20">?</div>
+      </div>
+    );
+  }
+
+  if (!currentSlide) {
+    return (
+      <div className="relative w-full aspect-video overflow-hidden flex items-center justify-center"
+           style={{ background: 'var(--lume-midnight)' }}>
+        <div className="text-4xl opacity-20">?</div>
+      </div>
+    );
+  }
+
   const progress = ((currentIndex + 1) / slides.length) * 100;
 
   return (
@@ -76,6 +107,7 @@ export function PresentationThumbnail({
       )}
 
       <div
+        key={`slide-${currentSlide.id}-${currentIndex}`}
         className={`slide ${currentSlide.className || ''}`}
         style={{
           transform: 'scale(0.2)',
@@ -85,9 +117,19 @@ export function PresentationThumbnail({
           position: 'absolute',
           top: 0,
           left: 0,
+          zIndex: 1,
+          pointerEvents: 'none',
         }}
       >
-        {currentSlide.content}
+        {React.isValidElement(currentSlide.content) ? (
+          currentSlide.content
+        ) : currentSlide.content != null ? (
+          <div>{String(currentSlide.content)}</div>
+        ) : (
+          <div className="text-white opacity-50 flex items-center justify-center w-full h-full">
+            No content
+          </div>
+        )}
       </div>
 
       {/* Slide indicator */}

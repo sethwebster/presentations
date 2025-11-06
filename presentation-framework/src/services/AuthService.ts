@@ -7,41 +7,131 @@ import type { AuthEvent, LoginResult } from '../types/services';
 class AuthService {
   private readonly TOKEN_KEY = 'lume-presenter-token';
   private authStateListeners = new Set<(event: AuthEvent) => void>();
+  private storeListeners = new Set<() => void>();
+  private cachedToken: string | null = null;
+  private initializationScheduled = false;
+  private storageListenerAttached = false;
+  private readonly initialSnapshot = { isAuthenticated: false, token: null };
+  private snapshot: { isAuthenticated: boolean; token: string | null } = this.initialSnapshot;
+
+  private resolveCachedToken(): void {
+    if (this.cachedToken !== null || !this.hasWindow()) {
+      return;
+    }
+
+    const stored = window.localStorage.getItem(this.TOKEN_KEY);
+    if (stored) {
+      this.cachedToken = stored;
+    }
+  }
+
+  private hasWindow(): boolean {
+    return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+  }
+
+  constructor() {}
+
+  private scheduleInitialization(): void {
+    if (this.initializationScheduled || !this.hasWindow()) {
+      return;
+    }
+
+    this.initializationScheduled = true;
+    Promise.resolve().then(() => {
+      if (!this.hasWindow()) {
+        return;
+      }
+
+      this.cachedToken = window.localStorage.getItem(this.TOKEN_KEY);
+      if (!this.storageListenerAttached) {
+        window.addEventListener('storage', this.handleStorage);
+        this.storageListenerAttached = true;
+      }
+
+      this.emitAuthState(
+        this.cachedToken
+          ? { type: 'authenticated', token: this.cachedToken }
+          : { type: 'logged_out' },
+      );
+    });
+  }
+
+  private handleStorage = (event: StorageEvent): void => {
+    if (event.key !== this.TOKEN_KEY || !this.hasWindow()) {
+      return;
+    }
+
+    const token = window.localStorage.getItem(this.TOKEN_KEY);
+    if (token !== this.cachedToken) {
+      this.cachedToken = token;
+      this.emitAuthState(
+        token ? { type: 'authenticated', token } : { type: 'logged_out' },
+      );
+    }
+  };
 
   /**
    * Get the current auth token
    */
   getToken(): string | null {
-    return localStorage.getItem(this.TOKEN_KEY);
+    this.scheduleInitialization();
+    this.resolveCachedToken();
+    return this.cachedToken;
   }
 
   /**
    * Check if user is authenticated
    */
   isAuthenticated(): boolean {
-    return !!this.getToken();
+    this.scheduleInitialization();
+    return Boolean(this.getToken());
+  }
+
+  /**
+   * Force refresh auth state from localStorage
+   * Useful when token is set in another window/tab
+   * Always updates the snapshot, even if token hasn't changed
+   */
+  refreshAuthState(): void {
+    if (!this.hasWindow()) {
+      return;
+    }
+    // Force read from localStorage
+    this.resolveCachedToken();
+    const token = window.localStorage.getItem(this.TOKEN_KEY);
+    console.log('AuthService.refreshAuthState: token from localStorage:', token ? 'exists' : 'missing');
+    // Always update, even if token hasn't changed (to ensure snapshot is correct)
+    this.cachedToken = token;
+    const event = token ? { type: 'authenticated' as const, token } : { type: 'logged_out' as const };
+    console.log('AuthService.refreshAuthState: emitting event:', event.type);
+    this.emitAuthState(event);
   }
 
   /**
    * Login with password
+   * @param password - The password to authenticate with
+   * @param remember - Whether to remember the token
+   * @param deckId - Optional deckId for deck-specific authentication
    */
-  async login(password: string, remember = true): Promise<LoginResult> {
+  async login(password: string, remember = true, deckId?: string): Promise<LoginResult> {
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password, deckId }),
       });
 
       if (response.ok) {
         const { token } = await response.json() as { token: string };
 
         // Store token if remember is true
-        if (remember) {
-          localStorage.setItem(this.TOKEN_KEY, token);
+        if (remember && this.hasWindow()) {
+          window.localStorage.setItem(this.TOKEN_KEY, token);
         }
+
+        this.cachedToken = token;
 
         // Emit authenticated event
         this.emitAuthState({ type: 'authenticated', token });
@@ -61,7 +151,10 @@ class AuthService {
    * Logout
    */
   logout(): void {
-    localStorage.removeItem(this.TOKEN_KEY);
+    if (this.hasWindow()) {
+      window.localStorage.removeItem(this.TOKEN_KEY);
+    }
+    this.cachedToken = null;
     this.emitAuthState({ type: 'logged_out' });
   }
 
@@ -73,11 +166,52 @@ class AuthService {
     return () => this.authStateListeners.delete(callback);
   }
 
+  subscribe(callback: () => void): () => void {
+    this.storeListeners.add(callback);
+    this.scheduleInitialization();
+    return () => this.storeListeners.delete(callback);
+  }
+
+  getSnapshot(): { isAuthenticated: boolean; token: string | null } {
+    this.scheduleInitialization();
+    return this.snapshot;
+  }
+
+  getServerSnapshot(): { isAuthenticated: boolean; token: string | null } {
+    return this.initialSnapshot;
+  }
+
   /**
    * Emit auth state change to all listeners
    */
   emitAuthState(event: AuthEvent): void {
+    this.snapshot = {
+      isAuthenticated: event.type === 'authenticated',
+      token: event.type === 'authenticated' ? event.token ?? null : null,
+    };
+
     this.authStateListeners.forEach(listener => listener(event));
+    this.storeListeners.forEach(listener => listener());
+  }
+
+  /**
+   * Test helper to reset internal state between runs.
+   * Intended for use in unit tests only.
+   */
+  resetForTests(): void {
+    this.cachedToken = null;
+    this.snapshot = this.initialSnapshot;
+    this.initializationScheduled = false;
+    this.authStateListeners.clear();
+    this.storeListeners.clear();
+    if (this.storageListenerAttached && this.hasWindow()) {
+      window.removeEventListener('storage', this.handleStorage);
+      this.storageListenerAttached = false;
+    }
+  }
+
+  getListenerCountForTests(): number {
+    return this.authStateListeners.size;
   }
 }
 

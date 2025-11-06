@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React from 'react';
+
+const { useEffect, useState } = React;
 import { windowSyncService } from '../services/WindowSyncService';
 import { reactionService } from '../services/ReactionService';
 import { keyboardService } from '../services/KeyboardService';
@@ -44,7 +45,6 @@ export function PresenterView({
   const [recentReactions, setRecentReactions] = useState<ReactionData[]>([]);
   const current = slides[currentSlide];
   const next = currentSlide < slides.length - 1 ? slides[currentSlide + 1] : null;
-  const _navigate = useNavigate(); // Available but not currently used
 
   // Subscribe to double-escape events from KeyboardService
   useEffect(() => {

@@ -6,8 +6,9 @@
  * Place accompanying assets in a folder named "jsconf-2025-react-foundation-assets/"
  */
 
-import { Reveal } from "../components/Reveal.tsx";
-import { FadeOut } from "../components/FadeOut.tsx";
+import React from "react";
+import { Reveal } from "../components/Reveal";
+import { FadeOut } from "../components/FadeOut";
 import type { SlideData, PresentationConfig } from "../types/presentation";
 
 // ============================================================================

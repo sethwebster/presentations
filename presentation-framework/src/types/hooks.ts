@@ -19,7 +19,7 @@ export interface UsePresentationReturn {
 export interface UsePresenterAuthReturn {
   isAuthenticated: boolean;
   token: string | null;
-  login: (password: string, remember?: boolean) => Promise<{ success: boolean; error?: string }>;
+  login: (password: string, remember?: boolean, deckId?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   showWelcomeToast: boolean;
 }

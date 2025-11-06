@@ -1,4 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import React from 'react';
+
+const { useState, useEffect, useRef } = React;
 import { ReactionData } from '../types/services';
 import '../styles/EmojiFloaters.css';
 

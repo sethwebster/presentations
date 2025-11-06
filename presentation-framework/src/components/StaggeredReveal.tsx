@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import React from 'react';
+
+const { useState, useEffect } = React;
 
 interface StaggeredRevealProps {
   /** Content to reveal (can be single element or array) */

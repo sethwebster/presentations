@@ -2,25 +2,38 @@
  * Core presentation type definitions
  */
 
+import type { ReactNode } from 'react';
+import type { TimelineDefinition, SlideTransitions } from '../rsc/types';
+
 export interface SlideData {
   id: string;
   className?: string;
   notes?: string;
-  content: React.ReactNode;
+  content: ReactNode;
   hideBrandLogo?: boolean;
   hideQRCode?: boolean;
+  timeline?: TimelineDefinition | null;
+  transitions?: SlideTransitions;
 }
 
 export interface PresentationConfig {
-  brandLogo?: React.ReactNode;
-  renderSlideNumber?: () => React.ReactNode;
-  renderNavigation?: () => React.ReactNode;
+  brandLogo?: ReactNode;
+  renderSlideNumber?: () => ReactNode;
+  renderNavigation?: () => ReactNode;
   customStyles?: string;
+  slideSize?: {
+    width: number;
+    height: number;
+    preset?: string;
+    units?: string;
+  };
+  orientation?: 'landscape' | 'portrait';
+  [key: string]: unknown;
 }
 
 export interface PresentationModule {
   getSlides: (assetsPath: string) => SlideData[];
-  getBrandLogo?: (assetsPath: string) => React.ReactNode;
+  getBrandLogo?: (assetsPath: string) => ReactNode;
   presentationConfig?: PresentationConfig;
   customStyles?: string;
 }

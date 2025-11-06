@@ -1,6 +1,5 @@
 import { sseService } from './SSEService';
 import { reactionService } from './ReactionService';
-import { authService } from './AuthService';
 import type { ReactionData, RealtimeCallbacks, SSEEvent } from '../types/services';
 
 interface PublishSlideChangeResult {
@@ -101,18 +100,11 @@ class RealtimeService {
       return { success: false };
     }
 
-    const token = authService.getToken();
-    if (!token) {
-      console.error('No presenter token available');
-      return { success: false, error: 'Not authenticated' };
-    }
-
     try {
       const response = await fetch(`/api/control/advance/${deckId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ slide: slideIndex }),
       });
