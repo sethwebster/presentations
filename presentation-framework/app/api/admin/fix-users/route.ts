@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import Redis from 'ioredis';
 import { auth } from '@/lib/auth';
+import { getRedis } from '@/lib/redis';
 
-const redisUrl = process.env.REDIS_URL || process.env.KV_URL;
-const redis = redisUrl ? new Redis(redisUrl) : null;
+const redis = getRedis();
 
 export async function POST() {
   // Check authentication

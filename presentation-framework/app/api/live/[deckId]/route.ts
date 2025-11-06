@@ -1,5 +1,5 @@
-import Redis from 'ioredis';
 import { NextResponse } from 'next/server';
+import { getRedis, createRedis } from '@/lib/redis';
 
 export const runtime = 'nodejs';
 
@@ -16,13 +16,7 @@ interface InitEvent {
   slide: number;
 }
 
-// Create Redis client from environment variables
-const redisUrl = process.env.REDIS_URL || process.env.KV_URL;
-if (!redisUrl) {
-  console.error('REDIS_URL or KV_URL environment variable is not set');
-}
-
-const redis = redisUrl ? new Redis(redisUrl) : null;
+const redis = getRedis();
 
 export async function GET(request: Request, context: DeckRouteContext) {
   const { deckId } = await context.params;
@@ -35,7 +29,14 @@ export async function GET(request: Request, context: DeckRouteContext) {
     );
   }
 
-  const subscriber = redis.duplicate();
+  const subscriber = createRedis();
+  if (!subscriber) {
+    return NextResponse.json(
+      { error: 'Server configuration error: Redis subscriber not available' },
+      { status: 500 },
+    );
+  }
+
   const channelName = `deck:${deckId}:channel`;
   const encoder = new TextEncoder();
   let pingInterval: NodeJS.Timeout;

@@ -1,20 +1,13 @@
 import { NextResponse } from 'next/server';
-import Redis from 'ioredis';
 import type { DeckDefinition } from '@/rsc/types';
 import { auth } from '@/lib/auth';
+import { getRedis } from '@/lib/redis';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// Create Redis client from environment variables
-// Supports both KV_URL (single connection string) or REDIS_URL
-const redisUrl = process.env.REDIS_URL || process.env.KV_URL;
-if (!redisUrl) {
-  console.error('REDIS_URL or KV_URL environment variable is not set');
-}
-
-const redis = redisUrl ? new Redis(redisUrl) : null;
+const redis = getRedis();
 
 type DeckRouteContext = {
   params: Promise<{ deckId: string }>;

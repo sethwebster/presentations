@@ -1,15 +1,9 @@
-import Redis from 'ioredis';
 import { NextResponse } from 'next/server';
+import { getRedis } from '@/lib/redis';
 
 export const runtime = 'nodejs';
 
-// Create Redis client from environment variables
-const redisUrl = process.env.REDIS_URL || process.env.KV_URL;
-if (!redisUrl) {
-  console.error('REDIS_URL or KV_URL environment variable is not set');
-}
-
-const redis = redisUrl ? new Redis(redisUrl) : null;
+const redis = getRedis();
 
 interface LoginRequestBody {
   password: string;
