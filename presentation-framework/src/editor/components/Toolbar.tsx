@@ -9,6 +9,7 @@ import { AlignmentTools } from './AlignmentTools';
 import { ImageBackgroundModal } from './ImageBackgroundModal';
 import { RefinePanel } from './RefinePanel';
 import { FontPickerCompact } from './FontPicker';
+import { extractFontId } from '@/lib/fonts';
 import { useImageLibrary } from '../hooks/useImageLibrary';
 import type { ImageLibraryItem } from '@/editor/types/imageLibrary';
 import { getImageGenerationService } from '../services/ImageGenerationService';
@@ -1569,7 +1570,8 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
               .map(id => allElements.find(el => el.id === id))
               .find(el => el && el.type === 'text');
 
-            const currentFont = firstTextElement?.style?.fontFamily as string | undefined;
+            const currentFontFamily = firstTextElement?.style?.fontFamily as string | undefined;
+            const currentFont = extractFontId(currentFontFamily);
 
             return (
               <FontPickerCompact

@@ -507,3 +507,29 @@ export function getFontVariable(id: string): string {
   const font = getFontById(id);
   return font ? `var(${font.variable})` : 'inherit';
 }
+
+/**
+ * Extract font ID from a fontFamily value
+ * Handles both CSS variables (var(--font-inter)) and raw font IDs (inter)
+ */
+export function extractFontId(fontFamily: string | undefined): string | undefined {
+  if (!fontFamily) return undefined;
+
+  // If it's a CSS variable like "var(--font-inter)", extract the font ID
+  const cssVarMatch = fontFamily.match(/var\(--font-([^)]+)\)/);
+  if (cssVarMatch) {
+    return cssVarMatch[1];
+  }
+
+  // If it's already a font ID (no commas, not a CSS var), return it
+  if (!fontFamily.includes(',') && !fontFamily.startsWith('var(')) {
+    return fontFamily;
+  }
+
+  // For other cases (like full font stacks), try to find a matching font by variable
+  const matchingFont = FONT_REGISTRY.find(f =>
+    fontFamily.includes(f.variable) || fontFamily === f.id
+  );
+
+  return matchingFont?.id;
+}

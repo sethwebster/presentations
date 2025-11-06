@@ -20,6 +20,7 @@ import { Select } from '@/components/ui/select';
 import { ColorInput } from '@/components/ui/color-input';
 import { Button } from '@/components/ui/button';
 import { FontPicker } from './FontPicker';
+import { extractFontId } from '@/lib/fonts';
 
 type TextStyleUpdate = {
   style?: Record<string, any> | null;
@@ -965,7 +966,7 @@ export function PropertiesPanel() {
                       Font
                     </Label>
                     <FontPicker
-                      value={sharedFontFamily.value as string}
+                      value={extractFontId(sharedFontFamily.value as string)}
                       onChange={(fontId) => setFontFamily(fontId)}
                     />
                   </section>
