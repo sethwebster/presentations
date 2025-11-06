@@ -8,6 +8,7 @@ import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { AlignmentTools } from './AlignmentTools';
 import { ImageBackgroundModal } from './ImageBackgroundModal';
 import { RefinePanel } from './RefinePanel';
+import { FontPickerCompact } from './FontPicker';
 import { useImageLibrary } from '../hooks/useImageLibrary';
 import type { ImageLibraryItem } from '@/editor/types/imageLibrary';
 import { getImageGenerationService } from '../services/ImageGenerationService';
@@ -1451,7 +1452,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       {/* Insert Tools */}
       <div className="flex items-center gap-2 pr-4 mr-2 border-r" style={{ borderRightColor: 'rgba(148, 163, 184, 0.2)' }}>
         <ToolbarButton 
-          title="Insert Text" 
+          title="Insert Text"
           onClick={() => {
             editor.addElement({
               id: `text-${Date.now()}`,
@@ -1461,7 +1462,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
               style: {
                 fontSize: '24px',
                 color: '#000000',
-                fontFamily: 'inherit',
+                fontFamily: 'inter', // Default to Inter font
               },
             }, currentSlideIndex);
           }}
@@ -1552,16 +1553,51 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       {/* Format Tools */}
       {selectedElementIds.size > 0 && (
         <div className="flex items-center gap-2 pr-4 mr-2 border-r" style={{ borderRightColor: 'rgba(148, 163, 184, 0.2)' }}>
-          <ToolbarButton title="Bold" onClick={() => {
+          {/* Font Picker */}
+          {(() => {
             const deck = state.deck;
             const currentSlide = deck?.slides[currentSlideIndex];
-            if (!currentSlide) return;
-            
+            if (!currentSlide) return null;
+
             const allElements = [
               ...(currentSlide.elements || []),
               ...(currentSlide.layers?.flatMap(l => l.elements) || []),
             ];
-            
+
+            // Get the first selected text element's font
+            const firstTextElement = Array.from(selectedElementIds)
+              .map(id => allElements.find(el => el.id === id))
+              .find(el => el && el.type === 'text');
+
+            const currentFont = firstTextElement?.style?.fontFamily as string | undefined;
+
+            return (
+              <FontPickerCompact
+                value={currentFont}
+                onChange={(fontId) => {
+                  selectedElementIds.forEach((id) => {
+                    const element = allElements.find(el => el.id === id);
+                    if (element && element.type === 'text') {
+                      editor.updateElement(id, {
+                        style: { ...element.style, fontFamily: fontId },
+                      });
+                    }
+                  });
+                }}
+              />
+            );
+          })()}
+
+          <ToolbarButton title="Bold" onClick={() => {
+            const deck = state.deck;
+            const currentSlide = deck?.slides[currentSlideIndex];
+            if (!currentSlide) return;
+
+            const allElements = [
+              ...(currentSlide.elements || []),
+              ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+            ];
+
             selectedElementIds.forEach((id) => {
               const element = allElements.find(el => el.id === id);
               if (element && element.type === 'text') {
@@ -1578,12 +1614,12 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
             const deck = state.deck;
             const currentSlide = deck?.slides[currentSlideIndex];
             if (!currentSlide) return;
-            
+
             const allElements = [
               ...(currentSlide.elements || []),
               ...(currentSlide.layers?.flatMap(l => l.elements) || []),
             ];
-            
+
             selectedElementIds.forEach((id) => {
               const element = allElements.find(el => el.id === id);
               if (element && element.type === 'text') {
