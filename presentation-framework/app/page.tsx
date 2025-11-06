@@ -143,10 +143,10 @@ export default async function LandingPage() {
                 </svg>
               </Link>
               <Link
-                href="/present/demo-rsc-deck"
+                href="/watch/demo/jsconf-rsc"
                 className="inline-flex items-center justify-center px-6 py-3 rounded-full border border-white/15 text-[var(--lume-mist)]/80 hover:text-white hover:border-white/30 transition-colors"
               >
-                Watch a live deck
+                Watch JSConf keynote
               </Link>
             </div>
           </div>
