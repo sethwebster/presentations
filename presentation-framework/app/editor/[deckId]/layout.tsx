@@ -1,35 +1,49 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Toolbar } from './Toolbar';
-import { EditorCanvas } from './EditorCanvas';
-import { PropertiesPanel } from './PropertiesPanel';
-import { LayerPanel } from './LayerPanel';
-import { TimelineEditor } from './TimelineEditor';
-import { StatusBar } from './StatusBar';
-import { KeyboardShortcutsOverlay } from './KeyboardShortcutsOverlay';
-import { useEditor, useEditorInstance } from '../hooks/useEditor';
-import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import { Toolbar } from '@/editor/components/Toolbar';
+import { EditorCanvas } from '@/editor/components/EditorCanvas';
+import { PropertiesPanel } from '@/editor/components/PropertiesPanel';
+import { LayerPanel } from '@/editor/components/LayerPanel';
+import { TimelineEditor } from '@/editor/components/TimelineEditor';
+import { StatusBar } from '@/editor/components/StatusBar';
+import { KeyboardShortcutsOverlay } from '@/editor/components/KeyboardShortcutsOverlay';
+import { useEditor, useEditorInstance } from '@/editor/hooks/useEditor';
+import { useKeyboardShortcuts } from '@/editor/hooks/useKeyboardShortcuts';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
 
 interface EditorLayoutProps {
-  deckId: string;
+  children: React.ReactNode;
+  params: Promise<{ deckId: string }>;
 }
 
-export function EditorLayout({ deckId }: EditorLayoutProps) {
+export default function EditorLayout({ children, params }: EditorLayoutProps) {
   const [showTimeline, setShowTimeline] = useState(false);
+  const [deckId, setDeckId] = useState<string | null>(null);
+
   // Observe editor state
   const state = useEditor();
   // Get editor instance to call methods
   const editor = useEditorInstance();
 
+  // Unwrap params (Next.js 15 pattern)
   useEffect(() => {
-    editor.loadDeck(deckId);
+    params.then(p => setDeckId(p.deckId));
+  }, [params]);
+
+  useEffect(() => {
+    if (deckId) {
+      editor.loadDeck(deckId);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deckId]); // editor is a stable singleton
 
   // Enable keyboard shortcuts
   useKeyboardShortcuts();
+
+  if (!deckId) {
+    return null;
+  }
 
   return (
     <>
@@ -38,12 +52,12 @@ export function EditorLayout({ deckId }: EditorLayoutProps) {
         <Toolbar deckId={deckId} onToggleTimeline={() => setShowTimeline(!showTimeline)} />
 
         {/* Main Content Area */}
-        <div className="flex flex-1 overflow-hidden relative">
+        <div className="relative flex flex-1 overflow-hidden">
           {/* Left Sidebar - Layer Panel */}
           <LayerPanel deckId={deckId} />
 
           {/* Center - Canvas Area */}
-          <div className="flex-1 flex flex-col overflow-hidden relative">
+          <div className="relative flex flex-col flex-1 overflow-hidden">
             <EditorCanvas deckId={deckId} />
           </div>
 
@@ -64,7 +78,9 @@ export function EditorLayout({ deckId }: EditorLayoutProps) {
 
       {/* Keyboard Shortcuts Overlay */}
       <KeyboardShortcutsOverlay />
+
+      {/* Render page-specific overlays (modals, warnings, etc.) */}
+      {children}
     </>
   );
 }
-

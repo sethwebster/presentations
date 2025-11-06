@@ -1,25 +1,15 @@
 import { NextResponse } from 'next/server';
-import type { DeckDefinition } from '@/rsc/types';
-import { getRedis } from '@/lib/redis';
+import { listDecks } from '@/lib/deckApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-const redis = getRedis();
 
 type SlugRouteContext = {
   params: Promise<{ slug: string }>;
 };
 
 export async function GET(request: Request, context: SlugRouteContext) {
-  if (!redis) {
-    return NextResponse.json(
-      { error: 'Redis not configured' },
-      { status: 500 }
-    );
-  }
-
   const { slug } = await context.params;
 
   if (!slug) {
@@ -30,25 +20,20 @@ export async function GET(request: Request, context: SlugRouteContext) {
   }
 
   try {
-    // Find all deck keys (pattern: deck:*:data)
-    const keys = await redis.keys('deck:*:data');
-    
-    // Find the deck with this slug
-    for (const key of keys) {
-      const deckId = key.replace('deck:', '').replace(':data', '');
-      const deckDataJson = await redis.get(key);
-      if (deckDataJson) {
-        const deckData = JSON.parse(deckDataJson) as DeckDefinition;
-        if (deckData.meta?.slug === slug || deckId === slug) {
-          return NextResponse.json({ deckId }, {
-            headers: {
-              'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-              'Pragma': 'no-cache',
-              'Expires': '0',
-            },
-          });
-        }
-      }
+    // Get all decks (supports both old and new formats)
+    const decks = await listDecks();
+
+    // Find the deck with this slug or deckId
+    const deck = decks.find(d => d.slug === slug || d.id === slug);
+
+    if (deck) {
+      return NextResponse.json({ deckId: deck.id }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      });
     }
 
     return NextResponse.json(

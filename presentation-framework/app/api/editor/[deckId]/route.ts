@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { DeckDefinition } from '@/rsc/types';
 import { auth } from '@/lib/auth';
-import { getRedis } from '@/lib/redis';
+import { getDeck, saveDeck } from '@/lib/deckApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-const redis = getRedis();
 
 type DeckRouteContext = {
   params: Promise<{ deckId: string }>;
@@ -16,21 +14,13 @@ type DeckRouteContext = {
 export async function GET(request: Request, context: DeckRouteContext) {
   const { deckId } = await context.params;
 
-  if (!redis) {
-    return NextResponse.json(
-      { error: 'Redis not configured' },
-      { status: 500 }
-    );
-  }
-
   // Get authenticated user session (optional for viewing)
   const session = await auth();
   const userId = session?.user?.id;
 
   try {
-    // Try to load deck from Redis storage
-    const deckDataJson = await redis.get(`deck:${deckId}:data`);
-    const deckData = deckDataJson ? JSON.parse(deckDataJson) as DeckDefinition : null;
+    // Try to load deck from storage (supports both old and new formats)
+    const deckData = await getDeck(deckId);
 
     if (!deckData) {
       // Return empty deck structure if not found (new presentation)
@@ -55,7 +45,7 @@ export async function GET(request: Request, context: DeckRouteContext) {
 
       // Save the new deck only if user is authenticated
       if (userId) {
-        await redis.set(`deck:${deckId}:data`, JSON.stringify(emptyDeck));
+        await saveDeck(deckId, emptyDeck);
       }
 
       return NextResponse.json(emptyDeck, {
@@ -88,8 +78,8 @@ export async function GET(request: Request, context: DeckRouteContext) {
           ...deckData.meta,
           ownerId: userId,
         };
-        // Save the updated deck
-        await redis.set(`deck:${deckId}:data`, JSON.stringify(deckData));
+        // Save the updated deck (will migrate to new format)
+        await saveDeck(deckId, deckData);
       }
     }
     // If not authenticated, allow read-only access for public viewing
@@ -113,16 +103,21 @@ export async function GET(request: Request, context: DeckRouteContext) {
 export async function POST(request: Request, context: DeckRouteContext) {
   const { deckId } = await context.params;
 
-  if (!redis) {
-    return NextResponse.json(
-      { error: 'Redis not configured' },
-      { status: 500 }
-    );
-  }
-
   // Get authenticated user session
   const session = await auth();
+
+  console.log('[API DEBUG] Session:', {
+    hasSession: !!session,
+    hasUser: !!session?.user,
+    userId: session?.user?.id,
+    userEmail: session?.user?.email,
+    userName: session?.user?.name,
+    sessionKeys: session ? Object.keys(session) : [],
+    userKeys: session?.user ? Object.keys(session.user) : [],
+  });
+
   if (!session?.user?.id) {
+    console.error('[API ERROR] No session or user ID');
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401 }
@@ -135,20 +130,20 @@ export async function POST(request: Request, context: DeckRouteContext) {
     // Get request body as text first to check size
     const requestText = await request.text();
     const requestSizeMB = new Blob([requestText]).size / (1024 * 1024);
-    
-    // Warn if payload is large (Redis supports up to 512MB, but warn at reasonable thresholds)
+
+    // Note: With new format, assets are stored separately so payload will be smaller
     if (requestSizeMB > 50) {
-      console.warn(`API: Large payload detected: ${requestSizeMB.toFixed(2)}MB`);
+      console.warn(`API: Large payload detected: ${requestSizeMB.toFixed(2)}MB (will be split into manifest + assets)`);
     }
-    
+
     let deckData: DeckDefinition;
     try {
       deckData = JSON.parse(requestText) as DeckDefinition;
     } catch (parseError) {
       console.error('API: JSON parse error:', parseError);
       return NextResponse.json(
-        { 
-          error: 'Failed to parse deck data', 
+        {
+          error: 'Failed to parse deck data',
           details: parseError instanceof Error ? parseError.message : String(parseError),
           payloadSizeMB: requestSizeMB.toFixed(2)
         },
@@ -156,22 +151,28 @@ export async function POST(request: Request, context: DeckRouteContext) {
       );
     }
 
-    // Check if deck exists and verify access
-    const existingDeckJson = await redis.get(`deck:${deckId}:data`);
-    if (existingDeckJson) {
-      const existingDeck = JSON.parse(existingDeckJson) as DeckDefinition;
-      const hasAccess = 
+    // Check if deck exists and verify access (supports both old and new formats)
+    const existingDeck = await getDeck(deckId);
+
+    console.log('[API DEBUG] User ID:', userId);
+    console.log('[API DEBUG] Deck ID:', deckId);
+    console.log('[API DEBUG] Existing deck?', !!existingDeck);
+    console.log('[API DEBUG] Existing ownerId:', existingDeck?.meta?.ownerId);
+    console.log('[API DEBUG] Incoming ownerId:', deckData.meta?.ownerId);
+
+    if (existingDeck) {
+      const hasAccess =
         existingDeck.meta?.ownerId === userId || // User is the owner
         existingDeck.meta?.sharedWith?.includes(userId) || // User is in sharedWith list
         (!existingDeck.meta?.ownerId && !existingDeck.meta?.sharedWith); // Legacy deck (no owner set) - allow access for now
-      
+
       if (!hasAccess) {
         return NextResponse.json(
           { error: 'Forbidden - You do not have access to this presentation' },
           { status: 403 }
         );
       }
-      
+
       // If it's a legacy deck (no ownerId), set the current user as owner on first save
       if (!existingDeck.meta?.ownerId && !existingDeck.meta?.sharedWith) {
         if (!deckData.meta) {
@@ -179,22 +180,26 @@ export async function POST(request: Request, context: DeckRouteContext) {
         }
         if (!deckData.meta.ownerId) {
           deckData.meta.ownerId = userId;
+          console.log('[API DEBUG] Set ownerId for legacy deck:', userId);
         }
       }
     } else {
       // New deck - ensure ownerId is set
+      console.log('[API DEBUG] New deck - setting ownerId');
       if (!deckData.meta) {
         deckData.meta = { id: deckId, title: 'Untitled Presentation' };
       }
       if (!deckData.meta.ownerId) {
         deckData.meta.ownerId = userId;
+        console.log('[API DEBUG] Set ownerId for new deck:', userId);
       }
     }
+
+    console.log('[API DEBUG] Final ownerId before save:', deckData.meta?.ownerId);
     
     // Ensure ownerId doesn't change (security check)
-    if (deckData.meta?.ownerId && deckData.meta.ownerId !== userId && existingDeckJson) {
+    if (deckData.meta?.ownerId && deckData.meta.ownerId !== userId && existingDeck) {
       // Only allow ownerId change if user is current owner (for future sharing features)
-      const existingDeck = JSON.parse(existingDeckJson) as DeckDefinition;
       if (existingDeck.meta?.ownerId !== userId) {
         return NextResponse.json(
           { error: 'Forbidden - Cannot change ownership' },
@@ -203,32 +208,30 @@ export async function POST(request: Request, context: DeckRouteContext) {
       }
     }
     
-    console.log('API: Saving deck', deckId, { 
-      slides: deckData.slides.length, 
+    console.log('API: Saving deck', deckId, {
+      slides: deckData.slides.length,
       title: deckData.meta.title,
       updatedAt: deckData.meta.updatedAt,
       ownerId: deckData.meta.ownerId,
       payloadSizeMB: requestSizeMB.toFixed(2)
     });
 
-    // Save deck to Redis storage
-    // Redis supports up to 512MB per value
+    // Save deck to storage (will convert to new format with content-addressed assets)
     try {
-      await redis.set(`deck:${deckId}:data`, JSON.stringify(deckData));
-    } catch (redisError) {
-      console.error('API: Redis storage error:', redisError);
+      await saveDeck(deckId, deckData);
+    } catch (saveError) {
+      console.error('API: Storage error:', saveError);
       return NextResponse.json(
-        { 
-          error: 'Failed to save deck to storage', 
-          details: redisError instanceof Error ? redisError.message : String(redisError),
-          payloadSizeMB: requestSizeMB.toFixed(2),
-          suggestion: requestSizeMB > 50 ? 'Payload may be too large. Consider compressing images or using external storage.' : undefined
+        {
+          error: 'Failed to save deck to storage',
+          details: saveError instanceof Error ? saveError.message : String(saveError),
+          payloadSizeMB: requestSizeMB.toFixed(2)
         },
         { status: 500 }
       );
     }
-    
-    console.log('API: Deck saved successfully', deckId);
+
+    console.log('API: Deck saved successfully to ManifestV1 format', deckId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

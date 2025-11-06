@@ -71,18 +71,23 @@ class ImageGenerationService {
    * @returns Generated image data and metadata
    */
   async generateBackground(options: ImageGenerationOptions): Promise<ImageGenerationResult> {
+    const requestBody = {
+      prompt: options.prompt,
+      width: options.width,
+      height: options.height,
+      model: options.model || 'flux',
+      quality: options.quality || 'quick',
+    };
+
+    console.log('[ImageGenerationService] generateBackground called with:', options);
+    console.log('[ImageGenerationService] Request body:', requestBody);
+
     const response = await fetch('/api/ai/background', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        prompt: options.prompt,
-        width: options.width,
-        height: options.height,
-        model: options.model || 'flux',
-        quality: options.quality || 'quick',
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {

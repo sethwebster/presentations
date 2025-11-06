@@ -2,17 +2,19 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { EditorLayout } from '@/editor/components/EditorLayout';
+import { useSession } from 'next-auth/react';
 import { AIPresentationWizard } from '@/components/ai/AIPresentationWizard';
 
 export default function EditorPage() {
   const params = useParams<{ deckId: string }>();
   const router = useRouter();
+  const { data: session, status: sessionStatus } = useSession();
   const deckId = params?.deckId;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
   const [showAIWizard, setShowAIWizard] = useState(false);
+  const [showAuthWarning, setShowAuthWarning] = useState(false);
 
   useEffect(() => {
     if (!deckId) {
@@ -45,6 +47,22 @@ export default function EditorPage() {
 
     loadDeck();
   }, [deckId]);
+
+  // Check authentication status after loading
+  useEffect(() => {
+    if (!loading && deckId !== 'new' && sessionStatus !== 'loading') {
+      console.log('[Editor Page DEBUG] Session status:', sessionStatus);
+      console.log('[Editor Page DEBUG] Session:', session);
+      console.log('[Editor Page DEBUG] User ID:', session?.user?.id);
+      console.log('[Editor Page DEBUG] User email:', session?.user?.email);
+
+      if (!session?.user?.id) {
+        setShowAuthWarning(true);
+      } else {
+        setShowAuthWarning(false);
+      }
+    }
+  }, [loading, deckId, session, sessionStatus]);
 
   const handleStartFromScratch = () => {
     // Generate a new unique ID
@@ -81,7 +99,7 @@ export default function EditorPage() {
         fontFamily: "'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif",
       }}>
         <div className="text-center">
-          <h1 className="text-2xl mb-4" style={{ color: 'var(--lume-ember)' }}>Error</h1>
+          <h1 className="mb-4 text-2xl" style={{ color: 'var(--lume-ember)' }}>Error</h1>
           <p style={{ opacity: 0.8 }}>{error}</p>
         </div>
       </div>
@@ -105,11 +123,11 @@ export default function EditorPage() {
           onClick={() => router.push('/account')}
         >
           <div
-            className="relative max-w-2xl w-full mx-4"
+            className="relative w-full max-w-2xl mx-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div
-              className="rounded-2xl p-8"
+              className="p-8 rounded-2xl"
               style={{
                 background: 'var(--lume-midnight)',
                 border: '1px solid rgba(236, 236, 236, 0.1)',
@@ -127,7 +145,7 @@ export default function EditorPage() {
               </button>
 
               <h2
-                className="text-3xl font-bold mb-2"
+                className="mb-2 text-3xl font-bold"
                 style={{ color: 'var(--lume-mist)' }}
               >
                 Create New Presentation
@@ -136,10 +154,10 @@ export default function EditorPage() {
                 className="mb-8"
                 style={{ color: 'var(--lume-mist)', opacity: 0.7 }}
               >
-                Choose how you'd like to get started
+                Choose how you&apos;d like to get started
               </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {/* Start from Scratch */}
                 <button
                   onClick={handleStartFromScratch}
@@ -159,7 +177,7 @@ export default function EditorPage() {
                 >
                   <div className="flex flex-col items-start">
                     <div
-                      className="w-12 h-12 rounded-lg flex items-center justify-center mb-4"
+                      className="flex items-center justify-center w-12 h-12 mb-4 rounded-lg"
                       style={{ background: 'rgba(236, 236, 236, 0.1)' }}
                     >
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -167,7 +185,7 @@ export default function EditorPage() {
                       </svg>
                     </div>
                     <h3
-                      className="text-xl font-semibold mb-2"
+                      className="mb-2 text-xl font-semibold"
                       style={{ color: 'var(--lume-mist)' }}
                     >
                       Start from Scratch
@@ -200,7 +218,7 @@ export default function EditorPage() {
                 >
                   <div className="flex flex-col items-start">
                     <div
-                      className="w-12 h-12 rounded-lg flex items-center justify-center mb-4"
+                      className="flex items-center justify-center w-12 h-12 mb-4 rounded-lg"
                       style={{ background: 'rgba(22, 194, 199, 0.2)' }}
                     >
                       <svg className="w-6 h-6" style={{ color: 'var(--lume-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -208,7 +226,7 @@ export default function EditorPage() {
                       </svg>
                     </div>
                     <h3
-                      className="text-xl font-semibold mb-2"
+                      className="mb-2 text-xl font-semibold"
                       style={{ color: 'var(--lume-primary)' }}
                     >
                       Build with AI
@@ -241,8 +259,60 @@ export default function EditorPage() {
         />
       )}
 
-      {/* Editor Layout */}
-      {!showNewModal && !showAIWizard && <EditorLayout deckId={deckId} />}
+      {/* Authentication Warning Banner */}
+      {showAuthWarning && !showNewModal && !showAIWizard && (
+        <div
+          className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center p-4"
+          style={{
+            background: 'linear-gradient(180deg, rgba(255, 107, 107, 0.95) 0%, rgba(255, 87, 87, 0.95) 100%)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 4px 12px rgba(255, 107, 107, 0.3)',
+          }}
+        >
+          <div className="flex items-center justify-between w-full max-w-6xl">
+            <div className="flex items-center gap-3">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div>
+                <div className="font-semibold text-white">Sign in required to save changes</div>
+                <div className="text-sm text-white opacity-90">
+                  You can view and edit, but changes won&apos;t be saved until you sign in
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push(`/auth/signin?callbackUrl=/editor/${deckId}`)}
+                className="px-4 py-2 font-medium transition-all rounded-lg"
+                style={{
+                  background: 'white',
+                  color: '#ff6b6b',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'white';
+                }}
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => setShowAuthWarning(false)}
+                className="p-2 text-white transition-colors rounded-lg hover:bg-white hover:bg-opacity-20"
+                aria-label="Dismiss"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Page content is wrapped by layout.tsx */}
     </>
   );
 }

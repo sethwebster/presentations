@@ -611,6 +611,8 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
   }, [activeSlideId, setBackgroundFeedback]);
 
   const handleGenerateImage = useCallback(async (prompt: string, mode: 'background' | 'element', model: 'openai' | 'flux' = 'flux', quality: 'quick' | 'polish' | 'heroic' = 'quick', polishEnabled: boolean = false) => {
+    console.log('[Toolbar] handleGenerateImage called:', { mode, model, quality, polishEnabled });
+
     if (mode === 'background') {
       if (!activeSlideId) {
         setBackgroundFeedback({ error: 'Select a slide before generating a background.' });
@@ -625,11 +627,13 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
 
     try {
       setBackgroundFeedback({ isGenerating: true, error: null, success: null });
-      
+
       // Get slide dimensions from deck settings
       const slideWidth = deck?.settings?.slideSize?.width ?? 1280;
       const slideHeight = deck?.settings?.slideSize?.height ?? 720;
-      
+
+      console.log('[Toolbar] Calling imageService.generateBackground with:', { model, quality });
+
       // Use service for image generation
       const imageService = getImageGenerationService();
       const result = await imageService.generateBackground({

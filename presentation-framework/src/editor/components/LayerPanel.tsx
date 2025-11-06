@@ -173,7 +173,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                       position: { x: e.clientX, y: e.clientY },
                     });
                   }}
-                  className="cursor-pointer flex justify-center"
+                  className="flex justify-center cursor-pointer"
                 >
                   <div className="flex flex-col items-center">
                     <div
@@ -191,7 +191,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                       }
                     >
                       <div
-                        className="relative w-full h-full overflow-hidden rounded-xl bg-card shadow-sm"
+                        className="relative w-full h-full overflow-hidden shadow-sm rounded-xl bg-card"
                         style={{
                           background: getBackground(childSlide),
                           border: '1px solid rgba(148, 163, 184, 0.2)',
@@ -200,7 +200,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                         }}
                       >
                         <div
-                          className="absolute left-0 top-0"
+                          className="absolute top-0 left-0"
                           style={{
                             width: `${baseSlideWidth}px`,
                             height: `${baseSlideHeight}px`,
@@ -269,7 +269,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                 position: { x: e.clientX, y: e.clientY },
               });
             }}
-            className="cursor-pointer flex justify-center"
+            className="flex justify-center cursor-pointer"
           >
             <div className="flex flex-col items-center">
               <div
@@ -287,7 +287,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                 }
               >
                 <div
-                  className="relative w-full h-full overflow-hidden rounded-xl bg-card shadow-sm"
+                  className="relative w-full h-full overflow-hidden shadow-sm rounded-xl bg-card"
                   style={{
                     background: getBackground(slide),
                     border: '1px solid rgba(148, 163, 184, 0.2)',
@@ -296,7 +296,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                   }}
                 >
                   <div
-                    className="absolute left-0 top-0"
+                    className="absolute top-0 left-0"
                     style={{
                       width: `${baseSlideWidth}px`,
                       height: `${baseSlideHeight}px`,
@@ -350,7 +350,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
         ),
       };
     });
-  }, [deck?.slides, deck?.settings, selectedSlideId, expandedSlides]);
+  }, [deck?.slides, deck?.settings?.slideSize?.width, deck?.settings?.slideSize?.height, deck?.settings?.defaultBackground, selectedSlideId, expandedSlides, editor]);
 
   const currentSlide = deck?.slides[currentSlideIndex];
   if (!currentSlide) {
@@ -681,12 +681,13 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
               </Button>
             </div>
 
-            <div className="flex-1 overflow-y-auto flex justify-center px-4">
+            <div className="flex justify-center flex-1 px-4 overflow-y-auto">
               {!deck || deck.slides.length === 0 ? (
                 <p className="text-xs italic text-muted-foreground">No slides yet</p>
               ) : (
-                <div className="w-[240px]">
+                <div className="">
                   <ReorderableList
+                  itemClassName=''
                   items={slideItems}
                   onReorder={(fromIndex, toIndex) => {
                     // Get the actual slide IDs
@@ -730,7 +731,7 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                     });
                   }}
                   enableNesting={true}
-                  className="mt-4"
+                  className=""
                 />
                 </div>
               )}

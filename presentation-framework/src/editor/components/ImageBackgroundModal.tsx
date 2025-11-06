@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Select } from "@/components/ui/select";
+import { QualitySlider } from "@/components/ui/quality-slider";
 import { Modal } from "@/components/ui/modal";
 import type { ImageLibraryItem } from "@/editor/types/imageLibrary";
 
@@ -52,19 +53,39 @@ export function ImageBackgroundModal({
 }: ImageBackgroundModalProps) {
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState<ImageMode>("background");
-  const [model, setModel] = useState<ImageModel>("flux");
-  // Quality is derived from toggles, not stored separately
-  const [polishEnabled, setPolishEnabled] = useState(false);
-  const [heroicEnabled, setHeroicEnabled] = useState(false);
+  const [qualityLevel, setQualityLevel] = useState<number>(0); // 0=fast, 1=good, 2=great, 3=premium, 4=ultimate
   const [activeTab, setActiveTab] = useState<"generate" | "upload" | "library">("generate");
+
+  // Derive model and quality from slider position
+  // 0: Fast → Fireworks + flux-1-schnell-fp8
+  // 1: Good → Fireworks + flux-1-dev-fp8
+  // 2: Great → Fireworks + flux-kontext-pro
+  // 3: Premium → Fireworks + TBD (4th model variant)
+  // 4: Ultimate → OpenAI + gpt-image-1
+  const getModelAndQuality = (level: number): { model: ImageModel; quality: ImageQuality } => {
+    switch (level) {
+      case 0:
+        return { model: 'flux', quality: 'quick' }; // flux-1-schnell-fp8
+      case 1:
+        return { model: 'flux', quality: 'polish' }; // flux-1-dev-fp8
+      case 2:
+        return { model: 'flux', quality: 'heroic' }; // flux-kontext-pro
+      case 3:
+        return { model: 'flux', quality: 'heroic' }; // TBD - need 4th Fireworks model
+      case 4:
+        return { model: 'openai', quality: 'quick' }; // OpenAI gpt-image-1
+      default:
+        return { model: 'flux', quality: 'quick' };
+    }
+  };
+
+  const { model, quality } = getModelAndQuality(qualityLevel);
 
   useEffect(() => {
     if (!open) {
       setPrompt("");
       setMode("background");
-      setModel("flux");
-      setPolishEnabled(false);
-      setHeroicEnabled(false);
+      setQualityLevel(0);
       setActiveTab(initialTab);
       return;
     }
@@ -84,12 +105,12 @@ export function ImageBackgroundModal({
     if (!prompt.trim()) {
       return;
     }
-    // Determine quality based on toggles
-    // If polish is enabled, we still generate quick first, then polish in background
-    // If heroic is enabled, we generate heroic directly
-    const finalQuality: ImageQuality = heroicEnabled ? 'heroic' : 'quick';
+    // Polish quality uses quick first, then upgrades in background (handled by parent)
+    const polishEnabled = quality === 'polish';
+    const finalQuality: ImageQuality = quality === 'polish' ? 'quick' : quality;
+    console.log('[ImageBackgroundModal] Generate clicked:', { mode, model, quality: finalQuality, polishEnabled });
     await onGenerate(prompt.trim(), mode, model, finalQuality, polishEnabled);
-  }, [onGenerate, prompt, mode, model, polishEnabled, heroicEnabled]);
+  }, [onGenerate, prompt, mode, model, quality]);
 
   const isLibraryTabEnabled = Boolean(onSelectFromLibrary);
 
@@ -177,71 +198,37 @@ export function ImageBackgroundModal({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-[var(--editor-text-muted)] mb-2">
-                  Type
-                </label>
-                <SegmentedControl
-                  items={[
-                    { value: "background", label: "Background" },
-                    { value: "element", label: "Image Element" },
-                  ]}
-                  value={mode}
-                  onValueChange={(value) => setMode(value as ImageMode)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[var(--editor-text-muted)] mb-2">
-                  Model
-                </label>
-                <Select
-                  value={model}
-                  onChange={(e) => setModel(e.target.value as ImageModel)}
-                >
-                  <option value="flux">Flux (Fireworks AI)</option>
-                  <option value="openai">OpenAI (GPT-4 Vision)</option>
-                </Select>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-[var(--editor-text-muted)] mb-2">
+                Type
+              </label>
+              <SegmentedControl
+                items={[
+                  { value: "background", label: "Background" },
+                  { value: "element", label: "Image Element" },
+                ]}
+                value={mode}
+                onValueChange={(value) => setMode(value as ImageMode)}
+              />
             </div>
 
-            {model === 'flux' && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    id="polish-toggle"
-                    checked={polishEnabled}
-                    onChange={(e) => {
-                      setPolishEnabled(e.target.checked);
-                      if (e.target.checked) setHeroicEnabled(false); // Disable heroic if polish is enabled
-                    }}
-                    className="h-4 w-4 rounded border-[var(--editor-border)] text-[var(--editor-accent)] focus:ring-[var(--editor-accent)]"
-                  />
-                  <label htmlFor="polish-toggle" className="text-sm text-[var(--editor-text)] cursor-pointer">
-                    Polish (12 steps, auto-swap when ready)
-                  </label>
-                </div>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    id="heroic-toggle"
-                    checked={heroicEnabled}
-                    onChange={(e) => {
-                      setHeroicEnabled(e.target.checked);
-                      if (e.target.checked) setPolishEnabled(false); // Disable polish if heroic is enabled
-                    }}
-                    className="h-4 w-4 rounded border-[var(--editor-border)] text-[var(--editor-accent)] focus:ring-[var(--editor-accent)]"
-                  />
-                  <label htmlFor="heroic-toggle" className="text-sm text-[var(--editor-text)] cursor-pointer">
-                    Make it heroic (Kontext Pro, cached)
-                  </label>
-                </div>
-                <p className="text-xs text-[var(--editor-text-muted)]">
-                  Default: Quick generation (4 steps, instant). Polish reruns with better quality and swaps when ready. Heroic uses the highest quality model.
-                </p>
-              </div>
-            )}
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-[var(--editor-text-muted)]">
+                Quality
+              </label>
+              <QualitySlider
+                value={[qualityLevel]}
+                onValueChange={(value) => setQualityLevel(value[0] ?? 0)}
+                options={['Fast', 'Good', 'Great', 'Premium', 'Ultimate']}
+              />
+              <p className="text-xs text-[var(--editor-text-muted)] text-center">
+                {qualityLevel === 0 && 'Fireworks AI • Instant response'}
+                {qualityLevel === 1 && 'Fireworks AI • Better quality, auto-swaps when ready'}
+                {qualityLevel === 2 && 'Fireworks AI • Premium quality'}
+                {qualityLevel === 3 && 'Fireworks AI • Professional grade'}
+                {qualityLevel === 4 && 'OpenAI • Highest quality'}
+              </p>
+            </div>
 
             {status?.error && (
               <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">

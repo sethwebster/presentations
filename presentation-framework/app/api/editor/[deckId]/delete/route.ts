@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import type { DeckDefinition } from '@/rsc/types';
-import { getRedis } from '@/lib/redis';
+import { getDeck, deleteDeck } from '@/lib/deckApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-const redis = getRedis();
 
 type DeckDeleteRouteContext = {
   params: Promise<{ deckId: string }>;
@@ -15,13 +12,6 @@ type DeckDeleteRouteContext = {
 
 export async function DELETE(_request: Request, context: DeckDeleteRouteContext) {
   const { deckId } = await context.params;
-
-  if (!redis) {
-    return NextResponse.json(
-      { error: 'Redis not configured' },
-      { status: 500 }
-    );
-  }
 
   // Require authentication for delete
   const session = await auth();
@@ -35,16 +25,14 @@ export async function DELETE(_request: Request, context: DeckDeleteRouteContext)
   const userId = session.user.id;
 
   try {
-    // Load the deck
-    const deckDataJson = await redis.get(`deck:${deckId}:data`);
-    if (!deckDataJson) {
+    // Load the deck (supports both old and new formats)
+    const deckData = await getDeck(deckId);
+    if (!deckData) {
       return NextResponse.json(
         { error: 'Deck not found' },
         { status: 404 }
       );
     }
-
-    const deckData = JSON.parse(deckDataJson) as DeckDefinition;
 
     // Verify ownership
     const isOwner = deckData.meta?.ownerId === userId;
@@ -55,17 +43,8 @@ export async function DELETE(_request: Request, context: DeckDeleteRouteContext)
       );
     }
 
-    // Soft delete by setting deletedAt timestamp
-    const updatedDeck: DeckDefinition = {
-      ...deckData,
-      meta: {
-        ...deckData.meta,
-        deletedAt: new Date().toISOString(),
-      },
-    };
-
-    // Save the updated deck
-    await redis.set(`deck:${deckId}:data`, JSON.stringify(updatedDeck));
+    // Delete the deck (handles both old and new formats)
+    await deleteDeck(deckId);
 
     console.log('API: Deleted deck', deckId, { title: deckData.meta.title });
 
