@@ -82,10 +82,142 @@ export interface FontMetadata {
 }
 
 /**
- * Complete font registry
+ * Complete font registry (System Fonts + Google Fonts)
  */
 export const FONT_REGISTRY: FontMetadata[] = [
-  // Sans-serif
+  // System Fonts - Sans-serif
+  {
+    id: 'system-ui',
+    name: 'System UI',
+    category: 'sans-serif',
+    variable: '--font-system',
+    className: '',
+    description: 'Native system font',
+    popularUse: 'OS default',
+  },
+  {
+    id: 'arial',
+    name: 'Arial',
+    category: 'sans-serif',
+    variable: '--font-arial',
+    className: '',
+    description: 'Classic sans-serif',
+    popularUse: 'Universal fallback',
+  },
+  {
+    id: 'helvetica',
+    name: 'Helvetica',
+    category: 'sans-serif',
+    variable: '--font-helvetica',
+    className: '',
+    description: 'Swiss design classic',
+    popularUse: 'Print, corporate',
+  },
+  {
+    id: 'verdana',
+    name: 'Verdana',
+    category: 'sans-serif',
+    variable: '--font-verdana',
+    className: '',
+    description: 'Screen-optimized',
+    popularUse: 'Web readability',
+  },
+  {
+    id: 'tahoma',
+    name: 'Tahoma',
+    category: 'sans-serif',
+    variable: '--font-tahoma',
+    className: '',
+    description: 'Compact, clear',
+    popularUse: 'Windows default',
+  },
+  {
+    id: 'trebuchet',
+    name: 'Trebuchet MS',
+    category: 'sans-serif',
+    variable: '--font-trebuchet',
+    className: '',
+    description: 'Humanist sans-serif',
+    popularUse: 'Web, Office',
+  },
+
+  // System Fonts - Serif
+  {
+    id: 'georgia',
+    name: 'Georgia',
+    category: 'serif',
+    variable: '--font-georgia',
+    className: '',
+    description: 'Screen-optimized serif',
+    popularUse: 'Web body text',
+  },
+  {
+    id: 'times',
+    name: 'Times New Roman',
+    category: 'serif',
+    variable: '--font-times',
+    className: '',
+    description: 'Traditional serif',
+    popularUse: 'Print, academic',
+  },
+  {
+    id: 'palatino',
+    name: 'Palatino',
+    category: 'serif',
+    variable: '--font-palatino',
+    className: '',
+    description: 'Renaissance-inspired',
+    popularUse: 'Books, headings',
+  },
+  {
+    id: 'baskerville',
+    name: 'Baskerville',
+    category: 'serif',
+    variable: '--font-baskerville',
+    className: '',
+    description: 'Transitional serif',
+    popularUse: 'Editorial, luxury',
+  },
+  {
+    id: 'garamond',
+    name: 'Garamond',
+    category: 'serif',
+    variable: '--font-garamond',
+    className: '',
+    description: 'Old-style serif',
+    popularUse: 'Books, elegant text',
+  },
+
+  // System Fonts - Monospace
+  {
+    id: 'courier',
+    name: 'Courier New',
+    category: 'monospace',
+    variable: '--font-courier',
+    className: '',
+    description: 'Typewriter-style',
+    popularUse: 'Code, terminal',
+  },
+  {
+    id: 'monaco',
+    name: 'Monaco',
+    category: 'monospace',
+    variable: '--font-monaco',
+    className: '',
+    description: 'Mac terminal font',
+    popularUse: 'macOS, coding',
+  },
+  {
+    id: 'consolas',
+    name: 'Consolas',
+    category: 'monospace',
+    variable: '--font-consolas',
+    className: '',
+    description: 'Windows monospace',
+    popularUse: 'Visual Studio',
+  },
+
+  // Google Fonts - Sans-serif
   {
     id: 'inter',
     name: 'Inter',

@@ -964,11 +964,13 @@ function applyStyleRecord(target: CSSPropertiesWithVars, styleRecord: Record<str
     // Check if it's a font ID from our registry (format: font-id like 'inter', 'roboto', etc.)
     // If so, convert to CSS variable. Otherwise, use as-is.
     const fontFamily = styleRecord.fontFamily;
-    if (fontFamily && !fontFamily.includes(',') && !fontFamily.includes('var(')) {
-      // Looks like a font ID - convert to CSS variable
-      target.fontFamily = `var(--font-${fontFamily}), sans-serif`;
-    } else {
+
+    // Skip if already a CSS variable or full font-family value
+    if (fontFamily.startsWith('var(') || fontFamily.includes(',')) {
       target.fontFamily = fontFamily;
+    } else {
+      // Convert font ID to CSS variable
+      target.fontFamily = `var(--font-${fontFamily})`;
     }
   }
   if (typeof styleRecord.fontStyle === 'string') {

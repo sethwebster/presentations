@@ -2,6 +2,22 @@
 
 @layer base {
   :root {
+    /* System Font Variables */
+    --font-system: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-arial: Arial, sans-serif;
+    --font-helvetica: Helvetica, Arial, sans-serif;
+    --font-verdana: Verdana, Geneva, sans-serif;
+    --font-tahoma: Tahoma, Geneva, sans-serif;
+    --font-trebuchet: 'Trebuchet MS', 'Lucida Grande', sans-serif;
+    --font-georgia: Georgia, serif;
+    --font-times: 'Times New Roman', Times, serif;
+    --font-palatino: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+    --font-baskerville: Baskerville, 'Baskerville Old Face', 'Hoefler Text', Garamond, serif;
+    --font-garamond: Garamond, 'Hoefler Text', 'Times New Roman', serif;
+    --font-courier: 'Courier New', Courier, monospace;
+    --font-monaco: Monaco, 'Lucida Console', monospace;
+    --font-consolas: Consolas, 'Andale Mono', monospace;
+
     /* Lume brand tokens */
     --lume-size: 64px;
     --lume-gap: 12px;
