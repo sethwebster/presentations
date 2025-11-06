@@ -501,11 +501,10 @@ export function PropertiesPanel() {
         } else {
           parts.add(token);
         }
-        const nextValue = parts.size > 0 ? Array.from(parts).join(' ') : undefined;
+        const nextValue = parts.size > 0 ? Array.from(parts).join(' ') : 'none';
         return {
           style: {
             textDecorationLine: nextValue,
-            textDecoration: nextValue,
           },
         };
       });

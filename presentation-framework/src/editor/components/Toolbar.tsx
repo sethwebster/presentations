@@ -1686,9 +1686,11 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
                         }
 
                         const newDecoration = Array.from(decorations).join(' ') || 'none';
-                        editor.updateElement(id, {
-                          style: { ...element.style, textDecorationLine: newDecoration },
-                        });
+                        // Remove old textDecoration property to avoid conflicts
+                        const newStyle = { ...element.style };
+                        delete newStyle.textDecoration;
+                        newStyle.textDecorationLine = newDecoration;
+                        editor.updateElement(id, { style: newStyle });
                       }
                     });
                   }}
@@ -1737,9 +1739,11 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
                         }
 
                         const newDecoration = Array.from(decorations).join(' ') || 'none';
-                        editor.updateElement(id, {
-                          style: { ...element.style, textDecorationLine: newDecoration },
-                        });
+                        // Remove old textDecoration property to avoid conflicts
+                        const newStyle = { ...element.style };
+                        delete newStyle.textDecoration;
+                        newStyle.textDecorationLine = newDecoration;
+                        editor.updateElement(id, { style: newStyle });
                       }
                     });
                   }}
