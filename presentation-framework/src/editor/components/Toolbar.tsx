@@ -1588,50 +1588,65 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
             );
           })()}
 
-          <ToolbarButton title="Bold" onClick={() => {
+          {(() => {
             const deck = state.deck;
             const currentSlide = deck?.slides[currentSlideIndex];
-            if (!currentSlide) return;
+            if (!currentSlide) return null;
 
             const allElements = [
               ...(currentSlide.elements || []),
               ...(currentSlide.layers?.flatMap(l => l.elements) || []),
             ];
 
-            selectedElementIds.forEach((id) => {
-              const element = allElements.find(el => el.id === id);
-              if (element && element.type === 'text') {
-                const currentWeight = (element.style as any)?.fontWeight || 'normal';
-                editor.updateElement(id, {
-                  style: { ...element.style, fontWeight: currentWeight === 'bold' ? 'normal' : 'bold' },
-                });
-              }
-            });
-          }}>
-            <strong style={{ fontSize: '14px' }}>B</strong>
-          </ToolbarButton>
-          <ToolbarButton title="Italic" onClick={() => {
-            const deck = state.deck;
-            const currentSlide = deck?.slides[currentSlideIndex];
-            if (!currentSlide) return;
+            // Get first selected text element to determine button states
+            const firstTextElement = Array.from(selectedElementIds)
+              .map(id => allElements.find(el => el.id === id))
+              .find(el => el && el.type === 'text');
 
-            const allElements = [
-              ...(currentSlide.elements || []),
-              ...(currentSlide.layers?.flatMap(l => l.elements) || []),
-            ];
+            const isBold = firstTextElement?.style?.fontWeight === 'bold' || firstTextElement?.style?.fontWeight === 700;
+            const isItalic = firstTextElement?.style?.fontStyle === 'italic';
 
-            selectedElementIds.forEach((id) => {
-              const element = allElements.find(el => el.id === id);
-              if (element && element.type === 'text') {
-                const currentStyle = (element.style as any)?.fontStyle || 'normal';
-                editor.updateElement(id, {
-                  style: { ...element.style, fontStyle: currentStyle === 'italic' ? 'normal' : 'italic' },
-                });
-              }
-            });
-          }}>
-            <em style={{ fontSize: '14px' }}>I</em>
-          </ToolbarButton>
+            return (
+              <>
+                <ToolbarButton
+                  title="Bold"
+                  pressed={isBold}
+                  onClick={() => {
+                    selectedElementIds.forEach((id) => {
+                      const element = allElements.find(el => el.id === id);
+                      if (element && element.type === 'text') {
+                        const currentWeight = (element.style as any)?.fontWeight || 'normal';
+                        const newWeight = (currentWeight === 'bold' || currentWeight === 700) ? 'normal' : 'bold';
+                        editor.updateElement(id, {
+                          style: { ...element.style, fontWeight: newWeight },
+                        });
+                      }
+                    });
+                  }}
+                >
+                  <strong style={{ fontSize: '14px' }}>B</strong>
+                </ToolbarButton>
+                <ToolbarButton
+                  title="Italic"
+                  pressed={isItalic}
+                  onClick={() => {
+                    selectedElementIds.forEach((id) => {
+                      const element = allElements.find(el => el.id === id);
+                      if (element && element.type === 'text') {
+                        const currentStyle = (element.style as any)?.fontStyle || 'normal';
+                        const newStyle = currentStyle === 'italic' ? 'normal' : 'italic';
+                        editor.updateElement(id, {
+                          style: { ...element.style, fontStyle: newStyle },
+                        });
+                      }
+                    });
+                  }}
+                >
+                  <em style={{ fontSize: '14px' }}>I</em>
+                </ToolbarButton>
+              </>
+            );
+          })()}
         </div>
       )}
       
