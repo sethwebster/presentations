@@ -513,7 +513,7 @@ export class Editor {
           });
           reject(error);
         }
-      }, 300); // Small debounce to batch rapid saves
+      }, 50); // Small debounce to batch rapid saves
     });
   }
 
