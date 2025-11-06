@@ -1644,12 +1644,114 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
                 >
                   <em style={{ fontSize: '14px' }}>I</em>
                 </ToolbarButton>
+                <ToolbarButton
+                  title="Underline"
+                  pressed={(() => {
+                    const deck = state.deck;
+                    const currentSlide = deck?.slides[currentSlideIndex];
+                    if (!currentSlide) return false;
+
+                    const allElements = [
+                      ...(currentSlide.elements || []),
+                      ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+                    ];
+
+                    const firstTextElement = Array.from(selectedElementIds)
+                      .map(id => allElements.find(el => el.id === id))
+                      .find(el => el && el.type === 'text');
+
+                    const decoration = String(firstTextElement?.style?.textDecoration || firstTextElement?.style?.textDecorationLine || '');
+                    return decoration.includes('underline');
+                  })()}
+                  onClick={() => {
+                    const deck = state.deck;
+                    const currentSlide = deck?.slides[currentSlideIndex];
+                    if (!currentSlide) return;
+
+                    const allElements = [
+                      ...(currentSlide.elements || []),
+                      ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+                    ];
+
+                    selectedElementIds.forEach((id) => {
+                      const element = allElements.find(el => el.id === id);
+                      if (element && element.type === 'text') {
+                        const currentDecoration = (element.style as any)?.textDecoration || (element.style as any)?.textDecorationLine || '';
+                        const decorations = new Set(currentDecoration.split(/\s+/).filter(Boolean));
+
+                        if (decorations.has('underline')) {
+                          decorations.delete('underline');
+                        } else {
+                          decorations.add('underline');
+                        }
+
+                        const newDecoration = Array.from(decorations).join(' ') || 'none';
+                        editor.updateElement(id, {
+                          style: { ...element.style, textDecorationLine: newDecoration },
+                        });
+                      }
+                    });
+                  }}
+                >
+                  <span style={{ fontSize: '14px', textDecoration: 'underline' }}>U</span>
+                </ToolbarButton>
+                <ToolbarButton
+                  title="Strikethrough"
+                  pressed={(() => {
+                    const deck = state.deck;
+                    const currentSlide = deck?.slides[currentSlideIndex];
+                    if (!currentSlide) return false;
+
+                    const allElements = [
+                      ...(currentSlide.elements || []),
+                      ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+                    ];
+
+                    const firstTextElement = Array.from(selectedElementIds)
+                      .map(id => allElements.find(el => el.id === id))
+                      .find(el => el && el.type === 'text');
+
+                    const decoration = String(firstTextElement?.style?.textDecoration || firstTextElement?.style?.textDecorationLine || '');
+                    return decoration.includes('line-through');
+                  })()}
+                  onClick={() => {
+                    const deck = state.deck;
+                    const currentSlide = deck?.slides[currentSlideIndex];
+                    if (!currentSlide) return;
+
+                    const allElements = [
+                      ...(currentSlide.elements || []),
+                      ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+                    ];
+
+                    selectedElementIds.forEach((id) => {
+                      const element = allElements.find(el => el.id === id);
+                      if (element && element.type === 'text') {
+                        const currentDecoration = (element.style as any)?.textDecoration || (element.style as any)?.textDecorationLine || '';
+                        const decorations = new Set(currentDecoration.split(/\s+/).filter(Boolean));
+
+                        if (decorations.has('line-through')) {
+                          decorations.delete('line-through');
+                        } else {
+                          decorations.add('line-through');
+                        }
+
+                        const newDecoration = Array.from(decorations).join(' ') || 'none';
+                        editor.updateElement(id, {
+                          style: { ...element.style, textDecorationLine: newDecoration },
+                        });
+                      }
+                    });
+                  }}
+                >
+                  <span style={{ fontSize: '14px', textDecoration: 'line-through' }}>S</span>
+                </ToolbarButton>
               </>
             );
           })()}
         </div>
       )}
-      
+
       {/* Text Alignment Tools */}
       {selectedElementIds.size > 0 && (
         <div className="flex items-center gap-2 pr-4 mr-2 border-r" style={{ borderRightColor: 'rgba(148, 163, 184, 0.2)' }}>

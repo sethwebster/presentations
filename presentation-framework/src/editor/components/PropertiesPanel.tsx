@@ -19,6 +19,7 @@ import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel
 import { Select } from '@/components/ui/select';
 import { ColorInput } from '@/components/ui/color-input';
 import { Button } from '@/components/ui/button';
+import { FontPicker } from './FontPicker';
 
 type TextStyleUpdate = {
   style?: Record<string, any> | null;
@@ -964,32 +965,10 @@ export function PropertiesPanel() {
                     <Label className={SECTION_HEADING}>
                       Font
                     </Label>
-                    <Select
-                      value={sharedFontFamily.mixed ? '__mixed__' : (sharedFontFamily.value as string) ?? 'inherit'}
-                      onChange={(e) => {
-                        if (e.target.value === '__mixed__') return;
-                        setFontFamily(e.target.value);
-                      }}
-                    >
-                      {sharedFontFamily.mixed && (
-                        <option value="__mixed__" disabled>
-                          Mixed fonts
-                        </option>
-                      )}
-                      <option value="inherit">System Default</option>
-                      <option value="Arial, sans-serif">Arial</option>
-                      <option value="Helvetica, sans-serif">Helvetica</option>
-                      <option value="'Times New Roman', serif">Times New Roman</option>
-                      <option value="Georgia, serif">Georgia</option>
-                      <option value="'Courier New', monospace">Courier New</option>
-                      <option value="Verdana, sans-serif">Verdana</option>
-                      <option value="Tahoma, sans-serif">Tahoma</option>
-                      <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
-                      <option value="'Palatino Linotype', serif">Palatino</option>
-                      <option value="'Comic Sans MS', cursive">Comic Sans</option>
-                      <option value="Impact, sans-serif">Impact</option>
-                      <option value="'Lucida Console', monospace">Lucida Console</option>
-                    </Select>
+                    <FontPicker
+                      value={sharedFontFamily.value as string}
+                      onChange={(fontId) => setFontFamily(fontId)}
+                    />
                   </section>
 
                   <section className="space-y-3">
