@@ -2,15 +2,17 @@
  * One-time script to fix user data in Redis
  * Run with: npx tsx scripts/fix-user-data.ts
  */
-import Redis from 'ioredis';
+import { createRedis } from '../src/lib/redis';
+import type Redis from 'ioredis';
 
-const redisUrl = process.env.REDIS_URL || process.env.KV_URL;
-if (!redisUrl) {
-  console.error('REDIS_URL or KV_URL not set');
+const redisClient = createRedis();
+if (!redisClient) {
+  console.error('Redis not configured');
   process.exit(1);
 }
 
-const redis = new Redis(redisUrl);
+// TypeScript doesn't recognize process.exit as a control flow terminator
+const redis: Redis = redisClient;
 
 async function fixUserData() {
   console.log('Starting user data fix...');

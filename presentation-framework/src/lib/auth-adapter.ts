@@ -1,32 +1,6 @@
-import Redis from 'ioredis';
 import type { Adapter } from '@auth/core/adapters';
 import crypto from 'crypto';
-
-const redisUrl = process.env.REDIS_URL || process.env.KV_URL;
-
-// Lazy Redis connection - only create when needed
-let redis: Redis | null = null;
-
-function getRedis(): Redis | null {
-  if (!redisUrl) {
-    return null;
-  }
-  if (!redis) {
-    try {
-      // Configure Redis to not auto-connect to prevent hangs
-      redis = new Redis(redisUrl, {
-        lazyConnect: true,
-        retryStrategy: () => null, // Don't retry on connection failure
-        maxRetriesPerRequest: 1,
-        enableReadyCheck: false,
-      });
-    } catch (error) {
-      console.warn('Failed to create Redis client for NextAuth adapter:', error);
-      return null;
-    }
-  }
-  return redis;
-}
+import { getRedis } from './redis';
 
 // Helper function to generate Gravatar URL from email
 function getGravatarUrl(email: string): string {
@@ -39,7 +13,10 @@ function getGravatarUrl(email: string): string {
 
 export function RedisAdapter(): Adapter | undefined {
   const redisClient = getRedis();
-  if (!redisClient) return undefined;
+  if (!redisClient) {
+    console.warn('[RedisAdapter] No Redis client available');
+    return undefined;
+  }
 
   // Store email from callback URL temporarily (expires in 5 minutes)
   // This allows adapter methods to access the email even if NextAuth doesn't pass it

@@ -1,16 +1,14 @@
-import Redis from 'ioredis';
 import type { DeckDefinition } from '@/rsc/types';
 import type { UserProfile, PublicPresentation } from './types';
+import { createRedis } from '@/lib/redis';
 
 // Server-side function to fetch user showcase data directly from Redis
 export async function getUserShowcase(username: string): Promise<{ profile: UserProfile | null; presentations: PublicPresentation[] } | null> {
-  const redisUrl = process.env.REDIS_URL || process.env.KV_URL;
-  if (!redisUrl) {
-    console.error('REDIS_URL or KV_URL environment variable is not set');
+  const redis = createRedis();
+  if (!redis) {
+    console.error('Redis not configured');
     return null;
   }
-
-  const redis = new Redis(redisUrl);
 
   try {
     // Find user by username (check email prefix or name)

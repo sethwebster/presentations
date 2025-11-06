@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
-import Redis from 'ioredis';
 import { auth } from '@/lib/auth';
 import type { ImageLibraryItem, ImageLibraryMetadata, ImageLibraryOrigin } from '@/editor/types/imageLibrary';
+import { getRedis } from '@/lib/redis';
 
 export const runtime = 'nodejs';
 export const revalidate = 0;
 
-const redisUrl = process.env.REDIS_URL || process.env.KV_URL;
-const redis = redisUrl ? new Redis(redisUrl) : null;
+const redis = getRedis();
 
 const STORAGE_VERSION = 1;
 const MAX_ITEMS_PER_REQUEST = 50;

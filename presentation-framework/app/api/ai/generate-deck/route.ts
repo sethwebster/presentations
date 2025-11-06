@@ -1,17 +1,16 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import Redis from 'ioredis';
 import { auth } from '@/lib/auth';
 import type { DeckDefinition, SlideDefinition } from '@/rsc/types';
 import { templates } from '@/editor/templates';
 import { applyAnimationsToDeck } from '@/editor/services/AnimationService';
 import { GENERATION_SYSTEM_PROMPT, SLIDE_CONTENT_GENERATION_PROMPT } from '@/ai/prompts/generation';
+import { getRedis } from '@/lib/redis';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const redisUrl = process.env.REDIS_URL || process.env.KV_URL;
-const redis = redisUrl ? new Redis(redisUrl) : null;
+const redis = getRedis();
 
 function sanitizeSensitiveData<T>(value: T): T {
   const mask = (input: string) => input.replace(/sk-[a-zA-Z0-9-_]+/g, 'sk-************************');

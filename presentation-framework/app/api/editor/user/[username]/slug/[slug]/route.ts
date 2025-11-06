@@ -1,14 +1,12 @@
 import { NextResponse } from 'next/server';
-import Redis from 'ioredis';
 import type { DeckDefinition } from '@/rsc/types';
+import { getRedis } from '@/lib/redis';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// Create Redis client from environment variables
-const redisUrl = process.env.REDIS_URL || process.env.KV_URL;
-const redis = redisUrl ? new Redis(redisUrl) : null;
+const redis = getRedis();
 
 type UserSlugRouteContext = {
   params: Promise<{ username: string; slug: string }>;

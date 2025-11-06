@@ -1,15 +1,13 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import Redis from 'ioredis';
 import { auth } from '@/lib/auth';
 import { CONVERSATION_SYSTEM_PROMPT } from '@/ai/prompts/conversation';
+import { getRedis } from '@/lib/redis';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Redis client
-const redisUrl = process.env.REDIS_URL || process.env.KV_URL;
-const redis = redisUrl ? new Redis(redisUrl) : null;
+const redis = getRedis();
 
 // OpenAI tools for function calling
 const tools = [
