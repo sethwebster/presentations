@@ -85,7 +85,7 @@ export function FontPicker({ value, onChange, category = 'all', className = '' }
           />
 
           {/* Dropdown panel */}
-          <div className="absolute z-50 w-full mt-2 bg-[var(--editor-surface)] border border-[var(--editor-border-strong)] rounded-lg shadow-lg max-h-96 overflow-hidden flex flex-col">
+          <div className="absolute z-50 w-full mt-2 border border-[var(--editor-border-strong)] rounded-lg shadow-lg max-h-96 overflow-hidden flex flex-col" style={{ backgroundColor: 'rgba(255, 255, 255, 1)' }}>
             {/* Search */}
             <div className="p-2 border-b border-[var(--editor-border)]">
               <input
@@ -210,7 +210,7 @@ export function FontPickerCompact({ value, onChange, className = '' }: Omit<Font
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
 
-          <div className="absolute z-50 left-0 mt-1 w-64 bg-[var(--editor-surface)] border border-[var(--editor-border-strong)] rounded-lg shadow-lg max-h-80 overflow-y-auto">
+          <div className="absolute z-50 left-0 mt-1 w-64 border border-[var(--editor-border-strong)] rounded-lg shadow-lg max-h-80 overflow-y-auto" style={{ backgroundColor: 'rgba(255, 255, 255, 1)' }}>
             {Object.entries(fontsByCategory).map(([cat, fonts]) => (
               <div key={cat} className="p-1">
                 <div className="px-2 py-1 text-xs font-semibold text-[var(--editor-text-muted)] uppercase tracking-wide">
