@@ -7,5 +7,16 @@
  * TODO: Complete the conversion from jsconf-rsc.lume file
  */
 
-// Re-export the original presentation until .lume conversion is complete
-export { getSlides, presentationConfig, customStyles } from './jsconf-2025-react-foundation';
+import * as jsconfModule from './jsconf-2025-react-foundation';
+
+// Re-export named exports
+export const getSlides = jsconfModule.getSlides;
+export const presentationConfig = jsconfModule.presentationConfig;
+export const customStyles = jsconfModule.customStyles;
+
+// Create default export as a module object
+export default {
+  getSlides: jsconfModule.getSlides,
+  presentationConfig: jsconfModule.presentationConfig,
+  customStyles: jsconfModule.customStyles,
+};
