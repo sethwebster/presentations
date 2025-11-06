@@ -6,8 +6,11 @@ import { ColorPicker } from './ColorPicker';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { QualitySlider } from '@/components/ui/quality-slider';
+import { Badge } from '@/components/ui/badge';
 import { ImageBackgroundModal } from './ImageBackgroundModal';
 import { Modal } from '@/components/ui/modal';
 import { Separator } from '@/components/ui/separator';
@@ -40,14 +43,12 @@ export function SlideProperties() {
   const slide = deck?.slides.find(s => s.id === selectedSlideId);
   const [isPreviewingTransition, setIsPreviewingTransition] = useState(false);
   const currentSlideIndex = state.currentSlideIndex;
-  
-  // Calculate preview scale factor for image drag-to-reposition
-  // Approximate preview width is ~400px, so we need to scale mouse deltas from preview to canvas space
+
+  // Get slide dimensions early for use in hooks
   const slideWidth = deck?.settings?.slideSize?.width ?? 1280;
-  const previewWidth = 400; // Approximate preview width
-  const previewScale = previewWidth / slideWidth;
-  
-  // Helper function defined before hooks (used in useEffect)
+  const slideHeight = deck?.settings?.slideSize?.height ?? 720;
+
+  // Helper functions defined before hooks (used in useEffect)
   // Gradients are handled via the Color tab, so we map gradient -> color
   const getBackgroundType = (slideToCheck: typeof slide): 'color' | 'image' => {
     if (slideToCheck?.background) {
@@ -57,6 +58,28 @@ export function SlideProperties() {
     }
     return 'color';
   };
+
+  const getImageBackgroundSafe = () => {
+    if (slide?.background && typeof slide.background === 'object' && slide.background.type === 'image') {
+      const value = slide.background.value;
+      if (typeof value === 'object' && value !== null) {
+        return {
+          src: (value as any).src || '',
+          offsetX: (value as any).offsetX || 0,
+          offsetY: (value as any).offsetY || 0,
+          scale: (value as any).scale || 100,
+          meta: value,
+        };
+      }
+      if (typeof value === 'string') {
+        return { src: value, offsetX: 0, offsetY: 0, scale: 100, meta: { src: value } };
+      }
+    }
+    return { src: '', offsetX: 0, offsetY: 0, scale: 100, meta: {} };
+  };
+
+  // Derive image data before using it in hooks
+  const imageData = useMemo(() => getImageBackgroundSafe(), [slide?.background]);
   
   // ALL HOOKS MUST BE DECLARED BEFORE ANY EARLY RETURNS
   // This ensures hooks are always called in the same order
@@ -66,7 +89,33 @@ export function SlideProperties() {
   const [showImageModal, setShowImageModal] = useState(false);
   const [showRefineModal, setShowRefineModal] = useState(false);
   const [refineRequest, setRefineRequest] = useState('');
+  const [refineQualityLevel, setRefineQualityLevel] = useState<number>(0); // 0=fast, 1=good, 2=great, 3=premium, 4=ultimate
   const [imageModalInitialTab, setImageModalInitialTab] = useState<'generate' | 'upload' | 'library'>('generate');
+
+  // Derive model and quality from slider position
+  // 0: Fast → Fireworks + flux-1-schnell-fp8
+  // 1: Good → Fireworks + flux-1-dev-fp8
+  // 2: Great → Fireworks + flux-kontext-pro
+  // 3: Premium → Fireworks + TBD (4th model variant)
+  // 4: Ultimate → OpenAI + gpt-image-1
+  const getRefineModelAndQuality = (level: number): { model: 'openai' | 'flux'; quality: 'quick' | 'polish' | 'heroic' } => {
+    switch (level) {
+      case 0:
+        return { model: 'flux', quality: 'quick' }; // flux-1-schnell-fp8
+      case 1:
+        return { model: 'flux', quality: 'polish' }; // flux-1-dev-fp8
+      case 2:
+        return { model: 'flux', quality: 'heroic' }; // flux-kontext-pro
+      case 3:
+        return { model: 'flux', quality: 'heroic' }; // TBD - need 4th Fireworks model
+      case 4:
+        return { model: 'openai', quality: 'quick' }; // OpenAI gpt-image-1
+      default:
+        return { model: 'flux', quality: 'quick' };
+    }
+  };
+
+  const { model: refineModel, quality: refineQuality } = getRefineModelAndQuality(refineQualityLevel);
   const [isLibraryRefreshing, setIsLibraryRefreshing] = useState(false);
   const [imageStatus, setImageStatus] = useState<{ isGenerating: boolean; error: string | null; success: string | null }>({
     isGenerating: false,
@@ -89,6 +138,8 @@ export function SlideProperties() {
   const imagePreviewRef = useRef<HTMLDivElement>(null);
   const isDraggingImageRef = useRef(false);
   const dragStartRef = useRef<{ x: number; y: number; offsetX: number; offsetY: number }>({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
+  const [previewScale, setPreviewScale] = useState(1);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   // Cache previous background values by type to restore when switching back
   const backgroundCacheRef = useRef<{
     color?: string | { type: 'color'; value: string; opacity?: number };
@@ -102,6 +153,44 @@ export function SlideProperties() {
       void refreshImageLibrary();
     }
   }, [showImageModal, refreshImageLibrary]);
+
+  // Callback to handle preview element ref and calculate scale
+  const handlePreviewRef = useCallback((el: HTMLDivElement | null) => {
+    // Clean up previous observer
+    if (resizeObserverRef.current) {
+      resizeObserverRef.current.disconnect();
+      resizeObserverRef.current = null;
+    }
+
+    // Set the ref
+    imagePreviewRef.current = el;
+
+    if (el) {
+      // Calculate scale immediately
+      const updateScale = () => {
+        const previewWidth = el.offsetWidth;
+        const scale = previewWidth / slideWidth;
+        console.log('[Preview Scale] Updated:', { previewWidth, slideWidth, scale });
+        setPreviewScale(scale);
+      };
+
+      // Use setTimeout to ensure element is fully laid out
+      setTimeout(updateScale, 0);
+
+      // Set up ResizeObserver for future changes
+      resizeObserverRef.current = new ResizeObserver(updateScale);
+      resizeObserverRef.current.observe(el);
+    }
+  }, [slideWidth]);
+
+  // Cleanup ResizeObserver on unmount
+  useEffect(() => {
+    return () => {
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+      }
+    };
+  }, []);
 
   // Sync backgroundType when slide changes and update cache
   useEffect(() => {
@@ -123,29 +212,6 @@ export function SlideProperties() {
       }
     }
   }, [selectedSlideId, slide?.background]);
-
-  // Helper functions used in hooks - defined before hooks that use them
-  const getImageBackgroundSafe = () => {
-    if (slide?.background && typeof slide.background === 'object' && slide.background.type === 'image') {
-      const value = slide.background.value;
-      if (typeof value === 'object' && value !== null) {
-        return {
-          src: (value as any).src || '',
-          offsetX: (value as any).offsetX || 0,
-          offsetY: (value as any).offsetY || 0,
-          scale: (value as any).scale || 100,
-          meta: value,
-        };
-      }
-      if (typeof value === 'string') {
-        return { src: value, offsetX: 0, offsetY: 0, scale: 100, meta: { src: value } };
-      }
-    }
-    return { src: '', offsetX: 0, offsetY: 0, scale: 100, meta: {} };
-  };
-
-  // ALL hooks must be declared before any early returns
-  const imageData = useMemo(() => getImageBackgroundSafe(), [slide?.background]);
 
   const updateImageBackground = useCallback((updates: Record<string, unknown>) => {
     if (!selectedSlideId || !slide) return;
@@ -211,7 +277,14 @@ export function SlideProperties() {
     setBackgroundType('image');
     setImageStatus({ isGenerating: false, error: null, success: 'Image uploaded successfully.' });
     setTimeout(() => setImageStatus({ isGenerating: false, error: null, success: null }), 2000);
-  }, [updateImageBackground, addImageToLibrary, deckId, slide]);
+
+    // Trigger immediate save to extract large base64 image as asset
+    // This prevents JSON.stringify errors on subsequent edits
+    console.log('[SlideProperties] Triggering immediate save after image upload');
+    setTimeout(() => {
+      editor.save();
+    }, 100);
+  }, [updateImageBackground, addImageToLibrary, deckId, editor]);
 
   const handleFileInputChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -243,7 +316,9 @@ export function SlideProperties() {
     }
   }, []);
 
-  const handleGenerateImage = useCallback(async (prompt: string, mode: 'background' | 'element', model: 'openai' | 'flux' = 'flux', quality: 'quick' | 'polish' | 'heroic' = 'quick') => {
+  const handleGenerateImage = useCallback(async (prompt: string, mode: 'background' | 'element', model: 'openai' | 'flux' = 'flux', quality: 'quick' | 'polish' | 'heroic' = 'quick', polishEnabled?: boolean) => {
+    console.log('[SlideProperties] handleGenerateImage called:', { mode, model, quality, polishEnabled });
+
     if (mode !== 'background') {
       // For image elements, we'd need to add to slide elements, but SlideProperties is only for backgrounds
       setImageStatus({ isGenerating: false, error: 'Image elements must be added from the toolbar.', success: null });
@@ -257,11 +332,13 @@ export function SlideProperties() {
 
     try {
       setImageStatus({ isGenerating: true, error: null, success: null });
-      
+
       // Get slide dimensions from deck settings
       const slideWidth = deck?.settings?.slideSize?.width ?? 1280;
       const slideHeight = deck?.settings?.slideSize?.height ?? 720;
-      
+
+      console.log('[SlideProperties] Calling imageService.generateBackground with:', { model, quality });
+
       // Use service for image generation
       const imageService = getImageGenerationService();
       const result = await imageService.generateBackground({
@@ -280,6 +357,19 @@ export function SlideProperties() {
         throw new Error('No image returned by generator.');
       }
 
+      // Calculate qualityLevel for storage (0-4 scale)
+      const getQualityLevel = (model: string, quality: string): number => {
+        if (model === 'openai') return 4; // Ultimate
+        if (model === 'flux') {
+          if (quality === 'quick') return 0; // Fast
+          if (quality === 'polish') return 1; // Good
+          if (quality === 'heroic') return 2; // Great
+        }
+        return 0; // Default to Fast
+      };
+
+      const qualityLevel = getQualityLevel(model, quality);
+
       const generatedAt = new Date().toISOString();
       const libraryItem = addImageToLibrary({
         dataUrl: imageDataResponse,
@@ -290,6 +380,7 @@ export function SlideProperties() {
           prompt,
           provider: meta?.provider ?? 'openai',
           quality: meta?.quality ?? 'hd',
+          qualityLevel,
           generatedAt,
           width: slideWidth,
           height: slideHeight,
@@ -307,12 +398,75 @@ export function SlideProperties() {
         source: 'ai',
         provider: meta?.provider ?? 'openai',
         quality: meta?.quality ?? 'hd',
+        qualityLevel,
         prompt,
         libraryItemId: libraryItem.id,
       });
 
       setImageStatus({ isGenerating: false, error: null, success: 'Generated background applied.' });
       setTimeout(() => setShowImageModal(false), 1200);
+
+      // Trigger immediate save to extract large base64 image as asset
+      // This prevents JSON.stringify errors on subsequent edits
+      console.log('[SlideProperties] Triggering immediate save after AI image generation');
+      setTimeout(() => {
+        editor.save();
+      }, 100);
+
+      // If polish is enabled, generate polish version in background and swap when ready
+      if (polishEnabled && model === 'flux') {
+        console.log('[SlideProperties] Starting polish generation in background...');
+        const imageService = getImageGenerationService();
+        imageService.generatePolishAsync(
+          {
+            prompt,
+            width: slideWidth,
+            height: slideHeight,
+            deckId,
+            model: 'flux',
+            quality: 'polish',
+          },
+          (polishResult) => {
+            console.log('[SlideProperties] Polish generation completed, swapping image');
+            const polishGeneratedAt = new Date().toISOString();
+
+            // Update library item if it exists
+            if (libraryItem.id) {
+              updateLibraryItem(libraryItem.id, (existing) => ({
+                ...existing,
+                dataUrl: polishResult.imageData,
+                thumbnailDataUrl: polishResult.imageData,
+                updatedAt: polishGeneratedAt,
+                metadata: {
+                  ...existing.metadata,
+                  quality: polishResult.meta?.quality ?? 'polish',
+                  qualityLevel: 1, // Good (polish)
+                  generatedAt: polishGeneratedAt,
+                },
+              }));
+            }
+
+            // Update slide background with polish version
+            updateImageBackground({
+              src: polishResult.imageData,
+              offsetX: 0,
+              offsetY: 0,
+              scale: 100,
+              generatedAt: polishGeneratedAt,
+              source: 'ai',
+              provider: polishResult.meta?.provider ?? 'fireworks',
+              quality: polishResult.meta?.quality ?? 'polish',
+              qualityLevel: 1, // Good (polish)
+              prompt,
+              libraryItemId: libraryItem.id,
+            });
+          },
+          (error) => {
+            console.error('[SlideProperties] Polish generation failed:', error);
+            // Don't show error to user - quick version is already applied
+          }
+        );
+      }
     } catch (error) {
       console.error('AI background generation failed:', error);
       setImageStatus({
@@ -321,7 +475,7 @@ export function SlideProperties() {
         success: null,
       });
     }
-  }, [updateImageBackground, addImageToLibrary, deckId, deck, slide]);
+  }, [updateImageBackground, addImageToLibrary, updateLibraryItem, deckId, deck, slide]);
 
   const handleRefineImage = useCallback(async () => {
     if (!refineRequest.trim() || !imageData.src) {
@@ -345,12 +499,19 @@ export function SlideProperties() {
       const slideWidth = deck?.settings?.slideSize?.width ?? 1280;
       const slideHeight = deck?.settings?.slideSize?.height ?? 720;
 
-      console.log('Refining image with:', { 
-        originalPrompt, 
-        refinement: refineRequest.trim(), 
-        width: slideWidth, 
+      // Polish quality uses quick first, then upgrades in background
+      const polishEnabled = refineQuality === 'polish';
+      const finalQuality = refineQuality === 'polish' ? 'quick' : refineQuality;
+
+      console.log('Refining image with:', {
+        originalPrompt,
+        refinement: refineRequest.trim(),
+        width: slideWidth,
         height: slideHeight,
-        imageLength: imageData.src.length 
+        model: refineModel,
+        quality: finalQuality,
+        polishEnabled,
+        imageLength: imageData.src.length
       });
 
       const response = await fetch('/api/ai/refine', {
@@ -362,6 +523,8 @@ export function SlideProperties() {
           refinement: refineRequest.trim(),
           width: slideWidth,
           height: slideHeight,
+          model: refineModel,
+          quality: finalQuality,
         }),
       });
 
@@ -381,14 +544,29 @@ export function SlideProperties() {
         throw new Error('No image returned by refinement.');
       }
 
-      // Update with refined image, preserving original prompt and refinement history
-      const refinedPrompt = `${originalPrompt}, ${refineRequest.trim()}`;
+      // Update with refined image
+      // Use the refineRequest as the new prompt (user can edit the full prompt)
+      const refinedPrompt = refineRequest.trim();
       const generatedAt = new Date().toISOString();
       const refinementEntry = {
         id: `ref-${Date.now()}`,
         prompt: refineRequest.trim(),
+        previousPrompt: originalPrompt,
         createdAt: generatedAt,
       };
+
+      // Calculate qualityLevel for storage (0-4 scale)
+      const getQualityLevel = (model: string, quality: string): number => {
+        if (model === 'openai') return 4; // Ultimate
+        if (model === 'flux') {
+          if (quality === 'quick') return 0; // Fast
+          if (quality === 'polish') return 1; // Good
+          if (quality === 'heroic') return 2; // Great
+        }
+        return 0; // Default to Fast
+      };
+
+      const refinedQualityLevel = getQualityLevel(refineModel, refineQuality);
 
       let libraryItemId = typeof (imageData.meta as any)?.libraryItemId === 'string'
         ? (imageData.meta as any).libraryItemId as string
@@ -405,6 +583,7 @@ export function SlideProperties() {
             prompt: refinedPrompt,
             provider: meta?.provider ?? existing.metadata?.provider,
             quality: meta?.quality ?? existing.metadata?.quality,
+            qualityLevel: refinedQualityLevel,
             generatedAt,
             refinementHistory: [...(existing.metadata?.refinementHistory ?? []), refinementEntry],
           },
@@ -419,6 +598,7 @@ export function SlideProperties() {
             prompt: refinedPrompt,
             provider: meta?.provider ?? 'openai',
             quality: meta?.quality ?? 'hd',
+            qualityLevel: refinedQualityLevel,
             generatedAt,
             deckId: deckId ?? undefined,
             refinementHistory: [refinementEntry],
@@ -436,6 +616,7 @@ export function SlideProperties() {
         source: 'ai',
         provider: meta?.provider ?? 'openai',
         quality: meta?.quality ?? 'hd',
+        qualityLevel: refinedQualityLevel,
         prompt: refinedPrompt,
         refinement: refineRequest.trim(),
         libraryItemId,
@@ -444,7 +625,67 @@ export function SlideProperties() {
       setImageStatus({ isGenerating: false, error: null, success: 'Image refined successfully.' });
       setShowRefineModal(false);
       setRefineRequest('');
+      setRefineQualityLevel(0);
       setTimeout(() => setImageStatus({ isGenerating: false, error: null, success: null }), 2000);
+
+      // If polish is enabled, generate polish version in background and swap when ready
+      if (polishEnabled && refineModel === 'flux' && libraryItemId) {
+        console.log('[SlideProperties] Starting polish refinement in background...');
+        const polishResponse = await fetch('/api/ai/refine', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image: imageDataResponse, // Use the quick refined version as input
+            originalPrompt: refinedPrompt,
+            refinement: 'enhanced quality',
+            width: slideWidth,
+            height: slideHeight,
+            model: 'flux',
+            quality: 'polish',
+          }),
+        }).catch((error) => {
+          console.error('[SlideProperties] Polish refinement failed:', error);
+          return null;
+        });
+
+        if (polishResponse && polishResponse.ok) {
+          const polishData = await polishResponse.json();
+          const polishImageData = polishData?.image;
+          const polishMeta = polishData?.meta;
+
+          if (polishImageData) {
+            console.log('[SlideProperties] Polish refinement completed, swapping image');
+            const polishGeneratedAt = new Date().toISOString();
+
+            // Update library item
+            updateLibraryItem(libraryItemId, (existing) => ({
+              ...existing,
+              dataUrl: polishImageData,
+              thumbnailDataUrl: polishImageData,
+              updatedAt: polishGeneratedAt,
+              metadata: {
+                ...existing.metadata,
+                quality: polishMeta?.quality ?? 'polish',
+                generatedAt: polishGeneratedAt,
+              },
+            }));
+
+            // Update slide background with polish version
+            updateImageBackground({
+              src: polishImageData,
+              offsetX: imageData.offsetX,
+              offsetY: imageData.offsetY,
+              scale: imageData.scale,
+              generatedAt: polishGeneratedAt,
+              source: 'ai',
+              provider: polishMeta?.provider ?? 'fireworks',
+              quality: polishMeta?.quality ?? 'polish',
+              prompt: refinedPrompt,
+              libraryItemId,
+            });
+          }
+        }
+      }
     } catch (error) {
       console.error('AI image refinement failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Image refinement failed.';
@@ -455,11 +696,12 @@ export function SlideProperties() {
       });
       // Keep modal open so user can see the error and try again
     }
-  }, [refineRequest, imageData, deck, updateImageBackground, updateLibraryItem, addImageToLibrary, deckId, slide]);
+  }, [refineRequest, refineModel, refineQuality, imageData, deck, updateImageBackground, updateLibraryItem, addImageToLibrary, deckId, slide]);
 
   const handleImageDragStart = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (!imageData.src) return;
     event.preventDefault();
+    console.log('[Drag Start]', { offsetX: imageData.offsetX, offsetY: imageData.offsetY, previewScale });
     isDraggingImageRef.current = true;
     dragStartRef.current = {
       x: event.clientX,
@@ -467,20 +709,18 @@ export function SlideProperties() {
       offsetX: imageData.offsetX,
       offsetY: imageData.offsetY,
     };
-  }, [imageData.offsetX, imageData.offsetY, imageData.src]);
+  }, [imageData.offsetX, imageData.offsetY, imageData.src, previewScale]);
 
   useEffect(() => {
-    if (!isDraggingImageRef.current) return;
-
     const handleMouseMove = (event: MouseEvent) => {
       if (!isDraggingImageRef.current) return;
       const deltaX = event.clientX - dragStartRef.current.x;
       const deltaY = event.clientY - dragStartRef.current.y;
 
-      // Convert preview pixel delta to canvas pixel delta using the scale factor
-      const scale = previewScale;
-      const nextOffsetX = Math.round(dragStartRef.current.offsetX + deltaX / scale);
-      const nextOffsetY = Math.round(dragStartRef.current.offsetY + deltaY / scale);
+      // Convert preview pixel delta to slide pixel delta using the preview scale
+      const nextOffsetX = Math.round(dragStartRef.current.offsetX + deltaX / previewScale);
+      const nextOffsetY = Math.round(dragStartRef.current.offsetY + deltaY / previewScale);
+      console.log('[Drag Move]', { deltaX, deltaY, previewScale, nextOffsetX, nextOffsetY });
       updateImageBackground({ offsetX: nextOffsetX, offsetY: nextOffsetY });
     };
 
@@ -529,7 +769,14 @@ export function SlideProperties() {
     setImageStatus({ isGenerating: false, error: null, success: 'Background applied from library.' });
     setTimeout(() => setImageStatus({ isGenerating: false, error: null, success: null }), 2000);
     setShowImageModal(false);
-  }, [updateImageBackground, slide]);
+
+    // Trigger immediate save to extract large base64 image as asset
+    // This prevents JSON.stringify errors on subsequent edits
+    console.log('[SlideProperties] Triggering immediate save after selecting library image');
+    setTimeout(() => {
+      editor.save();
+    }, 100);
+  }, [updateImageBackground, editor]);
 
   const previewSlideTransition = useCallback(() => {
     if (!slide?.transitions?.in || !deck || isPreviewingTransition) return;
@@ -806,34 +1053,48 @@ export function SlideProperties() {
                 // Get slide dimensions and calculate aspect ratio for preview
                 const slideWidth = deck?.settings?.slideSize?.width ?? 1280;
                 const slideHeight = deck?.settings?.slideSize?.height ?? 720;
-                
-                // Calculate scaled offsets for preview (assuming preview will be ~400px wide)
-                // We'll use a scale factor based on typical preview width
-                const previewScaleFactor = 400 / slideWidth; // Approximate preview width
-                const scaledOffsetX = imageData.offsetX * previewScaleFactor;
-                const scaledOffsetY = imageData.offsetY * previewScaleFactor;
-                
-                // Use aspect-ratio to maintain correct proportions
-                const previewStyle = {
-                  aspectRatio: `${slideWidth} / ${slideHeight}`,
-                  backgroundImage: `url(${imageData.src})`,
-                  backgroundPosition: `${scaledOffsetX}px ${scaledOffsetY}px`,
-                  backgroundSize: `${imageData.scale}% auto`,
-                  backgroundRepeat: 'no-repeat' as const,
-                };
-                
+
+                // Scale offsets from slide space to preview space
+                const scaledOffsetX = imageData.offsetX * previewScale;
+                const scaledOffsetY = imageData.offsetY * previewScale;
+
+                // Match EditorCanvas behavior: use 'center' when offsets are both 0
+                const backgroundPosition = (imageData.offsetX !== 0 || imageData.offsetY !== 0)
+                  ? `${scaledOffsetX}px ${scaledOffsetY}px`
+                  : 'center';
+
+                // Match EditorCanvas behavior: use cover when scale is 100, otherwise use scale percentage
+                const backgroundSize = imageData.scale !== 100
+                  ? `${imageData.scale}%`
+                  : 'cover';
+
+                console.log('[Preview Render]', {
+                  offsetX: imageData.offsetX,
+                  offsetY: imageData.offsetY,
+                  previewScale,
+                  scaledOffsetX,
+                  scaledOffsetY,
+                  scale: imageData.scale,
+                  backgroundPosition,
+                  backgroundSize
+                });
+
                 return (
                   <>
                     <div
-                      ref={imagePreviewRef}
-                      className="relative w-full overflow-hidden rounded-xl bg-muted/40"
+                      ref={handlePreviewRef}
+                      className="relative w-full overflow-hidden rounded-xl bg-muted/40 cursor-move"
                       style={{
-                        ...previewStyle,
+                        aspectRatio: `${slideWidth} / ${slideHeight}`,
+                        backgroundImage: `url(${imageData.src})`,
+                        backgroundPosition,
+                        backgroundSize,
+                        backgroundRepeat: 'no-repeat',
                         border: '1px solid rgba(22, 194, 199, 0.4)',
                       }}
                       onMouseDown={handleImageDragStart}
                     >
-                    <div className="absolute left-1/2 top-1/2 flex w-full -translate-x-1/2 -translate-y-1/2 justify-center">
+                    <div className="absolute left-1/2 top-1/2 flex w-full -translate-x-1/2 -translate-y-1/2 justify-center pointer-events-none">
                       <span className="rounded-full bg-black/40 px-3 py-1 text-xs text-white">
                         Drag to reposition
                       </span>
@@ -869,6 +1130,62 @@ export function SlideProperties() {
                     </button>
                   </div>
 
+                  {/* Image Metadata Info */}
+                  {(() => {
+                    const meta = imageData.meta as any;
+                    const provider = meta?.provider;
+                    const quality = meta?.quality;
+                    const source = meta?.source;
+
+                    // Only show if we have metadata to display
+                    if (!provider && !quality && !source) return null;
+
+                    // Format the provider name for display
+                    const formatProvider = (p: string) => {
+                      if (p === 'openai') return 'OpenAI';
+                      if (p === 'flux') return 'Flux';
+                      return p;
+                    };
+
+                    // Format quality for display
+                    const formatQuality = (q: string) => {
+                      if (q === 'hd') return 'HD';
+                      if (q === 'quick') return 'Quick';
+                      if (q === 'polish') return 'Polish';
+                      if (q === 'heroic') return 'Heroic';
+                      return q;
+                    };
+
+                    return (
+                      <div className="flex items-center justify-center gap-1.5 flex-wrap pt-2">
+                        {provider && (
+                          <Badge
+                            variant="outline"
+                            className="rounded-full bg-primary/5 text-primary border-gray-200/60 dark:border-gray-700/60 px-3 py-1 text-[0.7rem] font-medium shadow-sm"
+                          >
+                            {formatProvider(provider)}
+                          </Badge>
+                        )}
+                        {quality && (
+                          <Badge
+                            variant="outline"
+                            className="rounded-full bg-card text-foreground border-gray-200/60 dark:border-gray-700/60 px-3 py-1 text-[0.7rem] font-medium shadow-sm"
+                          >
+                            {formatQuality(quality)}
+                          </Badge>
+                        )}
+                        {source && (
+                          <Badge
+                            variant="outline"
+                            className="rounded-full bg-card text-muted-foreground border-gray-200/60 dark:border-gray-700/60 px-3 py-1 text-[0.7rem] font-medium shadow-sm"
+                          >
+                            {source === 'ai' ? 'AI' : 'Uploaded'}
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {/* Refine Image Button - Only show for AI-generated images */}
                   {(() => {
                     const hasPrompt = (imageData.meta as any)?.prompt;
@@ -883,8 +1200,23 @@ export function SlideProperties() {
                           e.preventDefault();
                           e.stopPropagation();
                           console.log('Refine button clicked, opening modal');
+
+                          // Reset first to prevent appending
                           setRefineRequest('');
-                          setShowRefineModal(true);
+                          setRefineQualityLevel(0);
+
+                          // Then set the original prompt and quality level
+                          const originalPrompt = (imageData.meta as any)?.prompt || '';
+                          const originalQuality = (imageData.meta as any)?.qualityLevel;
+
+                          // Use setTimeout to ensure state is cleared before setting new values
+                          setTimeout(() => {
+                            setRefineRequest(originalPrompt);
+                            if (typeof originalQuality === 'number') {
+                              setRefineQualityLevel(originalQuality);
+                            }
+                            setShowRefineModal(true);
+                          }, 0);
                         }}
                         className="w-full inline-flex items-center gap-2"
                         disabled={imageStatus.isGenerating}
@@ -1208,38 +1540,58 @@ export function SlideProperties() {
         onClose={() => {
           setShowRefineModal(false);
           setRefineRequest('');
+          setRefineQualityLevel(0);
         }}
         size="md"
         tone="brand"
       >
-        <Modal.Header className="gap-3">
+        <Modal.Header className="gap-3 bg-transparent">
           <Modal.Title>Refine Image</Modal.Title>
           <Modal.Description>
-            Describe how you’d like to polish this background or element.
+            Describe how you'd like to polish this background or element.
           </Modal.Description>
         </Modal.Header>
 
         <Modal.Body className="space-y-4">
-          <textarea
-            value={refineRequest}
-            onChange={(e) => setRefineRequest(e.target.value)}
-            placeholder="e.g., soften the lighting, add subtle depth of field, increase vibrancy..."
-            className={cn(
-              "w-full rounded-xl border border-border/60 bg-card/80 p-3 text-sm text-foreground",
-              "focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-            )}
-            rows={4}
-            autoFocus
-          />
+          <div>
+            <Label className="text-sm text-muted-foreground mb-2 block">Refinement Prompt</Label>
+            <textarea
+              value={refineRequest}
+              onChange={(e) => setRefineRequest(e.target.value)}
+              placeholder="e.g., soften the lighting, add subtle depth of field, increase vibrancy..."
+              className={cn(
+                "w-full rounded-xl border border-border/60 bg-card/80 p-3 text-sm text-foreground",
+                "focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+              )}
+              rows={4}
+              autoFocus
+            />
+          </div>
+
+          <div className="space-y-3">
+            <Label className="text-sm text-muted-foreground">Quality</Label>
+            <QualitySlider
+              value={[refineQualityLevel]}
+              onValueChange={(value) => setRefineQualityLevel(value[0] ?? 0)}
+              options={['Fast', 'Good', 'Great', 'Premium', 'Ultimate']}
+            />
+            <p className="text-xs text-muted-foreground text-center">
+              {refineQualityLevel === 0 && 'Fireworks AI • Instant response'}
+              {refineQualityLevel === 1 && 'Fireworks AI • Better quality, auto-swaps when ready'}
+              {refineQualityLevel === 2 && 'Fireworks AI • Premium quality'}
+              {refineQualityLevel === 3 && 'Fireworks AI • Professional grade'}
+              {refineQualityLevel === 4 && 'OpenAI • Highest quality'}
+            </p>
+          </div>
 
           {imageStatus.isGenerating && (
-            <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-sm text-blue-200">
+            <div className="rounded-lg border border-primary/40 bg-primary/15 px-3 py-2 text-sm text-foreground">
               <div className="flex items-center gap-2">
-                <svg className="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg className="h-4 w-4 animate-spin text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Generating refined image... This may take 10-30 seconds.
+                <span className="font-medium">Generating refined image... This may take 10-30 seconds.</span>
               </div>
             </div>
           )}
@@ -1264,6 +1616,8 @@ export function SlideProperties() {
             onClick={() => {
               setShowRefineModal(false);
               setRefineRequest('');
+              setRefineModel('flux');
+              setRefineQualityLevel(0);
               setImageStatus({ isGenerating: false, error: null, success: null });
             }}
             disabled={imageStatus.isGenerating}

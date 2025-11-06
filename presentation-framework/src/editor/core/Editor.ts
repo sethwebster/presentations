@@ -380,13 +380,65 @@ export class Editor {
           };
 
           console.log('Saving deck:', deckId, { slides: deckToSave.slides.length });
-          
+          console.log('[Editor DEBUG] Cookies:', document.cookie);
+
+          // Try to serialize the deck - catch if too large
+          let bodyString: string;
+          try {
+            bodyString = JSON.stringify(deckToSave);
+            console.log('[Editor DEBUG] Serialized deck size:', Math.round(bodyString.length / 1024), 'KB');
+          } catch (error) {
+            if (error instanceof RangeError) {
+              console.error('[Editor] Deck too large to serialize. Checking for large assets...');
+
+              // Try to identify what's large
+              const checks = {
+                totalSlides: deckToSave.slides.length,
+                slidesWithImages: 0,
+                totalImageSize: 0,
+              };
+
+              deckToSave.slides.forEach((slide, idx) => {
+                if (slide.background && typeof slide.background === 'object' && slide.background.type === 'image') {
+                  const value = slide.background.value;
+                  if (value && typeof value === 'object' && (value as any).src) {
+                    const src = (value as any).src;
+                    if (typeof src === 'string' && src.startsWith('data:')) {
+                      checks.slidesWithImages++;
+                      checks.totalImageSize += src.length;
+                      console.log(`[Editor] Slide ${idx} has base64 image: ${Math.round(src.length / 1024)} KB`);
+                    }
+                  }
+                }
+              });
+
+              console.error('[Editor] Size check:', checks);
+
+              // Clean up state
+              this.isSaving = false;
+              this.saveAbortController = null;
+
+              // Throw a clear error - the autosave should have been triggered after image upload
+              // If we're hitting this, something went wrong with the immediate save
+              const errorMsg = `Cannot save: deck contains ${Math.round(checks.totalImageSize / 1024)} KB of embedded image data across ${checks.slidesWithImages} slide(s). This usually means the initial save after image upload/generation failed or hasn't completed yet. Please wait a moment and try again.`;
+              reject(new Error(errorMsg));
+              return;
+            }
+            throw error;
+          }
+
           const response = await fetch(`/api/editor/${deckId}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(deckToSave),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include', // Explicitly include cookies
+            body: bodyString,
             signal: abortController.signal, // Make fetch abortable
           });
+
+          console.log('[Editor DEBUG] Response status:', response.status);
+          console.log('[Editor DEBUG] Response headers:', Object.fromEntries(response.headers.entries()));
           
           // Check if aborted during fetch
           if (abortController.signal.aborted) {
@@ -399,6 +451,12 @@ export class Editor {
           
           if (!response.ok) {
             const errorText = await response.text();
+
+            // Provide a clearer message for authentication errors
+            if (response.status === 401) {
+              throw new Error('Please sign in to save your changes. Click the "Sign In" button at the top of the page.');
+            }
+
             throw new Error(`Failed to save deck: ${response.statusText} - ${errorText}`);
           }
           
@@ -1021,22 +1079,7 @@ export class Editor {
           // CRITICAL: Children have absolute positions - no conversion needed
           const updatedChildren: ElementDefinition[] = group.children.map((child, i) => {
             if (i === childIndex) {
-              // Merge bounds properly, preserving existing properties when doing partial updates
-              let mergedBounds = child.bounds;
-              if (updates.bounds) {
-                // Ensure we have a base bounds object to merge into
-                const baseBounds = child.bounds || { x: 0, y: 0, width: 100, height: 50 };
-                // Filter out undefined/null values from updates to prevent overwriting existing properties
-                const cleanBounds: any = {};
-                Object.keys(updates.bounds).forEach(key => {
-                  const value = (updates.bounds as any)[key];
-                  if (value !== undefined && value !== null) {
-                    cleanBounds[key] = value;
-                  }
-                });
-                mergedBounds = { ...baseBounds, ...cleanBounds };
-              }
-              return { ...child, ...updates, bounds: mergedBounds } as ElementDefinition;
+              return this.deepMerge(child, updates) as ElementDefinition;
             }
             return child;
           });
@@ -1207,7 +1250,7 @@ export class Editor {
       
       if (childIndex !== undefined && childIndex !== -1 && group.children) {
         const updatedChildren: ElementDefinition[] = group.children.map((child, i) =>
-          i === childIndex ? { ...child, ...updates } as ElementDefinition : child
+          i === childIndex ? this.deepMerge(child, updates) as ElementDefinition : child
         );
         
         // Recalculate group bounds from absolute positions
@@ -1317,8 +1360,8 @@ export class Editor {
         if (elementIndex !== -1) {
           return {
             ...slide,
-            elements: elements.map((el, i) => 
-              i === elementIndex ? { ...el, ...finalUpdates } as ElementDefinition : el
+            elements: elements.map((el, i) =>
+              i === elementIndex ? this.deepMerge(el, finalUpdates) as ElementDefinition : el
             ),
           };
         }
@@ -1331,7 +1374,7 @@ export class Editor {
               return {
                 ...layer,
                 elements: layer.elements.map((el, i) =>
-                  i === layerElementIndex ? { ...el, ...finalUpdates } as ElementDefinition : el
+                  i === layerElementIndex ? this.deepMerge(el, finalUpdates) as ElementDefinition : el
                 ),
               };
             }
@@ -2962,12 +3005,12 @@ export class Editor {
             slides: deck.slides.map(slide => ({
               ...slide,
               elements: slide.elements?.map(el =>
-                el.id === elementId ? { ...el, ...updates } : el
+                el.id === elementId ? this.deepMerge(el, updates) : el
               ) as ElementDefinition[] | undefined,
               layers: slide.layers?.map(layer => ({
                 ...layer,
                 elements: layer.elements.map(el =>
-                  el.id === elementId ? { ...el, ...updates } : el
+                  el.id === elementId ? this.deepMerge(el, updates) : el
                 ) as ElementDefinition[],
               })),
             })),

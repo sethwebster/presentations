@@ -96,8 +96,13 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
               const offsetX = (value as any).offsetX ?? 0;
               const offsetY = (value as any).offsetY ?? 0;
               const scale = (value as any).scale ?? 100;
+
+              // Scale offsets from slide space to thumbnail space
+              const scaledOffsetX = offsetX * scaleFactor;
+              const scaledOffsetY = offsetY * scaleFactor;
+
               const position = offsetX !== 0 || offsetY !== 0
-                ? `${offsetX}px ${offsetY}px`
+                ? `${scaledOffsetX}px ${scaledOffsetY}px`
                 : ((value as any).position || 'center');
               const fit = (value as any).fit || 'cover';
               const repeat = (value as any).repeat || 'no-repeat';
