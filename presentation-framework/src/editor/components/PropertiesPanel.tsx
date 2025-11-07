@@ -12,7 +12,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Slider } from '@/components/ui/slider';
-import { Toggle } from '@/components/ui/toggle';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
@@ -1001,43 +1000,75 @@ export function PropertiesPanel() {
                     <Label className={SECTION_HEADING}>
                       Style
                     </Label>
-                    <div className="grid grid-cols-4 gap-2">
-                      <Toggle
+                    <div className="relative h-10 flex items-center justify-center rounded-xl border bg-card/96 p-1.5 shadow-[0_10px_28px_rgba(11,16,34,0.09)] backdrop-blur-sm supports-[backdrop-filter]:bg-card/85" style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}>
+                      <button
+                        type="button"
                         aria-label="Bold"
-                        pressed={boldAll}
-                        data-indeterminate={boldSome && !boldAll ? true : undefined}
-                        onPressedChange={() => toggleBold()}
-                        className="h-9 rounded-lg text-sm font-semibold data-[state=on]:!bg-[var(--editor-accent)] data-[state=on]:!text-[var(--editor-accent-foreground)] data-[state=on]:!border-[var(--editor-accent)]"
+                        onClick={() => toggleBold()}
+                        className={`flex-1 relative z-10 flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-bold transition-all focus-visible:outline-none ${
+                          boldAll
+                            ? 'text-white shadow-[0_6px_18px_rgba(22,194,199,0.15)]'
+                            : 'text-muted-foreground hover:text-foreground/80'
+                        }`}
+                        style={{
+                          border: 'none',
+                          backgroundColor: boldAll ? 'var(--lume-primary, #16C2C7)' : 'transparent',
+                          borderRadius: '0.375rem',
+                        }}
                       >
                         B
-                      </Toggle>
-                      <Toggle
+                      </button>
+                      <button
+                        type="button"
                         aria-label="Italic"
-                        pressed={italicAll}
-                        data-indeterminate={italicSome && !italicAll ? true : undefined}
-                        onPressedChange={() => toggleItalic()}
-                        className="h-9 rounded-lg text-sm italic data-[state=on]:!bg-[var(--editor-accent)] data-[state=on]:!text-[var(--editor-accent-foreground)] data-[state=on]:!border-[var(--editor-accent)]"
+                        onClick={() => toggleItalic()}
+                        className={`flex-1 relative z-10 flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm italic transition-all focus-visible:outline-none ${
+                          italicAll
+                            ? 'text-white shadow-[0_6px_18px_rgba(22,194,199,0.15)]'
+                            : 'text-muted-foreground hover:text-foreground/80'
+                        }`}
+                        style={{
+                          border: 'none',
+                          backgroundColor: italicAll ? 'var(--lume-primary, #16C2C7)' : 'transparent',
+                          borderRadius: '0.375rem',
+                        }}
                       >
                         I
-                      </Toggle>
-                      <Toggle
+                      </button>
+                      <button
+                        type="button"
                         aria-label="Underline"
-                        pressed={underlineAll}
-                        data-indeterminate={underlineSome && !underlineAll ? true : undefined}
-                        onPressedChange={() => toggleDecoration('underline')}
-                        className="h-9 rounded-lg text-sm data-[state=on]:!bg-[var(--editor-accent)] data-[state=on]:!text-[var(--editor-accent-foreground)] data-[state=on]:!border-[var(--editor-accent)]"
+                        onClick={() => toggleDecoration('underline')}
+                        className={`flex-1 relative z-10 flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-all focus-visible:outline-none ${
+                          underlineAll
+                            ? 'text-white shadow-[0_6px_18px_rgba(22,194,199,0.15)]'
+                            : 'text-muted-foreground hover:text-foreground/80'
+                        }`}
+                        style={{
+                          border: 'none',
+                          backgroundColor: underlineAll ? 'var(--lume-primary, #16C2C7)' : 'transparent',
+                          borderRadius: '0.375rem',
+                        }}
                       >
                         <span className="underline">U</span>
-                      </Toggle>
-                      <Toggle
+                      </button>
+                      <button
+                        type="button"
                         aria-label="Strikethrough"
-                        pressed={strikethroughAll}
-                        data-indeterminate={strikethroughSome && !strikethroughAll ? true : undefined}
-                        onPressedChange={() => toggleDecoration('line-through')}
-                        className="h-9 rounded-lg text-sm data-[state=on]:!bg-[var(--editor-accent)] data-[state=on]:!text-[var(--editor-accent-foreground)] data-[state=on]:!border-[var(--editor-accent)]"
+                        onClick={() => toggleDecoration('line-through')}
+                        className={`flex-1 relative z-10 flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-all focus-visible:outline-none ${
+                          strikethroughAll
+                            ? 'text-white shadow-[0_6px_18px_rgba(22,194,199,0.15)]'
+                            : 'text-muted-foreground hover:text-foreground/80'
+                        }`}
+                        style={{
+                          border: 'none',
+                          backgroundColor: strikethroughAll ? 'var(--lume-primary, #16C2C7)' : 'transparent',
+                          borderRadius: '0.375rem',
+                        }}
                       >
                         <span style={{ textDecoration: 'line-through' }}>S</span>
-                      </Toggle>
+                      </button>
                     </div>
                   </section>
 
