@@ -18,7 +18,6 @@ export interface LumeExportResult {
 }
 
 export interface ExportEnhancements {
-  includeRsc?: boolean;
   presentationModule?: PresentationModule;
   assetsPath?: string;
 }
@@ -40,27 +39,6 @@ export async function exportSlidesAsLume(
   const pkg = createLumePackageFromSlides(slides, options);
 
   const assetEntries: LumeSerializedAssets = { ...assets };
-
-  if (enhancements.includeRsc && enhancements.presentationModule) {
-    if (typeof window !== 'undefined') {
-      console.warn('Skipping RSC payload export in browser environment. Use CLI for canonical exports.');
-    } else {
-      try {
-        const { renderDeckToRSC } = await import('../lume/rsc/renderDeck');
-
-        const rscStream = await renderDeckToRSC(enhancements.presentationModule, {
-          presentationName: options.deckId,
-          presentationTitle: options.title,
-          assetsPath: enhancements.assetsPath,
-        });
-
-        const rscBytes = await readableStreamToUint8Array(rscStream);
-        assetEntries['lume.rsc'] = rscBytes;
-      } catch (error) {
-        console.error('Failed to generate RSC payload for export:', error);
-      }
-    }
-  }
 
   const archive = await serializeLumePackage(pkg, assetEntries);
 
@@ -101,26 +79,4 @@ export function downloadLumeArchive(filename: string, archive: Uint8Array): void
 
   document.body.removeChild(anchor);
   URL.revokeObjectURL(url);
-}
-
-async function readableStreamToUint8Array(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    if (value) chunks.push(value);
-  }
-
-  const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-  const merged = new Uint8Array(totalLength);
-
-  let offset = 0;
-  for (const chunk of chunks) {
-    merged.set(chunk, offset);
-    offset += chunk.length;
-  }
-
-  return merged;
 }

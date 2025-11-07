@@ -1,29 +1,22 @@
 import type { DeckDefinition } from './types';
-import { parseDeckSummaryFromText } from '../lume/rsc/parseSummary';
 
 export async function fetchDeckDefinition(url: string): Promise<DeckDefinition> {
   const response = await fetch(url, {
     headers: {
-      Accept: 'text/x-component, application/json',
+      Accept: 'application/json',
     },
     credentials: 'include', // Include cookies for authentication
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch RSC payload: ${response.status}`);
+    throw new Error(`Failed to fetch deck definition: ${response.status}`);
   }
 
-  const contentType = response.headers.get('content-type') ?? '';
-  if (contentType.includes('application/json')) {
-    const json = await response.json();
-    if (json && typeof json === 'object' && 'meta' in json && 'slides' in json) {
-      return json as DeckDefinition;
-    }
-    throw new Error('Invalid deck definition JSON fallback');
+  const json = await response.json();
+  if (json && typeof json === 'object' && 'meta' in json && 'slides' in json) {
+    return json as DeckDefinition;
   }
-
-  const text = await response.text();
-  return parseDeckSummaryFromText(text);
+  throw new Error('Invalid deck definition JSON');
 }
 
 export async function fetchDeckSummary(url: string): Promise<DeckDefinition> {

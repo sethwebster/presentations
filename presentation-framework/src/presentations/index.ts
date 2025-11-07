@@ -5,7 +5,6 @@ import type { PresentationModule } from '../types/presentation';
 
 export const presentations: Record<string, () => Promise<PresentationModule>> = {
   'jsconf-rsc': () => import('./jsconf-rsc'),
-  'demo-rsc-deck': () => import('./demo-rsc'),
 };
 
 export async function loadPresentation(name: string): Promise<PresentationModule> {

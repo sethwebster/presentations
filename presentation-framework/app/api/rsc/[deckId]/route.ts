@@ -4,12 +4,7 @@ import JSZip from 'jszip';
 import { NextResponse } from 'next/server';
 import type { DeckDefinition } from '@/rsc/types';
 
-const FALLBACK_DECKS: Record<string, () => Promise<DeckDefinition>> = {
-  'demo-rsc-deck': async () => {
-    const mod = await import('@/presentations/demo-rsc');
-    return mod.deckDefinition as DeckDefinition;
-  },
-};
+const FALLBACK_DECKS: Record<string, () => Promise<DeckDefinition>> = {};
 
 type DeckRouteContext = {
   params: Promise<{ deckId: string }>;

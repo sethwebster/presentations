@@ -268,14 +268,6 @@ export interface LumePackageArchive {
    * Binary blobs keyed by archive path, ready for zipping.
    */
   files: Record<string, Uint8Array | string>;
-  /**
-   * Optional canonical React Server Components payload if present.
-   */
-  rscPayload?: Uint8Array | null;
-  /**
-   * Optional decoded deck summary derived from the RSC payload.
-   */
-  rscSummary?: DeckDefinition | null;
 }
 
 export const LUME_META_FILENAME = 'meta.json';
