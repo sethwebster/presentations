@@ -278,7 +278,20 @@ function renderTextElement(element: TextElementDefinition, _assetsBase?: string,
   const style = mergeStyles(element);
   const animationAttrs = skipCssAnimation ? null : getAnimationAttributes(element.animation);
   const className = ['rsc-text-element', animationAttrs?.className].filter(Boolean).join(' ');
-  const combinedStyle: CSSPropertiesWithVars = {
+
+  const textAlign = (element.style?.textAlign || 'left') as CSSProperties['textAlign'];
+  const justifyContent = (() => {
+    switch (textAlign) {
+      case 'center':
+        return 'center';
+      case 'right':
+        return 'flex-end';
+      default:
+        return 'flex-start';
+    }
+  })();
+
+  const containerStyle: CSSPropertiesWithVars = {
     ...style,
     ...(animationAttrs?.style ?? {}),
     // Timeline-controlled elements start hidden to avoid flash
@@ -289,11 +302,45 @@ function renderTextElement(element: TextElementDefinition, _assetsBase?: string,
     <div
       key={element.id}
       className={className}
-      style={combinedStyle}
+      style={containerStyle}
       data-element-id={element.id}
       {...(animationAttrs?.dataAttrs ?? {})}
     >
-      {element.content}
+      <div
+        style={{
+          display: 'flex',
+          height: '100%',
+          width: '100%',
+          alignItems: 'center',
+          padding: '0.5rem',
+          justifyContent,
+        }}
+      >
+        <span
+          style={{
+            display: 'block',
+            width: '100%',
+            fontSize: (element.style?.fontSize as any) || '16px',
+            fontFamily: (element.style?.fontFamily as any) || 'inherit',
+            color: (element.style?.color as any) || '#000000',
+            fontWeight: (element.style?.fontWeight as any) || 'normal',
+            fontStyle: (element.style?.fontStyle as any) || 'normal',
+            textDecorationLine: (element.style as any)?.textDecorationLine,
+            lineHeight: (element.style as any)?.lineHeight,
+            letterSpacing: (element.style as any)?.letterSpacing,
+            textShadow: (element.style as any)?.textShadow,
+            textTransform: (element.style as any)?.textTransform,
+            backgroundImage: (element.style as any)?.backgroundImage,
+            WebkitBackgroundClip: (element.style as any)?.WebkitBackgroundClip,
+            backgroundClip: (element.style as any)?.backgroundClip,
+            textAlign,
+            whiteSpace: 'pre-wrap' as const,
+            wordBreak: 'break-word' as const,
+          }}
+        >
+          {element.content || 'Text'}
+        </span>
+      </div>
     </div>
   );
 }
