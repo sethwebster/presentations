@@ -313,7 +313,7 @@ function renderTextElement(element: TextElementDefinition, _assetsBase?: string,
           height: '100%',
           width: '100%',
           alignItems: 'center',
-          padding: '0.5rem',
+          padding: '0.75rem 0.5rem',
           justifyContent,
           overflow: 'visible',
         }}
