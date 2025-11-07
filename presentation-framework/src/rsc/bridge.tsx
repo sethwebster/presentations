@@ -1063,6 +1063,15 @@ function applyStyleRecord(target: CSSPropertiesWithVars, styleRecord: Record<str
   if (typeof styleRecord.viewTransitionName === 'string') {
     (target as Record<string, unknown>).viewTransitionName = styleRecord.viewTransitionName;
   }
+
+  // Handle text decoration - prefer textDecorationLine over textDecoration
+  // If both exist, use textDecorationLine and ignore textDecoration to avoid React warning
+  if (typeof styleRecord.textDecorationLine === 'string') {
+    target.textDecorationLine = styleRecord.textDecorationLine as CSSProperties['textDecorationLine'];
+  } else if (typeof styleRecord.textDecoration === 'string') {
+    // Convert old textDecoration to textDecorationLine
+    target.textDecorationLine = styleRecord.textDecoration as CSSProperties['textDecorationLine'];
+  }
 }
 
 function resolveAssetPath(src: string, assetsBase?: string): string {
