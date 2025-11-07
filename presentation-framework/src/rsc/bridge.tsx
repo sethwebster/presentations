@@ -296,6 +296,7 @@ function renderTextElement(element: TextElementDefinition, _assetsBase?: string,
     ...(animationAttrs?.style ?? {}),
     // Timeline-controlled elements start hidden to avoid flash
     ...(skipCssAnimation && { opacity: 0 }),
+    overflow: 'visible',
   };
 
   return (
@@ -314,6 +315,7 @@ function renderTextElement(element: TextElementDefinition, _assetsBase?: string,
           alignItems: 'center',
           padding: '0.5rem',
           justifyContent,
+          overflow: 'visible',
         }}
       >
         <span
