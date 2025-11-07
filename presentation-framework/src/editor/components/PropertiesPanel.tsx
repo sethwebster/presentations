@@ -1007,7 +1007,7 @@ export function PropertiesPanel() {
                         pressed={boldAll}
                         data-indeterminate={boldSome && !boldAll ? true : undefined}
                         onPressedChange={() => toggleBold()}
-                        className="h-9 rounded-lg text-sm font-semibold data-[state=on]:bg-[var(--editor-accent)] data-[state=on]:text-[var(--editor-accent-foreground)] data-[state=on]:border-[var(--editor-accent)]"
+                        className="h-9 rounded-lg text-sm font-semibold data-[state=on]:!bg-[var(--editor-accent)] data-[state=on]:!text-[var(--editor-accent-foreground)] data-[state=on]:!border-[var(--editor-accent)]"
                       >
                         B
                       </Toggle>
@@ -1016,7 +1016,7 @@ export function PropertiesPanel() {
                         pressed={italicAll}
                         data-indeterminate={italicSome && !italicAll ? true : undefined}
                         onPressedChange={() => toggleItalic()}
-                        className="h-9 rounded-lg text-sm italic data-[state=on]:bg-[var(--editor-accent)] data-[state=on]:text-[var(--editor-accent-foreground)] data-[state=on]:border-[var(--editor-accent)]"
+                        className="h-9 rounded-lg text-sm italic data-[state=on]:!bg-[var(--editor-accent)] data-[state=on]:!text-[var(--editor-accent-foreground)] data-[state=on]:!border-[var(--editor-accent)]"
                       >
                         I
                       </Toggle>
@@ -1025,7 +1025,7 @@ export function PropertiesPanel() {
                         pressed={underlineAll}
                         data-indeterminate={underlineSome && !underlineAll ? true : undefined}
                         onPressedChange={() => toggleDecoration('underline')}
-                        className="h-9 rounded-lg text-sm data-[state=on]:bg-[var(--editor-accent)] data-[state=on]:text-[var(--editor-accent-foreground)] data-[state=on]:border-[var(--editor-accent)]"
+                        className="h-9 rounded-lg text-sm data-[state=on]:!bg-[var(--editor-accent)] data-[state=on]:!text-[var(--editor-accent-foreground)] data-[state=on]:!border-[var(--editor-accent)]"
                       >
                         <span className="underline">U</span>
                       </Toggle>
@@ -1034,7 +1034,7 @@ export function PropertiesPanel() {
                         pressed={strikethroughAll}
                         data-indeterminate={strikethroughSome && !strikethroughAll ? true : undefined}
                         onPressedChange={() => toggleDecoration('line-through')}
-                        className="h-9 rounded-lg text-sm data-[state=on]:bg-[var(--editor-accent)] data-[state=on]:text-[var(--editor-accent-foreground)] data-[state=on]:border-[var(--editor-accent)]"
+                        className="h-9 rounded-lg text-sm data-[state=on]:!bg-[var(--editor-accent)] data-[state=on]:!text-[var(--editor-accent-foreground)] data-[state=on]:!border-[var(--editor-accent)]"
                       >
                         <span style={{ textDecoration: 'line-through' }}>S</span>
                       </Toggle>
