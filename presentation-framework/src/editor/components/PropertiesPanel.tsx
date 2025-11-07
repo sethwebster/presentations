@@ -12,13 +12,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Slider } from '@/components/ui/slider';
-import { Toggle } from '@/components/ui/toggle';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '@/components/ui/panel';
 import { Select } from '@/components/ui/select';
 import { ColorInput } from '@/components/ui/color-input';
 import { Button } from '@/components/ui/button';
+import { FontPicker } from './FontPicker';
+import { extractFontId } from '@/lib/fonts';
 
 type TextStyleUpdate = {
   style?: Record<string, any> | null;
@@ -476,16 +477,17 @@ export function PropertiesPanel() {
       const isBold =
         weight === 'bold' ||
         weight === '700' ||
+        weight === 700 ||
         (typeof weight === 'number' && weight >= 600) ||
         (!weight && boldAll);
-      return { style: { fontWeight: isBold ? undefined : '700' } };
+      return { style: { fontWeight: isBold ? 'normal' : 'bold' } };
     });
   }, [applyTextStyle, boldAll]);
 
   const toggleItalic = useCallback(() => {
     applyTextStyle(({ style }) => {
       const isItalic = style.fontStyle === 'italic';
-      return { style: { fontStyle: isItalic ? undefined : 'italic' } };
+      return { style: { fontStyle: isItalic ? 'normal' : 'italic' } };
     });
   }, [applyTextStyle]);
 
@@ -499,11 +501,10 @@ export function PropertiesPanel() {
         } else {
           parts.add(token);
         }
-        const nextValue = parts.size > 0 ? Array.from(parts).join(' ') : undefined;
+        const nextValue = parts.size > 0 ? Array.from(parts).join(' ') : 'none';
         return {
           style: {
             textDecorationLine: nextValue,
-            textDecoration: nextValue,
           },
         };
       });
@@ -963,32 +964,10 @@ export function PropertiesPanel() {
                     <Label className={SECTION_HEADING}>
                       Font
                     </Label>
-                    <Select
-                      value={sharedFontFamily.mixed ? '__mixed__' : (sharedFontFamily.value as string) ?? 'inherit'}
-                      onChange={(e) => {
-                        if (e.target.value === '__mixed__') return;
-                        setFontFamily(e.target.value);
-                      }}
-                    >
-                      {sharedFontFamily.mixed && (
-                        <option value="__mixed__" disabled>
-                          Mixed fonts
-                        </option>
-                      )}
-                      <option value="inherit">System Default</option>
-                      <option value="Arial, sans-serif">Arial</option>
-                      <option value="Helvetica, sans-serif">Helvetica</option>
-                      <option value="'Times New Roman', serif">Times New Roman</option>
-                      <option value="Georgia, serif">Georgia</option>
-                      <option value="'Courier New', monospace">Courier New</option>
-                      <option value="Verdana, sans-serif">Verdana</option>
-                      <option value="Tahoma, sans-serif">Tahoma</option>
-                      <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
-                      <option value="'Palatino Linotype', serif">Palatino</option>
-                      <option value="'Comic Sans MS', cursive">Comic Sans</option>
-                      <option value="Impact, sans-serif">Impact</option>
-                      <option value="'Lucida Console', monospace">Lucida Console</option>
-                    </Select>
+                    <FontPicker
+                      value={extractFontId(sharedFontFamily.value as string)}
+                      onChange={(fontId) => setFontFamily(fontId)}
+                    />
                   </section>
 
                   <section className="space-y-3">
@@ -1021,47 +1000,75 @@ export function PropertiesPanel() {
                     <Label className={SECTION_HEADING}>
                       Style
                     </Label>
-                    <div className="grid grid-cols-4 gap-2">
-                      <Toggle
+                    <div className="relative h-10 flex items-center justify-center rounded-xl border bg-card/96 p-1.5 shadow-[0_10px_28px_rgba(11,16,34,0.09)] backdrop-blur-sm supports-[backdrop-filter]:bg-card/85" style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}>
+                      <button
+                        type="button"
                         aria-label="Bold"
-                        pressed={boldAll}
-                        data-indeterminate={boldSome && !boldAll ? true : undefined}
-                        onPressedChange={() => toggleBold()}
-                        className="h-9 rounded-lg text-sm font-semibold"
-                        style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}
+                        onClick={() => toggleBold()}
+                        className={`flex-1 relative z-10 flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-bold transition-all focus-visible:outline-none ${
+                          boldAll
+                            ? 'text-white shadow-[0_6px_18px_rgba(22,194,199,0.15)]'
+                            : 'text-muted-foreground hover:text-foreground/80'
+                        }`}
+                        style={{
+                          border: 'none',
+                          backgroundColor: boldAll ? 'var(--lume-primary, #16C2C7)' : 'transparent',
+                          borderRadius: '0.375rem',
+                        }}
                       >
                         B
-                      </Toggle>
-                      <Toggle
+                      </button>
+                      <button
+                        type="button"
                         aria-label="Italic"
-                        pressed={italicAll}
-                        data-indeterminate={italicSome && !italicAll ? true : undefined}
-                        onPressedChange={() => toggleItalic()}
-                        className="h-9 rounded-lg text-sm italic"
-                        style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}
+                        onClick={() => toggleItalic()}
+                        className={`flex-1 relative z-10 flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm italic transition-all focus-visible:outline-none ${
+                          italicAll
+                            ? 'text-white shadow-[0_6px_18px_rgba(22,194,199,0.15)]'
+                            : 'text-muted-foreground hover:text-foreground/80'
+                        }`}
+                        style={{
+                          border: 'none',
+                          backgroundColor: italicAll ? 'var(--lume-primary, #16C2C7)' : 'transparent',
+                          borderRadius: '0.375rem',
+                        }}
                       >
                         I
-                      </Toggle>
-                      <Toggle
+                      </button>
+                      <button
+                        type="button"
                         aria-label="Underline"
-                        pressed={underlineAll}
-                        data-indeterminate={underlineSome && !underlineAll ? true : undefined}
-                        onPressedChange={() => toggleDecoration('underline')}
-                        className="h-9 rounded-lg text-sm"
-                        style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}
+                        onClick={() => toggleDecoration('underline')}
+                        className={`flex-1 relative z-10 flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-all focus-visible:outline-none ${
+                          underlineAll
+                            ? 'text-white shadow-[0_6px_18px_rgba(22,194,199,0.15)]'
+                            : 'text-muted-foreground hover:text-foreground/80'
+                        }`}
+                        style={{
+                          border: 'none',
+                          backgroundColor: underlineAll ? 'var(--lume-primary, #16C2C7)' : 'transparent',
+                          borderRadius: '0.375rem',
+                        }}
                       >
                         <span className="underline">U</span>
-                      </Toggle>
-                      <Toggle
+                      </button>
+                      <button
+                        type="button"
                         aria-label="Strikethrough"
-                        pressed={strikethroughAll}
-                        data-indeterminate={strikethroughSome && !strikethroughAll ? true : undefined}
-                        onPressedChange={() => toggleDecoration('line-through')}
-                        className="h-9 rounded-lg text-sm"
-                        style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}
+                        onClick={() => toggleDecoration('line-through')}
+                        className={`flex-1 relative z-10 flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-all focus-visible:outline-none ${
+                          strikethroughAll
+                            ? 'text-white shadow-[0_6px_18px_rgba(22,194,199,0.15)]'
+                            : 'text-muted-foreground hover:text-foreground/80'
+                        }`}
+                        style={{
+                          border: 'none',
+                          backgroundColor: strikethroughAll ? 'var(--lume-primary, #16C2C7)' : 'transparent',
+                          borderRadius: '0.375rem',
+                        }}
                       >
                         <span style={{ textDecoration: 'line-through' }}>S</span>
-                      </Toggle>
+                      </button>
                     </div>
                   </section>
 

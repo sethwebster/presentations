@@ -8,6 +8,8 @@ import { useEditor, useEditorInstance } from '../hooks/useEditor';
 import { AlignmentTools } from './AlignmentTools';
 import { ImageBackgroundModal } from './ImageBackgroundModal';
 import { RefinePanel } from './RefinePanel';
+import { FontPickerCompact } from './FontPicker';
+import { extractFontId } from '@/lib/fonts';
 import { useImageLibrary } from '../hooks/useImageLibrary';
 import type { ImageLibraryItem } from '@/editor/types/imageLibrary';
 import { getImageGenerationService } from '../services/ImageGenerationService';
@@ -1451,7 +1453,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       {/* Insert Tools */}
       <div className="flex items-center gap-2 pr-4 mr-2 border-r" style={{ borderRightColor: 'rgba(148, 163, 184, 0.2)' }}>
         <ToolbarButton 
-          title="Insert Text" 
+          title="Insert Text"
           onClick={() => {
             editor.addElement({
               id: `text-${Date.now()}`,
@@ -1461,7 +1463,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
               style: {
                 fontSize: '24px',
                 color: '#000000',
-                fontFamily: 'inherit',
+                fontFamily: 'inter', // Default to Inter font
               },
             }, currentSlideIndex);
           }}
@@ -1552,53 +1554,210 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
       {/* Format Tools */}
       {selectedElementIds.size > 0 && (
         <div className="flex items-center gap-2 pr-4 mr-2 border-r" style={{ borderRightColor: 'rgba(148, 163, 184, 0.2)' }}>
-          <ToolbarButton title="Bold" onClick={() => {
+          {/* Font Picker */}
+          {(() => {
             const deck = state.deck;
             const currentSlide = deck?.slides[currentSlideIndex];
-            if (!currentSlide) return;
-            
+            if (!currentSlide) return null;
+
             const allElements = [
               ...(currentSlide.elements || []),
               ...(currentSlide.layers?.flatMap(l => l.elements) || []),
             ];
-            
-            selectedElementIds.forEach((id) => {
-              const element = allElements.find(el => el.id === id);
-              if (element && element.type === 'text') {
-                const currentWeight = (element.style as any)?.fontWeight || 'normal';
-                editor.updateElement(id, {
-                  style: { ...element.style, fontWeight: currentWeight === 'bold' ? 'normal' : 'bold' },
-                });
-              }
-            });
-          }}>
-            <strong style={{ fontSize: '14px' }}>B</strong>
-          </ToolbarButton>
-          <ToolbarButton title="Italic" onClick={() => {
+
+            // Get the first selected text element's font
+            const firstTextElement = Array.from(selectedElementIds)
+              .map(id => allElements.find(el => el.id === id))
+              .find(el => el && el.type === 'text');
+
+            const currentFontFamily = firstTextElement?.style?.fontFamily as string | undefined;
+            const currentFont = extractFontId(currentFontFamily);
+
+            return (
+              <FontPickerCompact
+                value={currentFont}
+                onChange={(fontId) => {
+                  selectedElementIds.forEach((id) => {
+                    const element = allElements.find(el => el.id === id);
+                    if (element && element.type === 'text') {
+                      editor.updateElement(id, {
+                        style: { ...element.style, fontFamily: fontId },
+                      });
+                    }
+                  });
+                }}
+              />
+            );
+          })()}
+
+          {(() => {
             const deck = state.deck;
             const currentSlide = deck?.slides[currentSlideIndex];
-            if (!currentSlide) return;
-            
+            if (!currentSlide) return null;
+
             const allElements = [
               ...(currentSlide.elements || []),
               ...(currentSlide.layers?.flatMap(l => l.elements) || []),
             ];
-            
-            selectedElementIds.forEach((id) => {
-              const element = allElements.find(el => el.id === id);
-              if (element && element.type === 'text') {
-                const currentStyle = (element.style as any)?.fontStyle || 'normal';
-                editor.updateElement(id, {
-                  style: { ...element.style, fontStyle: currentStyle === 'italic' ? 'normal' : 'italic' },
-                });
-              }
-            });
-          }}>
-            <em style={{ fontSize: '14px' }}>I</em>
-          </ToolbarButton>
+
+            // Get first selected text element to determine button states
+            const firstTextElement = Array.from(selectedElementIds)
+              .map(id => allElements.find(el => el.id === id))
+              .find(el => el && el.type === 'text');
+
+            const isBold = firstTextElement?.style?.fontWeight === 'bold' || firstTextElement?.style?.fontWeight === 700;
+            const isItalic = firstTextElement?.style?.fontStyle === 'italic';
+
+            return (
+              <>
+                <ToolbarButton
+                  title="Bold"
+                  pressed={isBold}
+                  onClick={() => {
+                    selectedElementIds.forEach((id) => {
+                      const element = allElements.find(el => el.id === id);
+                      if (element && element.type === 'text') {
+                        const currentWeight = (element.style as any)?.fontWeight || 'normal';
+                        const newWeight = (currentWeight === 'bold' || currentWeight === 700) ? 'normal' : 'bold';
+                        editor.updateElement(id, {
+                          style: { ...element.style, fontWeight: newWeight },
+                        });
+                      }
+                    });
+                  }}
+                >
+                  <strong style={{ fontSize: '14px' }}>B</strong>
+                </ToolbarButton>
+                <ToolbarButton
+                  title="Italic"
+                  pressed={isItalic}
+                  onClick={() => {
+                    selectedElementIds.forEach((id) => {
+                      const element = allElements.find(el => el.id === id);
+                      if (element && element.type === 'text') {
+                        const currentStyle = (element.style as any)?.fontStyle || 'normal';
+                        const newStyle = currentStyle === 'italic' ? 'normal' : 'italic';
+                        editor.updateElement(id, {
+                          style: { ...element.style, fontStyle: newStyle },
+                        });
+                      }
+                    });
+                  }}
+                >
+                  <em style={{ fontSize: '14px' }}>I</em>
+                </ToolbarButton>
+                <ToolbarButton
+                  title="Underline"
+                  pressed={(() => {
+                    const deck = state.deck;
+                    const currentSlide = deck?.slides[currentSlideIndex];
+                    if (!currentSlide) return false;
+
+                    const allElements = [
+                      ...(currentSlide.elements || []),
+                      ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+                    ];
+
+                    const firstTextElement = Array.from(selectedElementIds)
+                      .map(id => allElements.find(el => el.id === id))
+                      .find(el => el && el.type === 'text');
+
+                    const decoration = String(firstTextElement?.style?.textDecoration || firstTextElement?.style?.textDecorationLine || '');
+                    return decoration.includes('underline');
+                  })()}
+                  onClick={() => {
+                    const deck = state.deck;
+                    const currentSlide = deck?.slides[currentSlideIndex];
+                    if (!currentSlide) return;
+
+                    const allElements = [
+                      ...(currentSlide.elements || []),
+                      ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+                    ];
+
+                    selectedElementIds.forEach((id) => {
+                      const element = allElements.find(el => el.id === id);
+                      if (element && element.type === 'text') {
+                        const currentDecoration = (element.style as any)?.textDecoration || (element.style as any)?.textDecorationLine || '';
+                        const decorations = new Set(currentDecoration.split(/\s+/).filter(Boolean));
+
+                        if (decorations.has('underline')) {
+                          decorations.delete('underline');
+                        } else {
+                          decorations.add('underline');
+                        }
+
+                        const newDecoration = Array.from(decorations).join(' ') || 'none';
+                        // Remove old textDecoration property to avoid conflicts
+                        const newStyle = { ...element.style };
+                        delete newStyle.textDecoration;
+                        newStyle.textDecorationLine = newDecoration;
+                        editor.updateElement(id, { style: newStyle });
+                      }
+                    });
+                  }}
+                >
+                  <span style={{ fontSize: '14px', textDecoration: 'underline' }}>U</span>
+                </ToolbarButton>
+                <ToolbarButton
+                  title="Strikethrough"
+                  pressed={(() => {
+                    const deck = state.deck;
+                    const currentSlide = deck?.slides[currentSlideIndex];
+                    if (!currentSlide) return false;
+
+                    const allElements = [
+                      ...(currentSlide.elements || []),
+                      ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+                    ];
+
+                    const firstTextElement = Array.from(selectedElementIds)
+                      .map(id => allElements.find(el => el.id === id))
+                      .find(el => el && el.type === 'text');
+
+                    const decoration = String(firstTextElement?.style?.textDecoration || firstTextElement?.style?.textDecorationLine || '');
+                    return decoration.includes('line-through');
+                  })()}
+                  onClick={() => {
+                    const deck = state.deck;
+                    const currentSlide = deck?.slides[currentSlideIndex];
+                    if (!currentSlide) return;
+
+                    const allElements = [
+                      ...(currentSlide.elements || []),
+                      ...(currentSlide.layers?.flatMap(l => l.elements) || []),
+                    ];
+
+                    selectedElementIds.forEach((id) => {
+                      const element = allElements.find(el => el.id === id);
+                      if (element && element.type === 'text') {
+                        const currentDecoration = (element.style as any)?.textDecoration || (element.style as any)?.textDecorationLine || '';
+                        const decorations = new Set(currentDecoration.split(/\s+/).filter(Boolean));
+
+                        if (decorations.has('line-through')) {
+                          decorations.delete('line-through');
+                        } else {
+                          decorations.add('line-through');
+                        }
+
+                        const newDecoration = Array.from(decorations).join(' ') || 'none';
+                        // Remove old textDecoration property to avoid conflicts
+                        const newStyle = { ...element.style };
+                        delete newStyle.textDecoration;
+                        newStyle.textDecorationLine = newDecoration;
+                        editor.updateElement(id, { style: newStyle });
+                      }
+                    });
+                  }}
+                >
+                  <span style={{ fontSize: '14px', textDecoration: 'line-through' }}>S</span>
+                </ToolbarButton>
+              </>
+            );
+          })()}
         </div>
       )}
-      
+
       {/* Text Alignment Tools */}
       {selectedElementIds.size > 0 && (
         <div className="flex items-center gap-2 pr-4 mr-2 border-r" style={{ borderRightColor: 'rgba(148, 163, 184, 0.2)' }}>

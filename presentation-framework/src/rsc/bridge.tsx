@@ -176,7 +176,7 @@ function renderSlide(slide: SlideDefinition, assetsBase?: string, timelineTarget
 
   const slideStyle: CSSProperties = {
     position: 'relative',
-    overflow: 'hidden',
+    overflow: 'visible',
     ...(backgroundValue ? { background: backgroundValue } : {}),
   };
   // Don't set viewTransitionName here - it's set by SlideViewTransition wrapper in Presentation.tsx
@@ -278,22 +278,71 @@ function renderTextElement(element: TextElementDefinition, _assetsBase?: string,
   const style = mergeStyles(element);
   const animationAttrs = skipCssAnimation ? null : getAnimationAttributes(element.animation);
   const className = ['rsc-text-element', animationAttrs?.className].filter(Boolean).join(' ');
-  const combinedStyle: CSSPropertiesWithVars = {
+
+  const textAlign = (element.style?.textAlign || 'left') as CSSProperties['textAlign'];
+  const justifyContent = (() => {
+    switch (textAlign) {
+      case 'center':
+        return 'center';
+      case 'right':
+        return 'flex-end';
+      default:
+        return 'flex-start';
+    }
+  })();
+
+  const containerStyle: CSSPropertiesWithVars = {
     ...style,
     ...(animationAttrs?.style ?? {}),
     // Timeline-controlled elements start hidden to avoid flash
     ...(skipCssAnimation && { opacity: 0 }),
+    overflow: 'visible',
   };
 
   return (
     <div
       key={element.id}
       className={className}
-      style={combinedStyle}
+      style={containerStyle}
       data-element-id={element.id}
       {...(animationAttrs?.dataAttrs ?? {})}
     >
-      {element.content}
+      <div
+        style={{
+          display: 'flex',
+          height: '100%',
+          width: '100%',
+          alignItems: 'center',
+          padding: '0.75rem 0.5rem',
+          justifyContent,
+          overflow: 'visible',
+        }}
+      >
+        <span
+          style={{
+            display: 'block',
+            width: '100%',
+            fontSize: (element.style?.fontSize as any) || '16px',
+            fontFamily: (element.style?.fontFamily as any) || 'inherit',
+            color: (element.style?.color as any) || '#000000',
+            fontWeight: (element.style?.fontWeight as any) || 'normal',
+            fontStyle: (element.style?.fontStyle as any) || 'normal',
+            textDecorationLine: (element.style as any)?.textDecorationLine,
+            lineHeight: (element.style as any)?.lineHeight,
+            letterSpacing: (element.style as any)?.letterSpacing,
+            textShadow: (element.style as any)?.textShadow,
+            textTransform: (element.style as any)?.textTransform,
+            backgroundImage: (element.style as any)?.backgroundImage,
+            WebkitBackgroundClip: (element.style as any)?.WebkitBackgroundClip,
+            backgroundClip: (element.style as any)?.backgroundClip,
+            textAlign,
+            whiteSpace: 'pre-wrap' as const,
+            wordBreak: 'break-word' as const,
+          }}
+        >
+          {element.content || 'Text'}
+        </span>
+      </div>
     </div>
   );
 }
@@ -961,7 +1010,17 @@ function applyStyleRecord(target: CSSPropertiesWithVars, styleRecord: Record<str
     target.fontSize = styleRecord.fontSize;
   }
   if (typeof styleRecord.fontFamily === 'string') {
-    target.fontFamily = styleRecord.fontFamily;
+    // Check if it's a font ID from our registry (format: font-id like 'inter', 'roboto', etc.)
+    // If so, convert to CSS variable. Otherwise, use as-is.
+    const fontFamily = styleRecord.fontFamily;
+
+    // Skip if already a CSS variable or full font-family value
+    if (fontFamily.startsWith('var(') || fontFamily.includes(',')) {
+      target.fontFamily = fontFamily;
+    } else {
+      // Convert font ID to CSS variable
+      target.fontFamily = `var(--font-${fontFamily})`;
+    }
   }
   if (typeof styleRecord.fontStyle === 'string') {
     target.fontStyle = styleRecord.fontStyle as CSSProperties['fontStyle'];
@@ -1052,6 +1111,15 @@ function applyStyleRecord(target: CSSPropertiesWithVars, styleRecord: Record<str
   }
   if (typeof styleRecord.viewTransitionName === 'string') {
     (target as Record<string, unknown>).viewTransitionName = styleRecord.viewTransitionName;
+  }
+
+  // Handle text decoration - prefer textDecorationLine over textDecoration
+  // If both exist, use textDecorationLine and ignore textDecoration to avoid React warning
+  if (typeof styleRecord.textDecorationLine === 'string') {
+    target.textDecorationLine = styleRecord.textDecorationLine as CSSProperties['textDecorationLine'];
+  } else if (typeof styleRecord.textDecoration === 'string') {
+    // Convert old textDecoration to textDecorationLine
+    target.textDecorationLine = styleRecord.textDecoration as CSSProperties['textDecorationLine'];
   }
 }
 
@@ -1484,6 +1552,18 @@ function applyAnimationParameters(
   if (type === 'color-change') {
     const hueRotation = typeof parameters.hueRotation === 'number' ? parameters.hueRotation : 360;
     style['--rsc-hue-rotation'] = `${hueRotation}deg`;
+    return;
+  }
+
+  // Typewriter - character by character reveal
+  if (type === 'typewriter') {
+    // Calculate character count for steps() timing function
+    const charCount = typeof parameters.charCount === 'number' ? parameters.charCount : 30;
+    style['--rsc-char-count'] = charCount;
+    // Add required styles for typewriter effect
+    style.overflow = 'hidden';
+    style.whiteSpace = 'nowrap';
+    style.animationTimingFunction = `steps(${charCount}, end)`;
     return;
   }
 

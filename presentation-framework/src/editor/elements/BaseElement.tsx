@@ -425,14 +425,24 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
   if (filter !== undefined) outerStyle.filter = filter;
 
   // Extract background-related styles from visualStyles to prevent conflicts with shape fills
-  const { background, backgroundColor, ...otherVisualStyles } = visualStyles as any;
-  
+  const { background, backgroundColor, textDecoration, ...otherVisualStyles } = visualStyles as any;
+
+  // Clean up text decoration - use textDecorationLine if it exists, otherwise convert textDecoration
+  const cleanVisualStyles = { ...otherVisualStyles };
+  if (cleanVisualStyles.textDecorationLine) {
+    // Already has textDecorationLine, ensure textDecoration is not present
+    delete cleanVisualStyles.textDecoration;
+  } else if (textDecoration && !cleanVisualStyles.textDecorationLine) {
+    // Has old textDecoration but no textDecorationLine - convert it
+    cleanVisualStyles.textDecorationLine = textDecoration;
+  }
+
   const contentStyle: React.CSSProperties = {
     width: '100%',
     height: '100%',
     opacity: opacityValue,
     // Don't include background/backgroundColor in contentStyle - let shape elements handle their own backgrounds
-    ...otherVisualStyles,
+    ...cleanVisualStyles,
   };
   
   return (

@@ -25,8 +25,8 @@ export function TextElementContent({ element }: { element: ElementDefinition }) 
 
   return (
     <div
-      className="flex h-full w-full items-center p-2"
-      style={{ justifyContent }}
+      className="flex h-full w-full items-center"
+      style={{ justifyContent, padding: '0.75rem 0.5rem' }}
     >
       <span
         style={{

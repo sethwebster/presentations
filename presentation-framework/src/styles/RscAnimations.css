@@ -436,14 +436,7 @@
   }
 }
 
-@keyframes rsc-typewriter {
-  0% {
-    clip-path: inset(0 100% 0 0);
-  }
-  100% {
-    clip-path: inset(0 0 0 0);
-  }
-}
+/* Removed - replaced with better character-by-character version below */
 
 /* =============================================================================
    3D SLIDE TRANSITIONS
@@ -1269,5 +1262,21 @@
   100% {
     opacity: 1;
     transform: translate(0px, 0px) scale(1);
+  }
+}
+
+/* =============================================================================
+   TEXT-SPECIFIC ANIMATIONS
+   ============================================================================= */
+
+/* Typewriter - Character by character reveal (spy movie style)
+   Reveals text character-by-character using width animation with steps()
+   The bridge applies overflow:hidden, white-space:nowrap, and steps() timing */
+@keyframes rsc-typewriter {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
   }
 }
