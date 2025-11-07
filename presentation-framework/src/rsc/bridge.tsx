@@ -176,7 +176,7 @@ function renderSlide(slide: SlideDefinition, assetsBase?: string, timelineTarget
 
   const slideStyle: CSSProperties = {
     position: 'relative',
-    overflow: 'hidden',
+    overflow: 'visible',
     ...(backgroundValue ? { background: backgroundValue } : {}),
   };
   // Don't set viewTransitionName here - it's set by SlideViewTransition wrapper in Presentation.tsx
