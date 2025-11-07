@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { AIPresentationWizard } from '@/components/ai/AIPresentationWizard';
+import { StudioWizard } from '../../../src/components/studio/StudioWizard';
 import {
   NewPresentationModal,
   AuthWarningBanner,
@@ -25,6 +26,7 @@ export default function EditorPage() {
   const deckId = params?.deckId;
   const [showNewModal, setShowNewModal] = useState(deckId === 'new');
   const [showAIWizard, setShowAIWizard] = useState(false);
+  const [showStudioWizard, setShowStudioWizard] = useState(false);
   const [showAuthWarning, setShowAuthWarning] = useState(false);
 
   // Check authentication status
@@ -51,6 +53,11 @@ export default function EditorPage() {
     setShowAIWizard(true);
   };
 
+  const handleBuildWithStudio = () => {
+    setShowNewModal(false);
+    setShowStudioWizard(true);
+  };
+
   if (!deckId) {
     return null;
   }
@@ -62,11 +69,12 @@ export default function EditorPage() {
         <NewPresentationModal
           onStartFromScratch={handleStartFromScratch}
           onBuildWithAI={handleBuildWithAI}
+          onBuildWithStudio={handleBuildWithStudio}
           onClose={() => router.push('/account')}
         />
       )}
 
-      {/* AI Wizard */}
+      {/* AI Wizard (Conversational) */}
       {showAIWizard && (
         <AIPresentationWizard
           onCancel={() => {
@@ -80,8 +88,22 @@ export default function EditorPage() {
         />
       )}
 
+      {/* Studio Wizard (Award-Quality) */}
+      {showStudioWizard && (
+        <StudioWizard
+          onComplete={(deckId: string) => {
+            setShowStudioWizard(false);
+            router.push(`/editor/${deckId}`);
+          }}
+          onCancel={() => {
+            setShowStudioWizard(false);
+            router.push('/account');
+          }}
+        />
+      )}
+
       {/* Authentication Warning Banner */}
-      {showAuthWarning && !showNewModal && !showAIWizard && (
+      {showAuthWarning && !showNewModal && !showAIWizard && !showStudioWizard && (
         <AuthWarningBanner
           deckId={deckId}
           onSignIn={() => router.push(`/auth/signin?callbackUrl=/editor/${deckId}`)}
