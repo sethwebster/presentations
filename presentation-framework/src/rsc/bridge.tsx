@@ -1555,6 +1555,18 @@ function applyAnimationParameters(
     return;
   }
 
+  // Typewriter - character by character reveal
+  if (type === 'typewriter') {
+    // Calculate character count for steps() timing function
+    const charCount = typeof parameters.charCount === 'number' ? parameters.charCount : 30;
+    style['--rsc-char-count'] = charCount;
+    // Add required styles for typewriter effect
+    style.overflow = 'hidden';
+    style.whiteSpace = 'nowrap';
+    style.animationTimingFunction = `steps(${charCount}, end)`;
+    return;
+  }
+
   // Slide transitions
   if (type === 'door') {
     const doorAngle = typeof parameters.doorAngle === 'number' ? parameters.doorAngle : 90;
