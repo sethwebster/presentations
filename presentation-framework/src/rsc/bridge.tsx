@@ -208,30 +208,28 @@ function renderSlide(slide: SlideDefinition, assetsBase?: string, timelineTarget
 }
 
 function extractLayerList(slide: SlideDefinition): LayerDefinition[] {
-  // First, check if inline elements exist (elements added directly to slide)
+  const layers: LayerDefinition[] = [];
+
+  // First, add inline elements as a layer with order -1 (renders below all other layers)
   const inlineElements = (slide as SlideDefinition & { elements?: ElementDefinition[] }).elements;
   if (Array.isArray(inlineElements) && inlineElements.length > 0) {
-    return [
-      {
-        id: `${slide.id}-layer`,
-        order: 0,
-        elements: inlineElements,
-      },
-    ];
+    layers.push({
+      id: `${slide.id}-inline-layer`,
+      order: -1, // Render before layers (lower order = render first/bottom)
+      elements: inlineElements,
+    });
   }
 
-  // If no inline elements, check layers
+  // Then, add all actual layers (sorted by order will happen in renderSlide)
   if (Array.isArray(slide.layers)) {
-    // Filter to only layers that have elements
-    const layersWithElements = slide.layers.filter(layer => 
+    const layersWithElements = slide.layers.filter(layer =>
       Array.isArray(layer.elements) && layer.elements.length > 0
     );
-    if (layersWithElements.length > 0) {
-      return layersWithElements;
-    }
+    layers.push(...layersWithElements);
   }
 
-  return [];
+  // Sort by order (lower order = render first/bottom, higher order = render last/top)
+  return layers.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
 function renderLayer(layer: LayerDefinition, assetsBase?: string, timelineTargets?: Set<string>): ReactNode {
@@ -702,6 +700,7 @@ function renderMediaElement(element: MediaElementDefinition, assetsBase?: string
     ...style,
     ...(animationAttrs?.style ?? {}),
     ...(skipCssAnimation && { opacity: 0 }),
+    pointerEvents: 'auto', // Restore pointer events (layer has pointer-events: none)
   };
   const resolvedSrc = resolveAssetPath(element.src, assetsBase);
 

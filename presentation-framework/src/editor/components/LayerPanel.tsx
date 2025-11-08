@@ -982,7 +982,11 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
             onReorder={(fromIndex, toIndex) => {
               const elementId = allElements[fromIndex]?.element.id;
               if (elementId) {
-                editor.reorderElement(elementId, toIndex);
+                // Convert reversed UI index to rendering index
+                // In UI: index 0 = top (renders last), index N = bottom (renders first)
+                // In rendering: index 0 = bottom (renders first), index N = top (renders last)
+                const renderingIndex = allElements.length - 1 - toIndex;
+                editor.reorderElement(elementId, renderingIndex);
               }
             }}
             enableNesting={false}

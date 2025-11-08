@@ -100,9 +100,11 @@ export function SlideCanvas({
   };
 
   // Get all elements from the slide
+  // Sort layers by their order property (lower order = render first/bottom, higher order = render last/top)
+  const sortedLayers = (slide.layers || []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const allElements = [
     ...(slide.elements || []),
-    ...(slide.layers?.flatMap(l => l.elements) || []),
+    ...sortedLayers.flatMap(l => l.elements),
   ];
 
   return (
