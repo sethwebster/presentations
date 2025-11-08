@@ -35,6 +35,7 @@ export type DesignPlanItem = {
   accent_color: string; // hex
   animation: "fade-up" | "fade-in" | "slide-in-right" | "slide-in-left" | "flip" | "zoom-in";
   image_prompt: string;
+  decorative_elements: string; // Description of shapes/geometric elements to render
   design_comment: string;
 };
 export type DesignPlan = {
@@ -48,6 +49,7 @@ export type DeckSlide = {
   title: string;
   content: string[];
   image_prompt: string;
+  decorative_elements: string;
   animation: DesignPlanItem["animation"];
   background: DesignPlanItem["background"];
   colors: { bg: string; accent: string; text: string };
@@ -170,6 +172,7 @@ export const DesignPlanSchema: JSONSchemaType<DesignPlan> = {
           "animation",
           "design_comment",
           "image_prompt",
+          "decorative_elements",
         ],
         properties: {
           slide_number: { type: "integer", minimum: 1 },
@@ -184,6 +187,7 @@ export const DesignPlanSchema: JSONSchemaType<DesignPlan> = {
             enum: ["fade-up", "fade-in", "slide-in-right", "slide-in-left", "flip", "zoom-in"],
           },
           image_prompt: { type: "string" },
+          decorative_elements: { type: "string" },
           design_comment: { type: "string", minLength: 10 },
         },
       },
@@ -223,6 +227,7 @@ export const DeckSchema: JSONSchemaType<Deck> = {
               "colors",
               "duration_seconds",
               "image_prompt",
+              "decorative_elements",
               "notes",
             ],
             properties: {
@@ -235,6 +240,7 @@ export const DeckSchema: JSONSchemaType<Deck> = {
               title: { type: "string" },
               content: { type: "array", items: { type: "string" } },
               image_prompt: { type: "string" },
+              decorative_elements: { type: "string" },
               animation: {
                 type: "string",
                 enum: ["fade-up", "fade-in", "slide-in-right", "slide-in-left", "flip", "zoom-in"],

@@ -5,10 +5,11 @@ import { useSaveManager } from '../hooks/useSaveManager';
 
 interface StatusBarProps {
   deckId: string;
+  onToggleSpeakerNotes?: () => void;
 }
 
 // eslint-disable-next-line no-unused-vars
-export function StatusBar({ deckId: _deckId }: StatusBarProps) {
+export function StatusBar({ deckId: _deckId, onToggleSpeakerNotes }: StatusBarProps) {
   const state = useEditor();
   
   // Pure UI: just observe save status from the service
@@ -43,6 +44,24 @@ export function StatusBar({ deckId: _deckId }: StatusBarProps) {
     <div className="flex h-[26px] select-none items-center border-t bg-card/80 px-3 text-[11px] font-mono text-muted-foreground backdrop-blur supports-[backdrop-filter]:bg-card/60" style={{ borderTopColor: 'rgba(148, 163, 184, 0.25)' }}>
       {/* Left side - Status indicators */}
       <div className="flex items-center gap-4 flex-1">
+        {/* Speaker Notes Button */}
+        {onToggleSpeakerNotes && (
+          <button
+            onClick={onToggleSpeakerNotes}
+            className="flex items-center gap-1 opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
+            title="Toggle Speaker Notes"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+              <polyline points="10 9 9 9 8 9"/>
+            </svg>
+            <span>Notes</span>
+          </button>
+        )}
+
         {/* Save Status */}
         <div className="flex items-center gap-1">
           {saveState.status === 'saving' && (

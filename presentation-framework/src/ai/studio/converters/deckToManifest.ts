@@ -69,17 +69,22 @@ function convertSlideToManifest(
   slide: DeckSlide,
   designLanguage: Deck["presentation"]["design_language"]
 ): SlideDefinition {
+  const elements = buildSlideElements(slide);
+
   return {
     id: slide.id,
     title: slide.title,
     layout: mapLayoutToLume(slide.layout),
-    layers: [
+    // Only create a layer if there are elements; otherwise use empty arrays
+    layers: elements.length > 0 ? [
       {
         id: `${slide.id}-layer-1`,
+        name: 'Content',
         order: 0,
-        elements: buildSlideElements(slide),
+        elements: elements,
       },
-    ],
+    ] : [],
+    elements: [],
     transitions: {
       in: mapAnimationToTransition(slide.animation),
     },
@@ -93,17 +98,275 @@ function convertSlideToManifest(
       studioColors: slide.colors,
       studioBackground: slide.background,
       imagePrompt: slide.image_prompt,
+      decorativeElements: slide.decorative_elements,
       durationSeconds: slide.duration_seconds,
     },
   };
 }
 
 /**
+ * Parse decorative elements description and convert to shape elements
+ * This function extracts common patterns from the AI's natural language description
+ */
+function parseDecorativeElements(description: string, slideId: string, slideColors: DeckSlide["colors"]): any[] {
+  if (!description || description.trim() === "") return [];
+
+  const elements: any[] = [];
+  const desc = description.toLowerCase();
+
+  // Extract all hex colors from the description
+  const hexPattern = /#[0-9A-Fa-f]{6}/g;
+  const colors = description.match(hexPattern) || [];
+
+  // Pattern 1: Vertical/Horizontal color blocks (for roadmaps, timelines)
+  if (desc.includes("vertical") && (desc.includes("block") || desc.includes("section") || desc.includes("column"))) {
+    // Extract number of blocks (look for "three", "3", "four", "4", etc.)
+    const numberMatch = desc.match(/(?:three|3|four|4|five|5|six|6)/);
+    const numBlocks = numberMatch ? (
+      numberMatch[0] === "three" || numberMatch[0] === "3" ? 3 :
+      numberMatch[0] === "four" || numberMatch[0] === "4" ? 4 :
+      numberMatch[0] === "five" || numberMatch[0] === "5" ? 5 : 4
+    ) : 3;
+
+    const blockWidth = 1920 / numBlocks;
+    for (let i = 0; i < numBlocks; i++) {
+      elements.push({
+        id: `${slideId}-deco-block-${i}`,
+        type: "shape",
+        shapeType: "rect",
+        bounds: {
+          x: i * blockWidth,
+          y: 0,
+          width: blockWidth,
+          height: 1080,
+        },
+        style: {
+          fill: colors[i] || slideColors.accent,
+          opacity: 0.15, // Subtle background blocks
+        },
+      });
+    }
+  }
+
+  // Pattern 2: Flowing curve/wave connecting elements
+  if (desc.includes("curve") || desc.includes("wave") || desc.includes("flow")) {
+    // Create a gradient rectangle that simulates a flowing element
+    // This is a simplified approach; a real curve would need SVG path support
+    const curveColor = colors.find(c => desc.includes(c.toLowerCase())) || slideColors.accent;
+    elements.push({
+      id: `${slideId}-deco-curve`,
+      type: "shape",
+      shapeType: "rect",
+      bounds: {
+        x: 0,
+        y: 500, // Middle of slide
+        width: 1920,
+        height: 120,
+      },
+      style: {
+        fill: {
+          type: "linear",
+          angle: 90,
+          stops: [
+            { color: `${curveColor}00`, position: 0 },   // Transparent at edges
+            { color: curveColor, position: 50 },          // Opaque in middle
+            { color: `${curveColor}00`, position: 100 },  // Transparent at edges
+          ],
+        },
+        opacity: 0.3,
+        borderRadius: 60, // Rounded for organic feel
+      },
+    });
+  }
+
+  // Pattern 3: Circle/dot accents
+  if (desc.includes("circle") || desc.includes("dot")) {
+    const circleMatch = desc.match(/(\d+)(?:px)?\s*(?:diameter|circle)/);
+    const diameter = circleMatch ? parseInt(circleMatch[1]) : 200;
+
+    // Position based on description keywords
+    let x = 960, y = 540; // Center by default
+    if (desc.includes("left")) x = diameter / 2 + 100;
+    if (desc.includes("right")) x = 1920 - diameter / 2 - 100;
+    if (desc.includes("top")) y = diameter / 2 + 100;
+    if (desc.includes("bottom")) y = 1080 - diameter / 2 - 100;
+    if (desc.includes("center-right")) { x = 1440; y = 540; }
+    if (desc.includes("center-left")) { x = 480; y = 540; }
+
+    const circleColor = colors[0] || slideColors.accent;
+    elements.push({
+      id: `${slideId}-deco-circle`,
+      type: "shape",
+      shapeType: "ellipse",
+      bounds: {
+        x: x - diameter / 2,
+        y: y - diameter / 2,
+        width: diameter,
+        height: diameter,
+      },
+      style: {
+        fill: desc.includes("gradient") ? {
+          type: "radial",
+          stops: [
+            { color: colors[0] || "#FFA500", position: 0 },
+            { color: colors[1] || "#FF6B35", position: 100 },
+          ],
+        } : circleColor,
+        opacity: desc.includes("subtle") ? 0.2 : 0.4,
+      },
+    });
+  }
+
+  // Pattern 4: Divider lines
+  if (desc.includes("divider") || desc.includes("line")) {
+    const lineCount = desc.includes("three") ? 3 : desc.includes("two") ? 2 : 1;
+    const isHorizontal = !desc.includes("vertical");
+    const thickness = desc.match(/(\d+)px/) ? parseInt(desc.match(/(\d+)px/)![1]) : 2;
+
+    for (let i = 0; i < lineCount; i++) {
+      const spacing = isHorizontal ? 1080 / (lineCount + 1) : 1920 / (lineCount + 1);
+      elements.push({
+        id: `${slideId}-deco-divider-${i}`,
+        type: "shape",
+        shapeType: "rect",
+        bounds: isHorizontal ? {
+          x: 200,
+          y: spacing * (i + 1) - thickness / 2,
+          width: 1520,
+          height: thickness,
+        } : {
+          x: spacing * (i + 1) - thickness / 2,
+          y: 100,
+          width: thickness,
+          height: 880,
+        },
+        style: {
+          fill: colors[0] || slideColors.text,
+          opacity: 0.3,
+        },
+      });
+    }
+  }
+
+  // Pattern 5: Diagonal split
+  if (desc.includes("diagonal") && desc.includes("split")) {
+    // Create two triangular-ish shapes using positioned rectangles
+    // Left/top triangle
+    elements.push({
+      id: `${slideId}-deco-split-1`,
+      type: "shape",
+      shapeType: "rect",
+      bounds: {
+        x: 0,
+        y: 0,
+        width: 960,
+        height: 1080,
+      },
+      style: {
+        fill: colors[0] || slideColors.bg,
+        opacity: 1,
+      },
+    });
+
+    // Right/bottom triangle
+    elements.push({
+      id: `${slideId}-deco-split-2`,
+      type: "shape",
+      shapeType: "rect",
+      bounds: {
+        x: 960,
+        y: 0,
+        width: 960,
+        height: 1080,
+      },
+      style: {
+        fill: colors[1] || slideColors.accent,
+        opacity: 1,
+      },
+    });
+  }
+
+  return elements;
+}
+
+/**
  * Build slide elements from Studio slide data
+ * Z-order (bottom to top): background → decorative shapes → title/content
  */
 function buildSlideElements(slide: DeckSlide) {
   const elements: any[] = [];
 
+  // LAYER 1 (BOTTOM): Background
+  // Add background layer (image or solid color)
+  if (slide.image_prompt && slide.image_prompt.trim() !== "") {
+    // Check if image_prompt is an asset reference or a data URL
+    const isAssetReference = slide.image_prompt.startsWith('asset://sha256:');
+    const isDataUrl = slide.image_prompt.startsWith('data:image/');
+
+    if (isAssetReference || isDataUrl) {
+      // Background overlay (goes first, renders behind everything)
+      elements.push({
+        id: `${slide.id}-background-overlay`,
+        type: "shape",
+        shapeType: "rect",
+        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+        style: {
+          fill: slide.background === "dark" ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.4)",
+          opacity: 1,
+        },
+      });
+
+      // Background image (on top of overlay)
+      elements.push({
+        id: `${slide.id}-background-image`,
+        type: "image",
+        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+        src: slide.image_prompt,
+        style: {
+          objectFit: "cover",
+          opacity: 0.85, // Slightly transparent so text is more readable
+        },
+      });
+    } else {
+      // Fallback: just show the prompt in metadata (image generation may have failed)
+      // Add solid color background instead
+      elements.push({
+        id: `${slide.id}-background`,
+        type: "shape",
+        shapeType: "rect",
+        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+        style: {
+          fill: slide.colors.bg,
+          opacity: 1,
+        },
+      });
+    }
+  } else {
+    // Add solid color background
+    elements.push({
+      id: `${slide.id}-background`,
+      type: "shape",
+      shapeType: "rect",
+      bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+      style: {
+        fill: slide.colors.bg,
+        opacity: 1,
+      },
+    });
+  }
+
+  // LAYER 2 (MIDDLE): Decorative shapes
+  // These go on top of the background but below content/title
+  if (slide.decorative_elements && slide.decorative_elements.trim() !== "") {
+    const decorativeShapes = parseDecorativeElements(
+      slide.decorative_elements,
+      slide.id,
+      slide.colors
+    );
+    elements.push(...decorativeShapes);
+  }
+
+  // LAYER 3 (TOP): Text content
   // Add title element
   elements.push({
     id: `${slide.id}-title`,
@@ -123,20 +386,6 @@ function buildSlideElements(slide: DeckSlide) {
         bounds: getContentBounds(slide.layout, idx, slide.content!.length),
         style: getContentStyle(slide),
       });
-    });
-  }
-
-  // Add background element if needed
-  if (slide.background === "gradient" || slide.image_prompt) {
-    elements.unshift({
-      id: `${slide.id}-background`,
-      type: "shape",
-      shapeType: "rectangle",
-      bounds: { x: 0, y: 0, width: 1920, height: 1080 },
-      style: {
-        fill: slide.colors.bg,
-        opacity: 1,
-      },
     });
   }
 

@@ -338,6 +338,7 @@ export function normalizeDeck(deck: Deck): Deck {
         title: "—",
         content: [],
         image_prompt: "",
+        decorative_elements: "",
         animation: "fade-in",
         background: "dark",
         colors: {

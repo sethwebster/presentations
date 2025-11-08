@@ -31,8 +31,6 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
   const [editingLayerName, setEditingLayerName] = useState<string>('');
   const layerNameInputRef = useRef<HTMLInputElement>(null);
-  const [draggedElementId, setDraggedElementId] = useState<string | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   
   // Slide sections - track which slides are section parents and their expansion state
   const [expandedSlides, setExpandedSlides] = useState<Set<string>>(new Set());
@@ -50,6 +48,17 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
       layerNameInputRef.current.select();
     }
   }, [editingLayerId]);
+
+  // Auto-expand all layers on the current slide when it changes
+  useEffect(() => {
+    if (!deck?.slides[currentSlideIndex]) return;
+
+    const currentSlide = deck.slides[currentSlideIndex];
+    const layerIds = (currentSlide.layers || []).map(l => l.id);
+
+    // Expand all layers for this slide
+    setExpandedLayers(new Set(layerIds));
+  }, [currentSlideIndex, deck?.slides]);
 
   // Convert slides to ReorderableListItem format
   const slideItems = React.useMemo(() => {
@@ -578,51 +587,6 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
     setEditingLayerName('');
   };
 
-  const handleDragStart = (e: React.DragEvent, elementId: string, index: number) => {
-    const element = allElements[index]?.element;
-    if (!element) return;
-    
-    const isLocked = (element.metadata as any)?.locked === true;
-    if (isLocked) {
-      e.preventDefault();
-      return;
-    }
-
-    setDraggedElementId(elementId);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/html', elementId);
-  };
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDragOverIndex(index);
-  };
-
-  const handleDragLeave = () => {
-    setDragOverIndex(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
-    e.preventDefault();
-    setDragOverIndex(null);
-
-    if (!draggedElementId) return;
-
-    const currentIndex = allElements.findIndex(item => item.element.id === draggedElementId);
-    if (currentIndex === -1 || currentIndex === dropIndex) {
-      setDraggedElementId(null);
-      return;
-    }
-
-    editor.reorderElement(draggedElementId, dropIndex);
-    setDraggedElementId(null);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedElementId(null);
-    setDragOverIndex(null);
-  };
 
   return (
     <>
@@ -801,20 +765,20 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
 
             {allElements.length === 0 ? (
               <div className="px-3 py-2 text-xs italic border border-dashed rounded-md text-muted-foreground" style={{ borderColor: 'rgba(148, 163, 184, 0.3)' }}>
-                No layers yet
+                {(currentSlide.layers || []).length === 0 && (currentSlide.elements || []).length === 0
+                  ? 'No elements on this slide'
+                  : 'Expand layers to view elements'}
               </div>
             ) : (
-              <div className="flex flex-col gap-0.5">
-                {allElements.map(({ element, layerId, isGroupChild, parentGroupId }, index) => {
+              <ReorderableList
+                items={allElements.map(({ element, layerId, isGroupChild, parentGroupId }) => {
               const isSelected = selectedElementIds.has(element.id);
               const isLocked = (element.metadata as any)?.locked === true;
               const isHidden = (element.metadata as any)?.hidden === true;
-              const isDragging = draggedElementId === element.id;
-              const isDragOver = dragOverIndex === index;
               const elementType = element.type || 'unknown';
               const isGroup = element.type === 'group';
               const isGroupExpanded = isGroup && expandedGroups.has(element.id);
-              
+
               // Use element.name if set, otherwise generate a default name
               let elementName: string;
               if ((element as any).name) {
@@ -837,28 +801,20 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                 'group flex items-center gap-2 rounded-md border border-transparent px-3 py-2 text-xs transition-colors',
                 isGroupChild ? 'pl-6' : 'pl-3',
                 isSelected && 'bg-[var(--lume-primary,theme(colors.lume.primary))]/15 text-[var(--lume-primary,theme(colors.lume.primary))]',
-                !isSelected && isDragOver && 'border-dashed bg-[var(--lume-primary,theme(colors.lume.primary))]/10',
-                !isSelected && !isDragOver && !isLocked && 'hover:bg-[var(--lume-primary,theme(colors.lume.primary))]/10',
-                isLocked ? 'cursor-not-allowed text-muted-foreground/70' : 'cursor-pointer text-foreground',
-                isDragging && 'opacity-60'
+                !isSelected && !isLocked && 'hover:bg-[var(--lume-primary,theme(colors.lume.primary))]/10',
+                isLocked ? 'cursor-not-allowed text-muted-foreground/70' : 'cursor-pointer text-foreground'
               );
 
-              return (
-                <div
-                  key={element.id}
-                  draggable={!isLocked && !isGroupChild}
-                  onDragStart={(e) => handleDragStart(e, element.id, index)}
-                  onDragOver={(e) => handleDragOver(e, index)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={(e) => handleDrop(e, index)}
-                  onDragEnd={handleDragEnd}
-                  onClick={() => !isLocked && editor.selectElement(element.id, false)}
-                  className={itemClasses}
-                  style={{
-                    ...(isSelected && { borderColor: 'rgba(22, 194, 199, 0.7)' }),
-                    ...(isDragOver && !isSelected && { borderColor: 'rgba(22, 194, 199, 0.5)' }),
-                  }}
-                >
+              return {
+                id: element.id,
+                content: (
+                  <div
+                    onClick={() => !isLocked && editor.selectElement(element.id, false)}
+                    className={itemClasses}
+                    style={{
+                      ...(isSelected && { borderColor: 'rgba(22, 194, 199, 0.7)' }),
+                    }}
+                  >
                   {/* Visibility toggle - eye icon */}
                   <button
                     type="button"
@@ -1020,10 +976,19 @@ export function LayerPanel({ deckId }: LayerPanelProps) {
                     </span>
                   )}
                 </div>
-              );
+                ),
+              };
             })}
-          </div>
-          )}
+            onReorder={(fromIndex, toIndex) => {
+              const elementId = allElements[fromIndex]?.element.id;
+              if (elementId) {
+                editor.reorderElement(elementId, toIndex);
+              }
+            }}
+            enableNesting={false}
+            className=""
+          />
+            )}
           </div>
         )}
       </PanelBody>

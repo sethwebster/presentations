@@ -23,17 +23,23 @@ const designLanguageOptions = [
   { value: "Minimal", label: "Minimal", description: "Pure, restrained aesthetic" },
 ];
 
+const imageSourceOptions = [
+  { value: "generate", label: "Generate with AI", description: "Create custom images using Flux AI" },
+  { value: "none", label: "No Images", description: "Use solid colors and gradients only" },
+];
+
 export const StudioWizard: React.FC<{
   onComplete?: (deckId: string) => void;
   onCancel?: () => void;
 }> = ({ onComplete, onCancel }) => {
-  const [formData, setFormData] = useState<Partial<StudioInputs>>({
+  const [formData, setFormData] = useState<Partial<StudioInputs & { imageSource: string }>>({
     topic: "",
     audience: "",
     tone: "inspirational",
     goal: "",
     duration_minutes: 10,
     design_language: "Cinematic",
+    imageSource: "generate",
   });
 
   const { generate, cancel, isGenerating, progress, result, error } = useStudioGeneration({
@@ -65,7 +71,7 @@ export const StudioWizard: React.FC<{
     await generate(formData as StudioInputs);
   };
 
-  const handleChange = (field: keyof StudioInputs, value: any) => {
+  const handleChange = (field: keyof (StudioInputs & { imageSource: string }), value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -184,6 +190,28 @@ export const StudioWizard: React.FC<{
                       : "border-gray-200 hover:border-gray-300"
                   }`}
                   onClick={() => handleChange("design_language", opt.value)}
+                >
+                  <div className="font-semibold">{opt.label}</div>
+                  <div className="text-sm text-gray-600">{opt.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Image Source */}
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold">Background Images</label>
+            <div className="grid grid-cols-2 gap-4">
+              {imageSourceOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`p-4 border-2 rounded-lg text-left transition-all ${
+                    formData.imageSource === opt.value
+                      ? "border-purple-500 bg-purple-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                  onClick={() => handleChange("imageSource", opt.value)}
                 >
                   <div className="font-semibold">{opt.label}</div>
                   <div className="text-sm text-gray-600">{opt.description}</div>

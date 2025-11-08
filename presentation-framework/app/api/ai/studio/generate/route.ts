@@ -9,6 +9,8 @@ import type { StudioInputs } from "../../../../../src/ai/studio/payloadBuilders"
 import { studioDeckToManifest } from "../../../../../src/ai/studio/converters/deckToManifest";
 import { getRedis } from "../../../../../src/lib/redis";
 import { DocRepository } from "../../../../../src/repositories/DocRepository";
+import { AssetStore } from "../../../../../src/repositories/AssetStore";
+import { extractAssetData, detectMimeType } from "../../../../../src/converters/assetHelpers";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // 5 minutes for complex generation
@@ -76,6 +78,80 @@ export async function POST(req: NextRequest) {
 
         // Generate deck ID
         const deckId = `studio-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+        // Check if user wants images generated
+        const imageSource = body.imageSource || "generate";
+        const shouldGenerateImages = imageSource === "generate";
+
+        // Generate background images for slides with image_prompts (if enabled)
+        if (shouldGenerateImages) {
+          await writer.write(encoder.encode(`data: ${JSON.stringify({
+            type: "progress",
+            data: { phase: "render", progress: 85, message: "Generating background images..." }
+          })}\n\n`));
+
+          // Initialize asset store for storing images
+          const assetStore = new AssetStore();
+
+          const imageGenerationPromises = result.deck.presentation.slides.map(async (slide, index) => {
+            if (!slide.image_prompt || slide.image_prompt.trim() === "") {
+              return;
+            }
+
+            try {
+              console.log(`[Studio API] Generating image for slide ${index + 1}: "${slide.image_prompt}"`);
+
+              // Generate image using Flux (Fireworks AI) directly
+              const fireworksApiKey = process.env.FIREWORKS_API_KEY?.trim();
+
+              if (!fireworksApiKey) {
+                console.error(`[Studio API] FIREWORKS_API_KEY not configured, skipping image for slide ${index + 1}`);
+                return;
+              }
+
+              // Use Flux quick model for fast generation
+              const fluxResponse = await fetch(
+                'https://api.fireworks.ai/inference/v1/workflows/accounts/fireworks/models/flux-1-schnell-fp8/text_to_image',
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "image/jpeg",
+                    "Authorization": `Bearer ${fireworksApiKey}`,
+                  },
+                  body: JSON.stringify({
+                    prompt: slide.image_prompt,
+                  }),
+                }
+              );
+
+              if (!fluxResponse.ok) {
+                console.error(`[Studio API] Flux API error for slide ${index + 1}:`, await fluxResponse.text());
+                return;
+              }
+
+              // Flux workflow returns binary image data
+              const imageBuffer = await fluxResponse.arrayBuffer();
+              const imageBytes = new Uint8Array(imageBuffer);
+
+              // Store the image in the asset store
+              const assetHash = await assetStore.put(imageBytes, {
+                mimeType: 'image/jpeg',
+                originalFilename: `slide-${index + 1}-background.jpg`,
+              });
+
+              // Store asset reference instead of data URL
+              slide.image_prompt = `asset://sha256:${assetHash}`;
+              console.log(`[Studio API] Generated and stored image for slide ${index + 1} (${assetHash.substring(0, 12)}...)`);
+            } catch (error) {
+              console.error(`[Studio API] Error generating image for slide ${index + 1}:`, error);
+              // Continue without the image
+            }
+          });
+
+          // Wait for all images to generate
+          await Promise.all(imageGenerationPromises);
+        }
 
         // Convert Studio deck to ManifestV1 and save
         const redis = getRedis();

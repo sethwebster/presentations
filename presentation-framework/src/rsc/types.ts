@@ -478,8 +478,8 @@ export interface ImageElementDefinition extends BaseElementDefinition {
 
 export interface ShapeElementDefinition extends BaseElementDefinition {
   type: 'shape';
-  shapeType: 'rect' | 'ellipse' | 'path' | 'polygon';
-  data?: Record<string, unknown>;
+  shapeType: 'rect' | 'ellipse' | 'triangle' | 'line' | 'path' | 'polygon';
+  data?: Record<string, unknown>; // For polygon: { sides: number }, for line: { x1, y1, x2, y2 }
 }
 
 export interface ChartElementDefinition extends BaseElementDefinition {

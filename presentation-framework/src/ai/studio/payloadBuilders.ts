@@ -183,6 +183,7 @@ export function buildDesignPayload(outline: Outline, options: PayloadOptions = {
                   "animation",
                   "design_comment",
                   "image_prompt",
+                  "decorative_elements",
                 ],
                 properties: {
                   slide_number: { type: "integer", minimum: 1 },
@@ -198,6 +199,7 @@ export function buildDesignPayload(outline: Outline, options: PayloadOptions = {
                   },
                   design_comment: { type: "string", minLength: 10 },
                   image_prompt: { type: "string" },
+                  decorative_elements: { type: "string" },
                 },
                 additionalProperties: false,
               },
@@ -269,6 +271,7 @@ export function buildRenderPayload(
                       "colors",
                       "duration_seconds",
                       "image_prompt",
+                      "decorative_elements",
                       "notes",
                     ],
                     properties: {
@@ -304,6 +307,7 @@ export function buildRenderPayload(
                       },
                       duration_seconds: { type: "integer", minimum: 3, maximum: 20 },
                       image_prompt: { type: "string" },
+                      decorative_elements: { type: "string" },
                       notes: { type: "string" },
                     },
                     additionalProperties: false,

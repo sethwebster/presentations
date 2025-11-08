@@ -7,6 +7,7 @@ import { PropertiesPanel } from '@/editor/components/PropertiesPanel';
 import { LayerPanel } from '@/editor/components/LayerPanel';
 import { StatusBar } from '@/editor/components/StatusBar';
 import { TimelineDrawer } from './TimelineDrawer';
+import { SpeakerNotesDrawer } from './SpeakerNotesDrawer';
 
 interface EditorShellProps {
   deckId: string;
@@ -14,10 +15,11 @@ interface EditorShellProps {
 
 /**
  * Client component that renders the main editor UI structure.
- * Manages timeline drawer visibility and composes all editor panels.
+ * Manages timeline drawer and speaker notes drawer visibility and composes all editor panels.
  */
 export function EditorShell({ deckId }: EditorShellProps) {
   const [showTimeline, setShowTimeline] = useState(false);
+  const [showSpeakerNotes, setShowSpeakerNotes] = useState(false);
 
   return (
     <>
@@ -40,7 +42,7 @@ export function EditorShell({ deckId }: EditorShellProps) {
         </div>
 
         {/* Status Bar */}
-        <StatusBar deckId={deckId} />
+        <StatusBar deckId={deckId} onToggleSpeakerNotes={() => setShowSpeakerNotes(!showSpeakerNotes)} />
       </div>
 
       {/* Timeline Drawer */}
@@ -48,6 +50,13 @@ export function EditorShell({ deckId }: EditorShellProps) {
         deckId={deckId}
         open={showTimeline}
         onOpenChange={setShowTimeline}
+      />
+
+      {/* Speaker Notes Drawer */}
+      <SpeakerNotesDrawer
+        deckId={deckId}
+        open={showSpeakerNotes}
+        onOpenChange={setShowSpeakerNotes}
       />
     </>
   );
