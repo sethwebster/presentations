@@ -32,11 +32,12 @@ import {
 import { applyActions, deckToOutline, normalizeDeck } from "./critiqueActions";
 import { enforceDeckContrast, generateAccessibilityReport } from "./accessibility";
 import { RETRY_CONFIG } from "./prompts";
+import type { SlideCritique } from "./critique";
 
 // ===== Types =====
 
 export interface StudioProgress {
-  phase: "concept" | "outline" | "design" | "render" | "critique" | "refinement" | "complete";
+  phase: "concept" | "outline" | "design" | "render" | "critique" | "visual-critique" | "refinement" | "complete";
   progress: number; // 0-100
   message: string;
   currentSlide?: number;
@@ -48,10 +49,12 @@ export type ProgressCallback = (progress: StudioProgress) => void;
 export interface StudioResult {
   deck: Deck;
   critique?: Critique;
+  visualCritiques?: SlideCritique[]; // NEW: Visual design critiques
   metadata: {
     concept: Concept;
     finalScore: number;
     refinementCycles: number;
+    visualRefinementsApplied?: number; // NEW: Number of visual fixes applied
     totalTokens?: number;
     durationMs: number;
     accessibilityReport: ReturnType<typeof generateAccessibilityReport>;
@@ -64,6 +67,9 @@ export interface StudioOptions {
   targetQualityScore?: number;
   model?: string;
   skipCritique?: boolean;
+  enableVisualCritique?: boolean; // NEW: Enable screenshot-based visual critique
+  visualCritiqueIterations?: number; // NEW: Max visual refinement rounds (default: 2)
+  minVisualQualityScore?: number; // NEW: Minimum score to accept (default: 7)
 }
 
 // ===== Main Orchestrator Class =====
@@ -164,6 +170,12 @@ export class StudioOrchestrator {
         }
       }
 
+      // Stage 5.5: Visual Critique (optional)
+      // Note: Visual critique must be run client-side after slides are rendered in the DOM
+      // Use triggerVisualCritiqueAPI() from the client component after deck is displayed
+      // See docs/VISUAL-CRITIQUE-USAGE.md for integration examples
+      let visualCritiques: SlideCritique[] = [];
+
       // Final accessibility pass
       report("complete", 95, "Ensuring accessibility and final polish...");
       deck = enforceDeckContrast(deck);
@@ -175,10 +187,12 @@ export class StudioOrchestrator {
       return {
         deck,
         critique,
+        visualCritiques: visualCritiques.length > 0 ? visualCritiques : undefined,
         metadata: {
           concept,
           finalScore: critique?.score || 0,
           refinementCycles,
+          visualRefinementsApplied: visualCritiques.filter(c => c.overallScore < 7).length,
           durationMs: Date.now() - startTime,
           accessibilityReport,
         },

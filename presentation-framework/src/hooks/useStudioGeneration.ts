@@ -19,12 +19,20 @@ export interface UseStudioGenerationResult {
     targetQualityScore?: number;
     skipCritique?: boolean;
     model?: string;
+    enableVisualCritique?: boolean;
   }) => Promise<StudioResult | null>;
   cancel: () => void;
+  runVisualCritique: (deckId: string, context: {
+    deck: any;
+    theme?: string;
+    audience?: string;
+    designLanguage?: string;
+  }) => Promise<any[]>;
   isGenerating: boolean;
   progress: StudioProgress | null;
   result: StudioResult | null;
   error: Error | null;
+  visualCritiques: any[] | null;
 }
 
 export function useStudioGeneration(
@@ -34,6 +42,7 @@ export function useStudioGeneration(
   const [progress, setProgress] = useState<StudioProgress | null>(null);
   const [result, setResult] = useState<StudioResult | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  const [visualCritiques, setVisualCritiques] = useState<any[] | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -97,6 +106,15 @@ export function useStudioGeneration(
               } else if (parsed.type === "complete") {
                 const resultData = parsed.data as StudioResult;
                 setResult(resultData);
+
+                // Store whether visual critique was requested for later use
+                (resultData as any).visualCritiqueRequested = inputs.enableVisualCritique;
+                (resultData as any).visualCritiqueContext = {
+                  theme: inputs.topic,
+                  audience: inputs.audience,
+                  designLanguage: inputs.design_language,
+                };
+
                 setIsGenerating(false);
                 options.onComplete?.(resultData);
                 return resultData;
@@ -141,12 +159,32 @@ export function useStudioGeneration(
     }
   }, []);
 
+  const runVisualCritique = useCallback(async (deckId: string, context: {
+    deck: any;
+    theme?: string;
+    audience?: string;
+    designLanguage?: string;
+  }) => {
+    try {
+      const { triggerVisualCritiqueAPI } = await import("../ai/studio/critique/clientCritique");
+
+      const critiques = await triggerVisualCritiqueAPI(deckId, context);
+      setVisualCritiques(critiques);
+      return critiques;
+    } catch (error) {
+      console.error("Visual critique failed:", error);
+      throw error;
+    }
+  }, []);
+
   return {
     generate,
     cancel,
+    runVisualCritique,
     isGenerating,
     progress,
     result,
     error,
+    visualCritiques,
   };
 }

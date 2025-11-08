@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import { ToolbarButton } from '@/components/ui/toolbar-button';
 import { DropdownButton } from '@/components/ui/dropdown-button';
@@ -65,9 +66,21 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
   });
   // Store messages per slide - keyed by slideId
   const [refineMessagesBySlide, setRefineMessagesBySlide] = useState<Map<string, RefineMessage[]>>(new Map());
-  
+
   // Track which slides we've attempted to load (to avoid duplicate fetches)
   const loadedSlidesRef = useRef<Set<string>>(new Set());
+
+  // Visual Critique state
+  const [showVisualCritiqueModal, setShowVisualCritiqueModal] = useState(false);
+  const [visualCritiqueStatus, setVisualCritiqueStatus] = useState<{
+    isAnalyzing: boolean;
+    error: string | null;
+    critiques: any[] | null;
+  }>({
+    isAnalyzing: false,
+    error: null,
+    critiques: null,
+  });
 
   // Get messages for current slide
   const refineMessages = activeSlideId ? (refineMessagesBySlide.get(activeSlideId) || []) : [];
@@ -1285,6 +1298,123 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
     }
   }, [activeSlideId, deck, deckId, currentSlideIndex, selectedElementIds, applyFunctionCall]);
 
+  const handleVisualCritique = useCallback(async () => {
+    if (!deck || !deckId) {
+      setVisualCritiqueStatus({ isAnalyzing: false, error: 'No deck available', critiques: null });
+      return;
+    }
+
+    try {
+      setVisualCritiqueStatus({ isAnalyzing: true, error: null, critiques: null });
+
+      // We need to capture the current editor canvas directly
+      // The editor doesn't use data-slide-id attributes like the presentation view
+      // So we'll capture the current slide from the canvas
+
+      const canvas = document.querySelector('[data-canvas-container]') as HTMLElement;
+      if (!canvas) {
+        throw new Error('Editor canvas not found. Please try again.');
+      }
+
+      // Use html2canvas to capture the current slide
+      const html2canvas = (await import('html2canvas')).default;
+      const canvasElement = await html2canvas(canvas, {
+        backgroundColor: null,
+        scale: 2,
+        logging: false,
+        useCORS: true,
+        allowTaint: true,
+      });
+
+      const imageData = canvasElement.toDataURL('image/png');
+
+      // Get current slide info
+      const currentSlide = deck.slides[currentSlideIndex];
+      if (!currentSlide) {
+        throw new Error('No slide selected');
+      }
+
+      // Send to API for critique (just the current slide)
+      const response = await fetch('/api/ai/visual-critique', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          deckId,
+          images: [{
+            slideId: currentSlide.id,
+            imageData,
+          }],
+          context: {
+            deck,
+            theme: deck.meta?.title || 'Presentation',
+            audience: 'General audience',
+            designLanguage: deck.meta?.aiGeneration?.stylisticNotes || 'Modern',
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      setVisualCritiqueStatus({
+        isAnalyzing: false,
+        error: null,
+        critiques: result.critiques || [],
+      });
+    } catch (error) {
+      console.error('Visual critique failed:', error);
+      setVisualCritiqueStatus({
+        isAnalyzing: false,
+        error: error instanceof Error ? error.message : 'Visual critique failed',
+        critiques: null,
+      });
+    }
+  }, [deck, deckId, currentSlideIndex]);
+
+  const handleApplyVisualFixes = useCallback(async () => {
+    if (!deck || !visualCritiqueStatus.critiques || visualCritiqueStatus.critiques.length === 0) {
+      return;
+    }
+
+    try {
+      const currentSlide = deck.slides[currentSlideIndex];
+      const critique = visualCritiqueStatus.critiques[0]; // Current slide critique
+
+      if (!currentSlide || !critique) {
+        return;
+      }
+
+      // Import auto-fixer
+      const { autoFixSlide } = await import('@/ai/studio/critique/autoFixer');
+
+      // Apply fixes
+      const result = await autoFixSlide(currentSlide, critique);
+
+      if (result.fixesApplied.length > 0) {
+        // Update the slide in the deck
+        editor?.updateSlide(currentSlide.id, result.updatedSlide);
+
+        // Show success message
+        alert(`Applied ${result.fixesApplied.length} fixes:\n${result.fixesApplied.join('\n')}`);
+
+        // Re-run critique to show improvements
+        setTimeout(() => {
+          handleVisualCritique();
+        }, 500);
+      } else {
+        alert('No automatic fixes could be applied. Manual adjustments may be needed.');
+      }
+    } catch (error) {
+      console.error('Failed to apply fixes:', error);
+      alert('Failed to apply fixes. Please try again.');
+    }
+  }, [deck, currentSlideIndex, visualCritiqueStatus.critiques, editor, handleVisualCritique]);
+
   const handleRegenerate = useCallback(async () => {
     if (!deck?.meta?.aiGeneration || !deckId) {
       alert('This presentation was not generated with AI or is missing generation data.');
@@ -1969,12 +2099,30 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
 
       {/* Refine Button */}
       <div className="flex items-center gap-2 pr-4 mr-2 border-r" style={{ borderRightColor: 'rgba(148, 163, 184, 0.2)' }}>
-        <ToolbarButton 
-          title="Refine Slide with AI" 
+        <ToolbarButton
+          title="Refine Slide with AI"
           onClick={() => setShowRefineModal(true)}
           disabled={!activeSlideId}
         >
           <span className="text-lg">✨</span>
+        </ToolbarButton>
+        <ToolbarButton
+          title="Visual Critique - AI analyzes design quality"
+          onClick={() => {
+            setShowVisualCritiqueModal(true);
+            if (!visualCritiqueStatus.critiques && !visualCritiqueStatus.isAnalyzing) {
+              handleVisualCritique();
+            }
+          }}
+          disabled={visualCritiqueStatus.isAnalyzing}
+        >
+          {visualCritiqueStatus.isAnalyzing ? (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 animate-spin">
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+          ) : (
+            <span className="text-lg">📊</span>
+          )}
         </ToolbarButton>
       </div>
 
@@ -2061,6 +2209,143 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
             }
           }}
         />
+      )}
+
+      {/* Visual Critique Modal - Using Portal */}
+      {showVisualCritiqueModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm overflow-auto" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', zIndex: 99999 }}>
+          <div className="w-full bg-white dark:bg-gray-900 rounded-lg shadow-2xl my-auto" style={{ display: 'flex', flexDirection: 'column', maxWidth: '56rem', maxHeight: 'calc(100vh - 4rem)' }}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b dark:border-gray-700">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">📊</span>
+                <h2 className="text-xl font-semibold">Visual Design Critique</h2>
+              </div>
+              <button
+                onClick={() => setShowVisualCritiqueModal(false)}
+                className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {visualCritiqueStatus.isAnalyzing && (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-12 h-12 animate-spin text-blue-600 mb-4">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                  <p className="text-lg font-medium">Analyzing current slide...</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">Evaluating typography, colors, layout, and accessibility</p>
+                </div>
+              )}
+
+              {visualCritiqueStatus.error && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <div>
+                      <h3 className="font-medium text-red-900 dark:text-red-200">Error</h3>
+                      <p className="text-sm text-red-700 dark:text-red-300 mt-1">{visualCritiqueStatus.error}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {visualCritiqueStatus.critiques && visualCritiqueStatus.critiques.length > 0 && (
+                <div className="space-y-6">
+                  {visualCritiqueStatus.critiques.map((critique: any, idx: number) => (
+                    <div key={idx} className="border dark:border-gray-700 rounded-lg p-5 bg-gray-50 dark:bg-gray-800">
+                      <div className="flex justify-between items-start mb-4">
+                        <h3 className="font-semibold text-lg">Current Slide (Slide {currentSlideIndex + 1})</h3>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Score:</span>
+                          <span className={`font-bold text-lg ${
+                            critique.overallScore >= 8 ? 'text-green-600' :
+                            critique.overallScore >= 6 ? 'text-yellow-600' :
+                            'text-red-600'
+                          }`}>
+                            {critique.overallScore}/10
+                          </span>
+                        </div>
+                      </div>
+
+                      {critique.issues && critique.issues.length > 0 && (
+                        <div className="mt-3">
+                          <h4 className="text-sm font-medium mb-2">Issues:</h4>
+                          <ul className="space-y-2">
+                            {critique.issues.map((issue: any, issueIdx: number) => (
+                              <li key={issueIdx} className="text-sm">
+                                <span className={`inline-block px-2 py-1 rounded text-xs font-medium mr-2 ${
+                                  issue.severity === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
+                                  issue.severity === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                                  'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                                }`}>
+                                  {issue.severity}
+                                </span>
+                                <span className="text-gray-900 dark:text-gray-100">{issue.description}</span>
+                                <div className="ml-16 text-gray-600 dark:text-gray-400 mt-1">
+                                  → {issue.suggestion}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {critique.strengths && critique.strengths.length > 0 && (
+                        <div className="mt-3">
+                          <h4 className="text-sm font-medium text-green-700 dark:text-green-400 mb-2">Strengths:</h4>
+                          <ul className="space-y-1">
+                            {critique.strengths.map((strength: string, sIdx: number) => (
+                              <li key={sIdx} className="text-sm text-gray-700 dark:text-gray-300">
+                                ✓ {strength}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-6 py-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleVisualCritique}
+                  disabled={visualCritiqueStatus.isAnalyzing}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {visualCritiqueStatus.isAnalyzing ? 'Analyzing...' : 'Re-analyze'}
+                </button>
+                {visualCritiqueStatus.critiques && visualCritiqueStatus.critiques.length > 0 && visualCritiqueStatus.critiques[0].issues?.length > 0 && (
+                  <button
+                    onClick={handleApplyVisualFixes}
+                    disabled={visualCritiqueStatus.isAnalyzing}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                  >
+                    ✓ Apply Fixes ({visualCritiqueStatus.critiques[0].issues.length})
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => setShowVisualCritiqueModal(false)}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

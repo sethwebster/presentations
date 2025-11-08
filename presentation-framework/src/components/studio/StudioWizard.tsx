@@ -32,7 +32,7 @@ export const StudioWizard: React.FC<{
   onComplete?: (deckId: string) => void;
   onCancel?: () => void;
 }> = ({ onComplete, onCancel }) => {
-  const [formData, setFormData] = useState<Partial<StudioInputs & { imageSource: string }>>({
+  const [formData, setFormData] = useState<Partial<StudioInputs & { imageSource: string; enableVisualCritique: boolean }>>({
     topic: "",
     audience: "",
     tone: "inspirational",
@@ -40,9 +40,10 @@ export const StudioWizard: React.FC<{
     duration_minutes: 10,
     design_language: "Cinematic",
     imageSource: "generate",
+    enableVisualCritique: false,
   });
 
-  const { generate, cancel, isGenerating, progress, result, error } = useStudioGeneration({
+  const { generate, cancel, isGenerating, progress, result, error, visualCritiques, runVisualCritique } = useStudioGeneration({
     onComplete: async (result) => {
       console.log("Generation complete!", result);
 
@@ -71,7 +72,7 @@ export const StudioWizard: React.FC<{
     await generate(formData as StudioInputs);
   };
 
-  const handleChange = (field: keyof (StudioInputs & { imageSource: string }), value: any) => {
+  const handleChange = (field: keyof (StudioInputs & { imageSource: string; enableVisualCritique: boolean }), value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -220,6 +221,25 @@ export const StudioWizard: React.FC<{
             </div>
           </div>
 
+          {/* Visual Critique Option */}
+          <div className="space-y-2">
+            <label className="flex items-start space-x-3 p-4 border-2 rounded-lg cursor-pointer hover:border-blue-300 transition-all">
+              <input
+                type="checkbox"
+                className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                checked={formData.enableVisualCritique || false}
+                onChange={(e) => handleChange("enableVisualCritique", e.target.checked)}
+              />
+              <div className="flex-1">
+                <div className="font-semibold text-sm">Enable AI Visual Critique (Beta)</div>
+                <div className="text-sm text-gray-600 mt-1">
+                  After generation, AI will analyze each slide for design quality, accessibility, and visual hierarchy.
+                  Results will be displayed with actionable feedback.
+                </div>
+              </div>
+            </label>
+          </div>
+
           <button
             type="submit"
             className="w-full py-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
@@ -301,6 +321,92 @@ export const StudioWizard: React.FC<{
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+
+            {(result as any).visualCritiqueRequested && !visualCritiques && (
+              <div className="pt-4 border-t">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="font-semibold mb-2 flex items-center gap-2">
+                    <span>📊 Visual Critique Ready</span>
+                  </div>
+                  <p className="text-sm text-gray-700 mb-3">
+                    Open your presentation to run AI visual analysis. The system will analyze each slide for design quality, accessibility, and visual hierarchy.
+                  </p>
+                  <button
+                    onClick={() => {
+                      const deckId = (result as any).deckId;
+                      if (deckId) {
+                        window.location.href = `/editor/${deckId}`;
+                      }
+                    }}
+                    className="w-full py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    View Presentation & Run Critique
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {visualCritiques && visualCritiques.length > 0 && (
+              <div className="pt-4 border-t">
+                <div className="font-semibold mb-3 flex items-center gap-2">
+                  <span>AI Visual Critique</span>
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Beta</span>
+                </div>
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {visualCritiques.map((critique, idx) => (
+                    <div key={idx} className="border rounded-lg p-4 bg-gray-50">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="font-medium">Slide {idx + 1}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-600">Score:</span>
+                          <span className={`font-bold ${
+                            critique.overallScore >= 8 ? 'text-green-600' :
+                            critique.overallScore >= 6 ? 'text-yellow-600' :
+                            'text-red-600'
+                          }`}>
+                            {critique.overallScore}/10
+                          </span>
+                        </div>
+                      </div>
+
+                      {critique.issues && critique.issues.length > 0 && (
+                        <div className="mt-2">
+                          <div className="text-sm font-medium mb-1">Issues:</div>
+                          <ul className="space-y-1">
+                            {critique.issues.map((issue: any, issueIdx: number) => (
+                              <li key={issueIdx} className="text-sm">
+                                <span className={`inline-block w-16 font-medium ${
+                                  issue.severity === 'high' ? 'text-red-600' :
+                                  issue.severity === 'medium' ? 'text-yellow-600' :
+                                  'text-blue-600'
+                                }`}>
+                                  [{issue.severity}]
+                                </span>
+                                <span className="text-gray-700">{issue.description}</span>
+                                <div className="ml-16 text-gray-600 text-xs mt-1">
+                                  → {issue.suggestion}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {critique.strengths && critique.strengths.length > 0 && (
+                        <div className="mt-2">
+                          <div className="text-sm font-medium mb-1 text-green-700">Strengths:</div>
+                          <ul className="space-y-1">
+                            {critique.strengths.map((strength: string, sIdx: number) => (
+                              <li key={sIdx} className="text-sm text-gray-700">✓ {strength}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

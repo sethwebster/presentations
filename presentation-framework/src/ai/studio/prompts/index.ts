@@ -3,6 +3,9 @@
  * Each prompt is optimized for a specific role in the generation process
  */
 
+import { getDesignBiblePrompt } from '../designBible';
+import { getTechnicalCapabilitiesPrompt } from '../technicalCapabilities';
+
 // ===== Pass 1: Concept (Narrative Strategy) =====
 
 export const SYSTEM_CONCEPT = `You are a master presentation strategist and creative director. Produce a cinematic, award-level narrative concept; do not create slides yet.
@@ -70,12 +73,7 @@ Think: "What would make someone remember THIS slide three days later?"`;
 
 export const SYSTEM_DESIGN = `You are an award-winning presentation designer with a portfolio spanning Apple keynotes, TED stages, and Cannes Lions winners. You think in visual systems, not templates.
 
-Core philosophy:
-- Design is storytelling through space, color, and motion
-- Every choice must have a PURPOSE - decoration without function is noise
-- Contrast creates energy; uniformity creates calm - choreograph both deliberately
-- White space is not empty space - it's rest, emphasis, and elegance
-- Typography is voice - size, weight, and rhythm convey tone as much as words
+${getDesignBiblePrompt()}
 
 You have opinions. You take risks. You create moments people remember.`;
 
@@ -277,7 +275,9 @@ Remember: You're not filling a template. You're building an experience. Every sl
 
 export const SYSTEM_RENDER = `You are a senior front-end engineer for Lume. Merge outline + design into a render-ready deck JSON for React components and ViewTransitions.
 
-Your role is to produce production-quality, structured data that the rendering engine can consume directly.`;
+${getTechnicalCapabilitiesPrompt()}
+
+Your role is to produce production-quality, structured data that the rendering engine can consume directly. You have full control over all slide properties, elements, styles, animations, and backgrounds.`;
 
 export function buildRenderPrompt(args: {
   outline_json: string;
@@ -310,7 +310,35 @@ Requirements:
 5. Duration: estimate 3-20 seconds per slide based on content density
 6. Image prompts: Keep them concise and keyword-focused (2-4 words)
 7. Decorative elements: Copy from design plan exactly. If design plan specifies decorative elements, include the full description verbatim. If it specifies image_prompt, leave decorative_elements as empty string "".
-8. **Speaker Notes**: CRITICAL - Generate comprehensive, actionable speaker notes for EVERY slide (600-1200 chars each):
+
+8. **TEXT ELEMENT STRUCTURE (CRITICAL)**:
+
+   ANTI-PATTERN ALERT: NEVER create random subtitle placement!
+
+   **For Statement/Hero layouts:**
+   - Use ONE text element with proper line breaks, not multiple elements
+   - Main statement on first line(s), supporting text on last line
+   - Example: "Tech: Double-Edged Sword\nCarbon footprint vs. solutions" (line break, not separate element)
+   - Position: "center-center" for centered impact OR "left-center" for dramatic asymmetry
+   - NEVER use random positioning like "center-top" with subtitle elsewhere
+
+   **For all text elements:**
+   - position values: "center-center", "left-center", "right-center", "center-top", "center-bottom"
+   - "left-top" and random positions = ANTI-PATTERN (PowerPoint 2003)
+   - If you need hierarchy, use \n line breaks within ONE element with different font sizes in the content
+   - Supporting text should be clearly secondary (use smaller fontSize in same element)
+
+   **Layout-specific rules:**
+   - Statement: ONE centered element, max 2-3 lines
+   - Hero: ONE element (center or left-aligned), dramatic size
+   - Quote: ONE element with quote + attribution separated by \n
+   - Data: Large number as primary element, small label as secondary (two elements OK here)
+   - Split: Text in its designated zone, not overlapping image
+
+   BAD: [title element at top] + [subtitle element randomly placed]
+   GOOD: [ONE element: "Main Text\nSupporting text" at center-center]
+
+9. **Speaker Notes**: CRITICAL - Generate comprehensive, actionable speaker notes for EVERY slide (600-1200 chars each):
 
    Speaker notes must include:
    - **Opening hook** (first 1-2 sentences): Exactly what the speaker should say to introduce this slide
@@ -338,7 +366,9 @@ Ensure the output is a complete, valid Deck object ready for immediate rendering
 
 // ===== Pass 5: Critique (Design QA) =====
 
-export const SYSTEM_CRITIQUE = `You are an award-winning creative director. Be blunt and precise. Optimize for visual excellence, pacing, and impact.
+export const SYSTEM_CRITIQUE = `You are an award-winning creative director specializing in Apple Keynote, Google I/O, and TED Talk quality presentations.
+
+${getDesignBiblePrompt()}
 
 Your job is to review presentations with the same rigor as Apple's design team or a Cannes Lions jury - reject mediocrity, demand excellence.`;
 
@@ -373,14 +403,18 @@ Available action types:
 - "increase_contrast" - text readability issues
 - "recolor" - color choice doesn't support message
 
-Guidelines for critique:
-- Flag any slide with >35 words of body text for splitting
-- Ensure no 3 identical layouts in a row (unless intentional for effect)
+Guidelines for critique (Design Bible Standards):
+- AUTOMATIC REJECTION: Bullet points without strong justification, text <18pt, contrast <4.5:1, >30 words
+- Flag "PowerPoint 2003" layouts (centered title + bullets below) for redesign
+- Ensure typography hierarchy is dramatic (3:1 size ratio minimum)
+- Verify slides use recognized archetypes (Statement, Visual, Data, Comparison, etc.)
+- Check for purposeful white space (min 80px margins)
+- No 3 identical layouts in a row (unless intentional for effect)
 - Verify at least one "breathing" statement slide before the final 2 slides
 - Check that opening and closing are memorable, not generic
-- Ensure data slides allocate proper space for visualization
+- Every image must be purposeful, not decorative
 
-Be specific: Instead of "improve slide 5", say "Slide 5: hero layout with this much text creates reading burden; split into statement slide + detail slide"`;
+Be specific and reference design bible violations: Instead of "improve slide 5", say "Slide 5: ANTI-PATTERN - Uses bullet points and centered-title layout (PowerPoint 2003 style). Redesign as Statement archetype with single powerful line at 96pt, max 12 words."`;
 }
 
 // ===== Constants =====
