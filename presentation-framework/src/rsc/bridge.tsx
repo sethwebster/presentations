@@ -722,11 +722,12 @@ function renderMediaElement(element: MediaElementDefinition, assetsBase?: string
   }
 
   // For images, wrap in a container div (like the editor does) to properly handle bounds + objectFit
-  const imageElement = element as ImageElementDefinition & MediaElementDefinition;
+  // Note: element was originally ImageElementDefinition before conversion to MediaElementDefinition
+  const objectFit = (element as any).objectFit || 'cover';
   const imgStyle: CSSProperties = {
     width: '100%',
     height: '100%',
-    objectFit: imageElement.objectFit || 'cover',
+    objectFit: objectFit,
     display: 'block',
   };
 
