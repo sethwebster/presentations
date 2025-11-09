@@ -27,10 +27,9 @@ describe('Lume serialization', () => {
     const archive = await serializeLumePackage(pkg);
     expect(archive).toBeInstanceOf(Uint8Array);
 
-    const { package: parsed, rscPayload } = await deserializeLumePackage(archive);
+    const { package: parsed } = await deserializeLumePackage(archive);
     expect(parsed.meta.title).toBe('Test Deck');
     expect(parsed.slides).toHaveLength(1);
     expect(parsed.slides[0].notes?.speaker).toBe('Hello world');
-    expect(rscPayload).toBeNull();
   });
 });

@@ -11,7 +11,6 @@ import {
   LumeNotes,
 } from './types';
 import type { DeckDefinition } from '../rsc/types';
-import { parseDeckSummaryFromText } from './rsc/parseSummary';
 
 export interface LumeSerializeOptions {
   /**
@@ -107,34 +106,18 @@ export async function deserializeLumePackage(
 
   // Collect raw files for potential re-export/editing.
   const files: Record<string, Uint8Array> = {};
-  let rscPayload: Uint8Array | null = null;
   await Promise.all(
     zip
       .filter((path) => !path.endsWith('/')) // skip directories
       .map(async (zipObject) => {
         const buffer = await zipObject.async('uint8array');
         files[zipObject.name] = buffer;
-        if (zipObject.name === 'lume.rsc') {
-          rscPayload = buffer;
-        }
       }),
   );
-
-  let rscSummary: DeckDefinition | null = null;
-  if (rscPayload && typeof window === 'undefined') {
-    try {
-      const text = Buffer.from(rscPayload).toString('utf8');
-      rscSummary = parseDeckSummaryFromText(text);
-    } catch (error) {
-      console.warn('Failed to decode lume.rsc payload:', error);
-    }
-  }
 
   return {
     package: packageData,
     files,
-    rscPayload,
-    rscSummary,
   };
 }
 
