@@ -1040,7 +1040,7 @@ function resolveAnimationPhases(
   }
 
   phases.initialOpacity = ensureOpacity(phases.initialOpacity, fallbackOpacity || '0');
-  phases.finalOpacity = ensureOpacity(phases.finalOpacity, fallbackOpacity || '');
+  phases.finalOpacity = ensureOpacity(phases.finalOpacity, fallbackOpacity || '1');
 
   return phases;
 }
