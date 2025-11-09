@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth';
 import type { DeckDefinition } from '@/rsc/types';
 import { REFINEMENT_SYSTEM_PROMPT } from '@/ai/prompts/refinement';
 import { getRedis } from '@/lib/redis';
+import { getDeck } from '@/lib/deckApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -676,23 +677,21 @@ export async function POST(request: Request) {
   const openai = new OpenAI({ apiKey });
 
   try {
-    // Get deck from Redis
-    if (!redis) {
-      return NextResponse.json(
-        { error: 'Redis not configured' },
-        { status: 500 }
-      );
-    }
-
-    const deckDataJson = await redis.get(`deck:${deckId}:data`);
-    if (!deckDataJson) {
+    // Get deck from Redis using deckApi (supports both old and new formats)
+    const deck = await getDeck(deckId);
+    if (!deck) {
       return NextResponse.json(
         { error: 'Deck not found' },
         { status: 404 }
       );
     }
 
-    const deck: DeckDefinition = JSON.parse(deckDataJson);
+    if (!redis) {
+      return NextResponse.json(
+        { error: 'Redis not configured' },
+        { status: 500 }
+      );
+    }
 
     // Get conversation history
     const historyKey = `conversation:${conversationId || `${deckId}-${session.user.id}`}:messages`;

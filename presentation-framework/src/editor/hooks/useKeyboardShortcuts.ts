@@ -357,7 +357,10 @@ export function useKeyboardShortcuts() {
 
       // Arrow keys - Nudge selected elements OR navigate slides
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        console.log('[useKeyboardShortcuts] Arrow key pressed:', e.key, 'selectedElements:', selectedElementIds.size);
+
         if (selectedElementIds.size > 0) {
+          console.log('[useKeyboardShortcuts] Nudging elements');
           e.preventDefault();
           const nudgeAmount = e.shiftKey ? 10 : 1;
           let deltaX = 0;
@@ -398,20 +401,23 @@ export function useKeyboardShortcuts() {
           }
         } else {
           // No elements selected - navigate slides
+          console.log('[useKeyboardShortcuts] Navigating slides');
           e.preventDefault();
           const deck = state.deck;
           const currentSlideIndex = state.currentSlideIndex;
-          
+
           if (deck) {
             if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
               // Next slide
               const nextIndex = Math.min(currentSlideIndex + 1, deck.slides.length - 1);
+              console.log('[useKeyboardShortcuts] Next slide:', currentSlideIndex, '->', nextIndex);
               if (nextIndex !== currentSlideIndex) {
                 editor.setCurrentSlide(nextIndex);
               }
             } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
               // Previous slide
               const prevIndex = Math.max(currentSlideIndex - 1, 0);
+              console.log('[useKeyboardShortcuts] Previous slide:', currentSlideIndex, '->', prevIndex);
               if (prevIndex !== currentSlideIndex) {
                 editor.setCurrentSlide(prevIndex);
               }

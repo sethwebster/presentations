@@ -73,54 +73,40 @@ export function PropertiesPanel() {
   );
 
   const getAnimationNameFromType = useCallback((type: string): string | null => {
-    // Map animation types to CSS animation names (rsc-*)
+    // Map animation types to CSS class names (rsc-*)
+    // These classes combine keyframes + CSS variables for complex animations
     const typeMap: Record<string, string> = {
-      'appear': 'rsc-appear',
+      'appear': 'rsc-appear-in',
       'fade': 'rsc-fade-in',
-      'dissolve': 'rsc-fade-in',
-      'move-in-left': 'rsc-move-in-left',
-      'move-in-right': 'rsc-move-in-right',
-      'move-in-up': 'rsc-move-in-up',
-      'move-in-down': 'rsc-move-in-down',
-      'move-in-top-left': 'rsc-move-in-top-left',
-      'move-in-top-right': 'rsc-move-in-top-right',
-      'move-in-bottom-left': 'rsc-move-in-bottom-left',
-      'move-in-bottom-right': 'rsc-move-in-bottom-right',
-      'scale': 'rsc-scale',
-      'rotate': 'rsc-rotate',
+      'dissolve': 'rsc-dissolve',
+      'move-in-left': 'rsc-in-left',
+      'move-in-right': 'rsc-in-right',
+      'move-in-up': 'rsc-in-up',
+      'move-in-down': 'rsc-in-down',
+      'scale': 'rsc-zoom-in',
+      'rotate': 'rsc-rotate-in',
       'fly-in': 'rsc-fly-in',
       'bounce': 'rsc-bounce',
-      'pop': 'rsc-pop',
-      'blur': 'rsc-blur',
-      'anvil': 'rsc-anvil',
+      'pop': 'rsc-pop-in',
+      'blur': 'rsc-blur-in',
+      'anvil': 'rsc-anvil-in',
       'drop': 'rsc-drop',
       'fade-out': 'rsc-fade-out',
-      'dissolve-out': 'rsc-fade-out',
-      'move-out-left': 'rsc-move-out-left',
-      'move-out-right': 'rsc-move-out-right',
-      'move-out-up': 'rsc-move-out-up',
-      'move-out-down': 'rsc-move-out-down',
-      'scale-out': 'rsc-scale-out',
+      'dissolve-out': 'rsc-dissolve-out',
+      'move-out-left': 'rsc-out-left',
+      'move-out-right': 'rsc-out-right',
+      'move-out-up': 'rsc-out-up',
+      'move-out-down': 'rsc-out-down',
       'rotate-out': 'rsc-rotate-out',
-      'fly-out': 'rsc-fly-out',
-      'disappear': 'rsc-disappear',
-      'pulse': 'rsc-pulse',
-      'pop-emphasis': 'rsc-pop-emphasis',
-      'jiggle': 'rsc-jiggle',
-      'swing': 'rsc-swing',
-      'flip': 'rsc-flip',
-      'grow-shrink': 'rsc-grow-shrink',
-      'spin': 'rsc-spin',
-      'glow': 'rsc-glow',
-      'color-change': 'rsc-color-change',
-      'typewriter': 'rsc-typewriter',
       'zoom-in': 'rsc-zoom-in',
       'zoom-out': 'rsc-zoom-out',
-      'slide': 'rsc-move-in-down',
-      'rise-up': 'rsc-move-in-up',
-      'staggered-reveal': 'rsc-staggered-reveal',
-      'magic-move': 'rsc-magic-move',
+      'slide': 'rsc-in-down',
+      'rise-up': 'rsc-in-up',
       'zoom': 'rsc-zoom-in',
+      'pulse': 'rsc-pulse',
+      'jiggle': 'rsc-jiggle',
+      'swing': 'rsc-swing',
+      'spin': 'rsc-spin',
     };
     return typeMap[type] || null;
   }, []);
@@ -129,9 +115,16 @@ export function PropertiesPanel() {
     if (!selectedElement?.animation || selectedElementIds.size === 0) return;
     setIsPreviewing(true);
 
-    // Find all elements in the DOM by their data-element-id attribute
+    // Find the editor canvas (not the thumbnail preview)
+    const canvasContainer = document.querySelector('[data-canvas-container]') as HTMLElement;
+    if (!canvasContainer) {
+      setIsPreviewing(false);
+      return;
+    }
+
+    // Find all elements in the editor canvas by their data-element-id attribute
     const elements = Array.from(selectedElementIds).map((id) => {
-      const domElement = document.querySelector(`[data-element-id="${id}"]`) as HTMLElement;
+      const domElement = canvasContainer.querySelector(`[data-element-id="${id}"]`) as HTMLElement;
       return { id, element: domElement };
     }).filter(({ element }) => element !== null);
 
@@ -142,12 +135,12 @@ export function PropertiesPanel() {
 
     // Get animation properties
     const animation = selectedElement.animation;
-    const animationName = getAnimationNameFromType(animation.type);
+    const animationClass = getAnimationNameFromType(animation.type);
     const duration = animation.duration ?? 520;
     const delay = animation.delay ?? 0;
     const easing = animation.easing ?? 'ease-out';
 
-    if (!animationName) {
+    if (!animationClass) {
       setIsPreviewing(false);
       return;
     }
@@ -156,27 +149,34 @@ export function PropertiesPanel() {
     elements.forEach(({ element }) => {
       if (!element) return;
       const innerElement = (element.querySelector('div[style]') || element) as HTMLElement;
-      
+
       // Remove any existing animation classes and styles
       innerElement.classList.remove('rsc-animate');
+      // Remove all rsc-* classes
+      const classesToRemove = Array.from(innerElement.classList).filter(c => c.startsWith('rsc-'));
+      classesToRemove.forEach(c => innerElement.classList.remove(c));
       innerElement.style.animation = '';
-      innerElement.style.animationName = '';
-      
-      // Apply the animation
-      innerElement.classList.add('rsc-animate');
-      innerElement.style.animationName = animationName;
+
+      // Emphasis effects should loop a few times for better preview
+      const emphasisEffects = ['pulse', 'jiggle', 'swing', 'spin'];
+      const isEmphasisEffect = emphasisEffects.includes(animation.type);
+      const iterationCount = isEmphasisEffect ? '3' : '1';
+
+      // Apply the animation class (which includes the keyframe + variables)
+      innerElement.classList.add('rsc-animate', animationClass);
+      // Override duration, delay, and easing with inline styles
       innerElement.style.animationDuration = `${duration}ms`;
       innerElement.style.animationDelay = `${delay}ms`;
       innerElement.style.animationTimingFunction = easing;
       innerElement.style.animationFillMode = 'both';
-      innerElement.style.animationIterationCount = '1';
-      
+      innerElement.style.animationIterationCount = iterationCount;
+
       // Reset and replay after animation completes
-      const totalTime = duration + delay;
+      const iterations = isEmphasisEffect ? 3 : 1;
+      const totalTime = (duration * iterations) + delay;
       setTimeout(() => {
-        innerElement.classList.remove('rsc-animate');
+        innerElement.classList.remove('rsc-animate', animationClass);
         innerElement.style.animation = '';
-        innerElement.style.animationName = '';
         setIsPreviewing(false);
       }, totalTime + 100);
     });

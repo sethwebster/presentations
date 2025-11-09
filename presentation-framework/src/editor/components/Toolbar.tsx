@@ -1552,7 +1552,7 @@ export function Toolbar({ deckId, onToggleTimeline }: ToolbarProps) {
     const presentationSlug = deck?.meta?.slug || deckId;
     // Presentation uses 1-based indexing, editor uses 0-based, so add 1
     const url = `/present/${username}/${presentationSlug}?slide=${slideIndex + 1}`;
-    window.open(url, '_blank');
+    window.open(url, '_blank', 'noopener,noreferrer');
   }, [session, deck, deckId]);
   return (
     <div className="flex h-14 items-center gap-3 border-b bg-card/80 px-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/60 relative z-50" style={{ borderBottomColor: 'rgba(148, 163, 184, 0.25)' }}>

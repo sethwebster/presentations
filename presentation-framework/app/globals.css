@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "../src/styles/RscAnimations.css";
 
 @layer base {
   :root {

@@ -1162,8 +1162,28 @@
   --rsc-ease: var(--ease-emph);
 }
 
+.rsc-appear-in {
+  animation-name: rsc-appear-in;
+}
+
 .rsc-blur-in {
   animation-name: rsc-blur-in;
+}
+
+.rsc-bounce {
+  animation-name: rsc-bounce;
+}
+
+.rsc-drop {
+  animation-name: rsc-drop;
+}
+
+.rsc-dissolve {
+  animation-name: rsc-dissolve;
+}
+
+.rsc-fly-in {
+  animation-name: rsc-fly-in;
 }
 
 .rsc-fade-in {
@@ -1172,6 +1192,10 @@
 
 .rsc-fade-out {
   animation-name: rsc-fade-out;
+}
+
+.rsc-dissolve-out {
+  animation-name: rsc-dissolve-out;
 }
 
 /* Emphasis */
