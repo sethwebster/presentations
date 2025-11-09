@@ -87,13 +87,14 @@ export async function POST(request: Request) {
   console.log('[API /ai/background] Using model:', model, 'quality:', quality);
 
   // Calculate aspect ratio description from dimensions
-  // Flux models require dimensions to be multiples of 8, with min 256 and max 1440
+  // Flux models require dimensions to be multiples of 8
+  // Support up to 4K (3840x2160) for high-quality displays
   const roundToMultipleOf8 = (value: number) => {
-    const clamped = Math.max(256, Math.min(1440, value));
+    const clamped = Math.max(256, Math.min(3840, value)); // Increased max to 3840 for 4K
     return Math.round(clamped / 8) * 8;
   };
-  const width = roundToMultipleOf8(body.width ?? 1280);
-  const height = roundToMultipleOf8(body.height ?? 720);
+  const width = roundToMultipleOf8(body.width ?? 1920); // Default to 1920 (1080p)
+  const height = roundToMultipleOf8(body.height ?? 1080); // Default to 1080 (1080p)
 
   console.log('[API /ai/background] Normalized dimensions:', { original: { width: body.width, height: body.height }, normalized: { width, height } });
 

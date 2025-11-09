@@ -66,7 +66,7 @@ export interface DeckMeta {
 export interface SlideSize {
   width: number;
   height: number;
-  preset?: 'standard' | 'ultrawide' | 'cinema' | 'square' | 'custom';
+  preset?: 'standard' | 'ultrawide' | '4k' | 'cinema' | 'square' | 'custom';
   units?: 'pixels' | 'points' | 'inches' | 'centimeters';
 }
 

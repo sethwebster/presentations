@@ -136,7 +136,7 @@ export function DocumentProperties() {
         <Select
           value={settings.slideSize?.preset || "ultrawide"}
           onChange={(event) => {
-            const preset = event.target.value as "standard" | "ultrawide" | "cinema" | "square" | "custom";
+            const preset = event.target.value as "standard" | "ultrawide" | "4k" | "cinema" | "square" | "custom";
             let width = 1920;
             let height = 1080;
 
@@ -148,6 +148,10 @@ export function DocumentProperties() {
               case "ultrawide":
                 width = 1920;
                 height = 1080;
+                break;
+              case "4k":
+                width = 3840;
+                height = 2160;
                 break;
               case "cinema":
                 width = 2560;
@@ -174,7 +178,8 @@ export function DocumentProperties() {
           }}
         >
           <option value="standard">Standard (4:3) – 1024×768</option>
-          <option value="ultrawide">HD (16:9) – 1920×1080</option>
+          <option value="ultrawide">Full HD (16:9) – 1920×1080</option>
+          <option value="4k">4K UHD (16:9) – 3840×2160</option>
           <option value="cinema">Cinema (21:9) – 2560×1080</option>
           <option value="square">Square (1:1) – 1080×1080</option>
           <option value="custom">Custom</option>
