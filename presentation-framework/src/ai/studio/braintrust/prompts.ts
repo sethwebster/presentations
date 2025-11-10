@@ -365,6 +365,7 @@ export function getRefinementPrompt(
   return {
     model: "gpt-4o",
     temperature: 0.2,
+    response_format: { type: "json_object" as const },
     messages: [
       {
         role: "system" as const,
@@ -387,7 +388,7 @@ Apply ONLY the fixes dictated by the critique. Do not change anything else.
 - If fix says "Consolidate into one element", merge as specified
 - If fix says "Add proof slide", add it in the right position
 
-Return the complete refined deck JSON.`
+**CRITICAL:** You must respond with ONLY valid JSON. No explanations, no markdown, no comments - just the JSON object representing the refined BraintrustDeck.`
       },
       {
         role: "user" as const,
@@ -404,7 +405,7 @@ ${JSON.stringify(critique, null, 2)}
 \`\`\`
 
 Apply ONLY the fixes described in the critique.
-Return the complete refined deck JSON.`
+Return ONLY the complete refined deck as a JSON object. No markdown, no explanations, just valid JSON.`
       }
     ]
   };

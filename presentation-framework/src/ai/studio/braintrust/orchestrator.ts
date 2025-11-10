@@ -245,12 +245,47 @@ export class BraintrustOrchestrator {
         throw new Error(`No response from ${passName} pass`);
       }
 
-      // Parse JSON from response (handle markdown code blocks)
-      const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || content.match(/\{[\s\S]*\}/);
-      const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : content;
+      // Parse JSON from response (handle markdown code blocks and plain JSON)
+      let jsonStr = content.trim();
 
-      const parsed = JSON.parse(jsonStr);
-      return parsed;
+      // If response_format was json_object, content should already be valid JSON
+      if (promptConfig.response_format?.type === 'json_object') {
+        try {
+          const parsed = JSON.parse(jsonStr);
+          return parsed;
+        } catch (directParseError) {
+          // Fall through to extraction logic below
+          console.warn(`[BraintrustOrchestrator] Direct JSON parse failed despite json_object mode in ${passName}`);
+        }
+      }
+
+      // Try to extract from markdown code block first
+      const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (codeBlockMatch) {
+        jsonStr = codeBlockMatch[1].trim();
+      } else {
+        // Try to find JSON object
+        const objectMatch = content.match(/\{[\s\S]*\}/);
+        if (objectMatch) {
+          jsonStr = objectMatch[0].trim();
+        }
+      }
+
+      // Remove comments (// and /* */) which can break JSON parsing
+      jsonStr = jsonStr
+        .replace(/\/\*[\s\S]*?\*\//g, '') // Remove /* */ comments
+        .replace(/\/\/.*/g, '') // Remove // comments
+        .trim();
+
+      try {
+        const parsed = JSON.parse(jsonStr);
+        return parsed;
+      } catch (parseError) {
+        console.error(`[BraintrustOrchestrator] JSON parse error in ${passName} pass:`, parseError);
+        console.error(`[BraintrustOrchestrator] Raw content (first 1000 chars):`, content.substring(0, 1000));
+        console.error(`[BraintrustOrchestrator] Extracted JSON (first 1000 chars):`, jsonStr.substring(0, 1000));
+        throw parseError;
+      }
     } catch (error) {
       console.error(`[BraintrustOrchestrator] ${passName} pass failed:`, error);
       throw new Error(`${passName} pass failed: ${error instanceof Error ? error.message : String(error)}`);
