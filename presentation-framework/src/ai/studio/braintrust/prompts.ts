@@ -22,7 +22,7 @@ import type {
 
 export function getOutlinePrompt(context: GenerationContext) {
   return {
-    model: context.model || "gpt-4o",
+    model: "gpt-4o",
     temperature: 0.3,
     messages: [
       {
@@ -84,7 +84,7 @@ Generate the outline now.`
 
 export function getContentFillPrompt(deck: BraintrustDeck, context: GenerationContext) {
   return {
-    model: context.model || "gpt-4o",
+    model: "gpt-4o",
     temperature: 0.4,
     messages: [
       {
@@ -144,7 +144,7 @@ export function getDesignPrompt(
   context: GenerationContext
 ) {
   return {
-    model: context.model || "gpt-4o",
+    model: "gpt-4o",
     temperature: 0.2,
     messages: [
       {

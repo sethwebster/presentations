@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import OpenAI from "openai";
 import { createStudioOrchestrator } from "../../../../../src/ai/studio/StudioOrchestrator";
 import type { StudioInputs } from "../../../../../src/ai/studio/payloadBuilders";
 import { studioDeckToManifest } from "../../../../../src/ai/studio/converters/deckToManifest";
@@ -11,6 +12,10 @@ import { getRedis } from "../../../../../src/lib/redis";
 import { DocRepository } from "../../../../../src/repositories/DocRepository";
 import { AssetStore } from "../../../../../src/repositories/AssetStore";
 import { extractAssetData, detectMimeType } from "../../../../../src/converters/assetHelpers";
+import { BraintrustOrchestrator } from "../../../../../src/ai/studio/braintrust/orchestrator";
+import { braintrustResultToStudioResult } from "../../../../../src/ai/studio/braintrust/adapters";
+import { DEFAULT_BRAND_RULES, DEFAULT_THEME_TOKENS, DEFAULT_LAYOUT_CATALOG } from "../../../../../src/ai/studio/braintrust/examples/defaults";
+import type { GenerationContext } from "../../../../../src/ai/studio/braintrust/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // 5 minutes for complex generation
@@ -49,32 +54,90 @@ export async function POST(req: NextRequest) {
     // Start generation in background
     (async () => {
       try {
-        const orchestrator = createStudioOrchestrator(apiKey, {
-          maxRefinementCycles: body.maxRefinementCycles ?? 2,
-          targetQualityScore: body.targetQualityScore ?? 8.5,
-          skipCritique: body.skipCritique ?? false,
-          model: body.model ?? "gpt-4o",
-          onProgress: async (progress) => {
-            // Stream progress updates to client
-            const progressData = JSON.stringify({
-              type: "progress",
-              data: progress,
-            });
-            await writer.write(encoder.encode(`data: ${progressData}\n\n`));
-          },
-        });
+        const enableBraintrust = body.enableBraintrust ?? false;
+        let result;
 
-        const inputs: StudioInputs = {
-          topic,
-          audience,
-          tone,
-          goal,
-          duration_minutes,
-          deck_title: body.deck_title,
-          design_language: body.design_language ?? "Cinematic",
-        };
+        if (enableBraintrust) {
+          // ========== BRAINTRUST PATH ==========
+          const openaiClient = new OpenAI({ apiKey });
 
-        const result = await orchestrator.generate(inputs);
+          const braintrustOrchestrator = new BraintrustOrchestrator(openaiClient, {
+            maxRefinementRounds: body.maxRefinementCycles ?? 2,
+            targetScore: 4.2, // On 0-5 scale
+            minAxisScore: 3.8,
+            skipCritique: body.skipCritique ?? false,
+            model: body.model ?? "gpt-4o",
+            onProgress: async (progress) => {
+              // Map Braintrust progress to Studio progress format
+              const phaseMap: Record<string, "concept" | "outline" | "design" | "render" | "critique" | "refinement"> = {
+                outline: "concept",
+                content: "outline",
+                design: "design",
+                polish: "render",
+                critique: "critique",
+                refine: "refinement",
+              };
+
+              const progressData = JSON.stringify({
+                type: "progress",
+                data: {
+                  phase: phaseMap[progress.pass] || progress.pass,
+                  progress: progress.progress,
+                  message: progress.message,
+                },
+              });
+              await writer.write(encoder.encode(`data: ${progressData}\n\n`));
+            },
+          });
+
+          const context: GenerationContext = {
+            brief: topic,
+            audience,
+            goal,
+            themeId: body.design_language ?? "Cinematic",
+            brandRules: DEFAULT_BRAND_RULES,
+            themeTokens: DEFAULT_THEME_TOKENS,
+            layoutCatalog: DEFAULT_LAYOUT_CATALOG,
+          };
+
+          const braintrustResult = await braintrustOrchestrator.generate(context);
+
+          // Convert Braintrust result to Studio result format
+          result = braintrustResultToStudioResult(braintrustResult, {
+            topic,
+            audience,
+            goal,
+            tone,
+          });
+        } else {
+          // ========== STANDARD STUDIO PATH ==========
+          const orchestrator = createStudioOrchestrator(apiKey, {
+            maxRefinementCycles: body.maxRefinementCycles ?? 2,
+            targetQualityScore: body.targetQualityScore ?? 8.5,
+            skipCritique: body.skipCritique ?? false,
+            model: body.model ?? "gpt-4o",
+            onProgress: async (progress) => {
+              // Stream progress updates to client
+              const progressData = JSON.stringify({
+                type: "progress",
+                data: progress,
+              });
+              await writer.write(encoder.encode(`data: ${progressData}\n\n`));
+            },
+          });
+
+          const inputs: StudioInputs = {
+            topic,
+            audience,
+            tone,
+            goal,
+            duration_minutes,
+            deck_title: body.deck_title,
+            design_language: body.design_language ?? "Cinematic",
+          };
+
+          result = await orchestrator.generate(inputs);
+        }
 
         // Generate deck ID
         const deckId = `studio-${Date.now()}-${Math.random().toString(36).substring(7)}`;

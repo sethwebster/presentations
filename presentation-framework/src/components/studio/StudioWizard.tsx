@@ -32,7 +32,7 @@ export const StudioWizard: React.FC<{
   onComplete?: (deckId: string) => void;
   onCancel?: () => void;
 }> = ({ onComplete, onCancel }) => {
-  const [formData, setFormData] = useState<Partial<StudioInputs & { imageSource: string; enableVisualCritique: boolean }>>({
+  const [formData, setFormData] = useState<Partial<StudioInputs & { imageSource: string; enableVisualCritique: boolean; enableBraintrust: boolean }>>({
     topic: "",
     audience: "",
     tone: "inspirational",
@@ -41,6 +41,7 @@ export const StudioWizard: React.FC<{
     design_language: "Cinematic",
     imageSource: "generate",
     enableVisualCritique: false,
+    enableBraintrust: false,
   });
 
   const { generate, cancel, isGenerating, progress, result, error, visualCritiques, runVisualCritique } = useStudioGeneration({
@@ -72,7 +73,7 @@ export const StudioWizard: React.FC<{
     await generate(formData as StudioInputs);
   };
 
-  const handleChange = (field: keyof (StudioInputs & { imageSource: string; enableVisualCritique: boolean }), value: any) => {
+  const handleChange = (field: keyof (StudioInputs & { imageSource: string; enableVisualCritique: boolean; enableBraintrust: boolean }), value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -221,24 +222,53 @@ export const StudioWizard: React.FC<{
             </div>
           </div>
 
-          {/* Visual Critique Option */}
+          {/* Braintrust Multi-Axis Critique Option */}
           <div className="space-y-2">
-            <label className="flex items-start space-x-3 p-4 border-2 rounded-lg cursor-pointer hover:border-blue-300 transition-all">
+            <label className="flex items-start space-x-3 p-4 border-2 rounded-lg cursor-pointer hover:border-purple-300 transition-all">
               <input
                 type="checkbox"
-                className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                checked={formData.enableVisualCritique || false}
-                onChange={(e) => handleChange("enableVisualCritique", e.target.checked)}
+                className="mt-1 w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
+                checked={formData.enableBraintrust || false}
+                onChange={(e) => handleChange("enableBraintrust", e.target.checked)}
               />
               <div className="flex-1">
-                <div className="font-semibold text-sm">Enable AI Visual Critique (Beta)</div>
+                <div className="font-semibold text-sm flex items-center gap-2">
+                  Enable Braintrust Multi-Axis Critique
+                  <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">New</span>
+                </div>
                 <div className="text-sm text-gray-600 mt-1">
-                  After generation, AI will analyze each slide for design quality, accessibility, and visual hierarchy.
-                  Results will be displayed with actionable feedback.
+                  Pixar-style critique system with 3-axis scoring (Narrative, Visual, Brand).
+                  4-pass generation + refinement loop until quality threshold is met.
+                </div>
+                <div className="text-xs text-purple-600 mt-2 flex gap-3">
+                  <span>📖 Narrative coherence</span>
+                  <span>🎨 Visual hierarchy</span>
+                  <span>🎯 Brand fidelity</span>
                 </div>
               </div>
             </label>
           </div>
+
+          {/* Visual Critique Option - Only show if Braintrust is disabled */}
+          {!formData.enableBraintrust && (
+            <div className="space-y-2">
+              <label className="flex items-start space-x-3 p-4 border-2 rounded-lg cursor-pointer hover:border-blue-300 transition-all">
+                <input
+                  type="checkbox"
+                  className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                  checked={formData.enableVisualCritique || false}
+                  onChange={(e) => handleChange("enableVisualCritique", e.target.checked)}
+                />
+                <div className="flex-1">
+                  <div className="font-semibold text-sm">Enable AI Visual Critique (Beta)</div>
+                  <div className="text-sm text-gray-600 mt-1">
+                    After generation, AI will analyze each slide for design quality, accessibility, and visual hierarchy.
+                    Results will be displayed with actionable feedback.
+                  </div>
+                </div>
+              </label>
+            </div>
+          )}
 
           <button
             type="submit"

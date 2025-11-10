@@ -83,7 +83,9 @@ export function validateContrast(
 
     for (const element of allElements) {
       if (element.type === 'text') {
-        const textColor = element.style?.color || '#000000';
+        const colorValue = element.style?.color;
+        // Only process if color is a string
+        const textColor = typeof colorValue === 'string' ? colorValue : '#000000';
         const ratio = getContrastRatio(textColor, slideBg);
 
         if (ratio < minRatio) {
@@ -159,7 +161,8 @@ export function validateBrandColors(
 
     for (const element of allElements) {
       const color = element.style?.color;
-      if (color && !allowedColors.has(color) && !color.startsWith('hsl')) {
+      // Only check if color is a string
+      if (typeof color === 'string' && !allowedColors.has(color) && !color.startsWith('hsl')) {
         violations.push({
           slideId: slide.id,
           elementId: element.id,
@@ -248,7 +251,7 @@ export function validateWordCount(
 
     let totalWords = 0;
     for (const element of allElements) {
-      if (element.type === 'text' && element.content) {
+      if (element.type === 'text' && 'content' in element && typeof element.content === 'string') {
         const words = element.content.split(/\s+/).filter(Boolean).length;
         totalWords += words;
       }
