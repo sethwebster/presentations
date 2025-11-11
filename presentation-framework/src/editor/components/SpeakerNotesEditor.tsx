@@ -7,8 +7,9 @@ import { Panel, PanelHeader, PanelTitle, PanelBody } from '@/components/ui/panel
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Eye, Code } from 'lucide-react';
 import { RefineNotesDialog } from './RefineNotesDialog';
+import ReactMarkdown from 'react-markdown';
 
 interface SpeakerNotesEditorProps {
   deckId: string;
@@ -33,6 +34,7 @@ export function SpeakerNotesEditor({ deckId: _deckId }: SpeakerNotesEditorProps)
   const [localPresenterNotes, setLocalPresenterNotes] = useState(presenterNotes);
   const [localViewerNotes, setLocalViewerNotes] = useState(viewerNotes);
   const [refineDialogOpen, setRefineDialogOpen] = useState(false);
+  const [showMarkdownPreview, setShowMarkdownPreview] = useState(false);
 
   // Update local state when slide changes
   useEffect(() => {
@@ -135,23 +137,55 @@ export function SpeakerNotesEditor({ deckId: _deckId }: SpeakerNotesEditorProps)
             <Label htmlFor="presenter-notes" className="text-sm font-medium">
               Presenter Notes
             </Label>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setRefineDialogOpen(true)}
-              className="h-7"
-            >
-              <Sparkles className="w-3 h-3 mr-1.5" />
-              Refine with AI
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowMarkdownPreview(!showMarkdownPreview)}
+                className="h-7"
+              >
+                {showMarkdownPreview ? (
+                  <>
+                    <Code className="w-3 h-3 mr-1.5" />
+                    Edit
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-3 h-3 mr-1.5" />
+                    Preview
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRefineDialogOpen(true)}
+                className="h-7"
+              >
+                <Sparkles className="w-3 h-3 mr-1.5" />
+                Refine with AI
+              </Button>
+            </div>
           </div>
-          <Textarea
-            id="presenter-notes"
-            value={localPresenterNotes}
-            onChange={(e) => setLocalPresenterNotes(e.target.value)}
-            placeholder="Add notes for the presenter (visible during presentation mode)..."
-            className="min-h-[200px] resize-none font-mono text-sm"
-          />
+          {showMarkdownPreview ? (
+            <div className="min-h-[200px] border rounded-md p-3 bg-muted/30">
+              {localPresenterNotes ? (
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <ReactMarkdown>{localPresenterNotes}</ReactMarkdown>
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm">No presenter notes yet</p>
+              )}
+            </div>
+          ) : (
+            <Textarea
+              id="presenter-notes"
+              value={localPresenterNotes}
+              onChange={(e) => setLocalPresenterNotes(e.target.value)}
+              placeholder="Add notes for the presenter (visible during presentation mode)..."
+              className="min-h-[200px] resize-none font-mono text-sm"
+            />
+          )}
           <p className="text-xs text-muted-foreground">
             These notes are visible to the presenter during the presentation. Use markdown for formatting.
           </p>
