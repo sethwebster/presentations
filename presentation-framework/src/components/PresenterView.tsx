@@ -178,8 +178,10 @@ export function PresenterView({
                   onClick={() => handleSlideClick(index)}
                 >
                   <div className="thumbnail-number">{index + 1}</div>
-                  <div className={`thumbnail-preview ${slide.className}`}>
-                    {slide.id}
+                  <div className="thumbnail-preview">
+                    <ScalableSlidePreview className={slide.className}>
+                      {slide.content}
+                    </ScalableSlidePreview>
                   </div>
                 </div>
               ))}
