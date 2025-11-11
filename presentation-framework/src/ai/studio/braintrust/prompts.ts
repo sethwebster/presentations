@@ -177,10 +177,17 @@ ${JSON.stringify(themeTokens.colors, null, 2)}
 **Brand Rules (MUST FOLLOW):**
 ${brandRules.doNots.map(rule => `- ${rule}`).join('\n')}
 
-**Asset Proposals:**
-- Be specific: "minimalist line illustration of a growth chart" not "chart image"
+**Asset Proposals (IMPORTANT FOR IMAGES):**
+For slides that need background images, add to the assets array with kind: "img"
+- The "ref" field should contain an AI image generation prompt (NOT a URL)
+- Be specific and vivid: "minimalist line illustration of a growth chart with upward trending data, clean white background, professional style"
+- Describe style: "photorealistic", "illustrated", "abstract", "minimalist", etc.
+- Describe mood: "dramatic", "bright", "calm", "energetic", etc.
+- Include "professional presentation background" in the prompt
 - Provide alt text for accessibility
-- Only propose if it strengthens the message
+- Example: { "kind": "img", "ref": "abstract geometric shapes in teal and purple gradient, modern tech aesthetic, clean composition, professional presentation background", "alt": "Abstract tech background" }
+
+Only propose images if they strengthen the message. Most slides should have a background image.
 
 Return the complete deck JSON with layoutHint and assets assigned.`
       },

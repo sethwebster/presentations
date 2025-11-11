@@ -42,6 +42,15 @@ export function deckDefinitionToDeck(deckDef: DeckDefinition, braintrustDeck: Br
       return '';
     };
 
+    // Extract image prompt from Braintrust assets
+    const imageAsset = braintrustSlide?.assets?.find(a => a.kind === 'img');
+    const imagePrompt = imageAsset?.ref || '';
+
+    // Log for debugging
+    if (imagePrompt) {
+      console.log(`[Adapter] Slide ${index + 1} image prompt:`, imagePrompt.substring(0, 100));
+    }
+
     return {
       id: slide.id,
       slide_number: index + 1,
@@ -50,7 +59,7 @@ export function deckDefinitionToDeck(deckDef: DeckDefinition, braintrustDeck: Br
         : 'grid',
       title: titleElement ? getTextContent(titleElement) : '',
       content: bodyElements.map(getTextContent),
-      image_prompt: braintrustSlide?.assets?.find(a => a.kind === 'img')?.ref || '',
+      image_prompt: imagePrompt,
       decorative_elements: braintrustSlide?.assets?.filter(a => a.kind === 'icon').map(a => a.ref).join(', ') || '',
       animation: 'fade-in',
       background: 'dark',

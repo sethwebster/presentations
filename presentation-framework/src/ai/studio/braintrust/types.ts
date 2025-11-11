@@ -29,7 +29,7 @@ export interface BraintrustSlide {
 
 export interface BraintrustAsset {
   kind: "img" | "icon" | "chart";
-  ref: string;                   // URL or asset ID
+  ref: string;                   // For kind='img': AI image generation prompt; For others: URL or asset ID
   alt?: string;                  // Accessibility text
 }
 
