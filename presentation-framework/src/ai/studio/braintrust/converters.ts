@@ -71,13 +71,18 @@ function braintrustSlideToDeckSlide(
     });
   }
 
+  // Format notes as object with presenter field to support markdown
+  const notes = braintrustSlide.notes
+    ? { presenter: braintrustSlide.notes }
+    : undefined;
+
   return {
     id: braintrustSlide.id,
     title: title || `Slide ${index + 1}`,
     layout: layout,
     background: determineBackground(braintrustSlide.role, themeId),
     elements,
-    notes: braintrustSlide.notes,
+    notes,
   };
 }
 
@@ -212,6 +217,12 @@ function createAssetElement(
         ? { x: 0, y: 0, width: 1920, height: 1080 }
         : { x: 1000, y: 200, width: 800, height: 600 },
       style: {},
+      metadata: {
+        aiGenerated: true,
+        generationSource: 'braintrust',
+        originalPrompt: asset.ref,
+        canRefine: true,
+      },
     };
   }
 

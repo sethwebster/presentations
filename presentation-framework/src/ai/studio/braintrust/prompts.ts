@@ -102,12 +102,22 @@ Your task is to expand each slide with tight, impactful copy.
 - Concrete over abstract
 - Visual-friendly (leave room for design)
 
-**Presenter Notes Rules:**
+**Presenter Notes Rules (Use Markdown):**
 - Max 600 characters
-- Provide context and examples
-- Include delivery cues
-- Add timing if relevant
+- Use **bold** for key points and section headers
+- Use bullet lists (- ) for talking points
+- Use > blockquotes for important reminders or timing cues
+- Provide context, examples, and transitions
+- Include delivery cues and audience engagement tips
+- Add timing if relevant (e.g., "2 min")
 - Help the presenter, don't repeat slide content
+- Example format:
+  ```
+  **Opening** - Pause for effect, scan the room
+  - Share personal story about [topic]
+  - Ask rhetorical question to engage
+  > Keep energy HIGH, this sets the tone
+  ```
 
 **Slide Roles (keep intact):**
 - title: High-impact opener

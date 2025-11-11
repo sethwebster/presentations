@@ -68,7 +68,7 @@ export function deckDefinitionToDeck(deckDef: DeckDefinition, braintrustDeck: Br
         accent: '#16C2C7',
         text: '#FFFFFF',
       },
-      notes: typeof slide.notes === 'string' ? slide.notes : '',
+      notes: typeof slide.notes === 'string' ? slide.notes : (slide.notes?.presenter || ''),
       duration_seconds: 30,
     };
   });
