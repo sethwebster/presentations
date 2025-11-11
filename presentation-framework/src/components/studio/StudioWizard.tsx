@@ -78,8 +78,8 @@ export const StudioWizard: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm overflow-y-auto">
-      <div className="w-full max-w-4xl mx-auto p-8 space-y-8 my-8">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm overflow-y-auto py-8">
+      <div className="w-full max-w-4xl mx-auto px-8 space-y-8">
       <div className="flex items-start justify-between">
         <div className="space-y-2">
           <h1 className="text-4xl font-bold text-white">Lume Studio</h1>
