@@ -6,6 +6,9 @@ import type { SlideNotes } from '@/rsc/types';
 import { Panel, PanelHeader, PanelTitle, PanelBody } from '@/components/ui/panel';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Sparkles } from 'lucide-react';
+import { RefineNotesDialog } from './RefineNotesDialog';
 
 interface SpeakerNotesEditorProps {
   deckId: string;
@@ -29,6 +32,7 @@ export function SpeakerNotesEditor({ deckId: _deckId }: SpeakerNotesEditorProps)
 
   const [localPresenterNotes, setLocalPresenterNotes] = useState(presenterNotes);
   const [localViewerNotes, setLocalViewerNotes] = useState(viewerNotes);
+  const [refineDialogOpen, setRefineDialogOpen] = useState(false);
 
   // Update local state when slide changes
   useEffect(() => {
@@ -127,9 +131,20 @@ export function SpeakerNotesEditor({ deckId: _deckId }: SpeakerNotesEditorProps)
       <PanelBody className="space-y-4">
         {/* Presenter Notes */}
         <div className="space-y-2">
-          <Label htmlFor="presenter-notes" className="text-sm font-medium">
-            Presenter Notes
-          </Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="presenter-notes" className="text-sm font-medium">
+              Presenter Notes
+            </Label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRefineDialogOpen(true)}
+              className="h-7"
+            >
+              <Sparkles className="w-3 h-3 mr-1.5" />
+              Refine with AI
+            </Button>
+          </div>
           <Textarea
             id="presenter-notes"
             value={localPresenterNotes}
@@ -138,7 +153,7 @@ export function SpeakerNotesEditor({ deckId: _deckId }: SpeakerNotesEditorProps)
             className="min-h-[200px] resize-none font-mono text-sm"
           />
           <p className="text-xs text-muted-foreground">
-            These notes are visible to the presenter during the presentation.
+            These notes are visible to the presenter during the presentation. Use markdown for formatting.
           </p>
         </div>
 
@@ -175,6 +190,19 @@ export function SpeakerNotesEditor({ deckId: _deckId }: SpeakerNotesEditorProps)
             </div>
           </div>
         )}
+
+        {/* Refine Notes Dialog */}
+        <RefineNotesDialog
+          open={refineDialogOpen}
+          onOpenChange={setRefineDialogOpen}
+          currentNotes={localPresenterNotes}
+          slideTitle={currentSlide.title}
+          slideContent={currentSlide.elements?.find(el => el.type === 'text' && 'content' in el)?.content as string}
+          onApplyNotes={(refinedNotes) => {
+            setLocalPresenterNotes(refinedNotes);
+            saveNotes(refinedNotes, localViewerNotes);
+          }}
+        />
       </PanelBody>
     </Panel>
   );
