@@ -31,7 +31,7 @@ export function deckDefinitionToPresentation(
   deck: DeckDefinition,
   assetsBase?: string,
 ): DeckPresentation {
-  const slides = deck.slides.map((slide) => slideDefinitionToSlideData(slide, assetsBase));
+  const slides = deck.slides.map((slide) => slideDefinitionToSlideData(slide, assetsBase, deck.settings));
 
   const config: PresentationConfig = {};
   const customStyles = getThemeCustomStyles(deck.theme);
@@ -73,10 +73,10 @@ export function createPresentationModuleFromDeck(
   };
 }
 
-function slideDefinitionToSlideData(slide: SlideDefinition, assetsBase?: string): SlideData {
+function slideDefinitionToSlideData(slide: SlideDefinition, assetsBase?: string, deckSettings?: DeckDefinition['settings']): SlideData {
   // Extract timeline-controlled element IDs so we can skip CSS animations
   const timelineTargets = extractTimelineTargets(slide.timeline);
-  const content = renderSlide(slide, assetsBase, timelineTargets);
+  const content = renderSlide(slide, assetsBase, timelineTargets, deckSettings);
   const notesValue = slide.notes;
   let presenterNotes: string | undefined;
   if (typeof notesValue === 'string') {
@@ -118,7 +118,7 @@ function extractTimelineTargets(timeline?: SlideDefinition['timeline']): Set<str
   return targets;
 }
 
-function renderSlide(slide: SlideDefinition, assetsBase?: string, timelineTargets?: Set<string>): ReactNode {
+function renderSlide(slide: SlideDefinition, assetsBase?: string, timelineTargets?: Set<string>, deckSettings?: DeckDefinition['settings']): ReactNode {
   // Helper to convert gradient object to CSS string
   const gradientToCSS = (grad: any): string => {
     if (!grad || typeof grad !== 'object') return '#ffffff';
@@ -174,10 +174,25 @@ function renderSlide(slide: SlideDefinition, assetsBase?: string, timelineTarget
     }
   }
 
+  // If still no background, check deck settings for default background
+  if (!backgroundValue && deckSettings?.defaultBackground) {
+    const defaultBg = deckSettings.defaultBackground;
+    if (typeof defaultBg === 'string') {
+      backgroundValue = defaultBg;
+    } else if (typeof defaultBg === 'object') {
+      if ((defaultBg as any).type === 'color') {
+        backgroundValue = (defaultBg as any).value as string;
+      } else if ((defaultBg as any).type === 'gradient') {
+        backgroundValue = gradientToCSS((defaultBg as any).value);
+      }
+    }
+  }
+
   const slideStyle: CSSProperties = {
     position: 'relative',
-    overflow: 'visible',
-    ...(backgroundValue ? { background: backgroundValue } : {}),
+    overflow: 'hidden',
+    // Default to white background if no background is specified (matches editor default)
+    background: backgroundValue || '#ffffff',
   };
   // Don't set viewTransitionName here - it's set by SlideViewTransition wrapper in Presentation.tsx
 
@@ -193,37 +208,38 @@ function renderSlide(slide: SlideDefinition, assetsBase?: string, timelineTarget
 }
 
 function extractLayerList(slide: SlideDefinition): LayerDefinition[] {
-  // First, check if inline elements exist (elements added directly to slide)
+  const layers: LayerDefinition[] = [];
+
+  // First, add inline elements as a layer with order -1 (renders below all other layers)
   const inlineElements = (slide as SlideDefinition & { elements?: ElementDefinition[] }).elements;
   if (Array.isArray(inlineElements) && inlineElements.length > 0) {
-    return [
-      {
-        id: `${slide.id}-layer`,
-        order: 0,
-        elements: inlineElements,
-      },
-    ];
+    layers.push({
+      id: `${slide.id}-inline-layer`,
+      order: -1, // Render before layers (lower order = render first/bottom)
+      elements: inlineElements,
+    });
   }
 
-  // If no inline elements, check layers
+  // Then, add all actual layers (sorted by order will happen in renderSlide)
   if (Array.isArray(slide.layers)) {
-    // Filter to only layers that have elements
-    const layersWithElements = slide.layers.filter(layer => 
+    const layersWithElements = slide.layers.filter(layer =>
       Array.isArray(layer.elements) && layer.elements.length > 0
     );
-    if (layersWithElements.length > 0) {
-      return layersWithElements;
-    }
+    layers.push(...layersWithElements);
   }
 
-  return [];
+  // Sort by order (lower order = render first/bottom, higher order = render last/top)
+  return layers.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
 function renderLayer(layer: LayerDefinition, assetsBase?: string, timelineTargets?: Set<string>): ReactNode {
   const layerStyle: CSSProperties = {
-    position: 'relative',
+    position: 'absolute',
+    top: 0,
+    left: 0,
     width: '100%',
-    minHeight: '100%',
+    height: '100%',
+    pointerEvents: 'none', // Allow clicking through to lower layers
   };
 
   return (
@@ -297,6 +313,7 @@ function renderTextElement(element: TextElementDefinition, _assetsBase?: string,
     // Timeline-controlled elements start hidden to avoid flash
     ...(skipCssAnimation && { opacity: 0 }),
     overflow: 'visible',
+    pointerEvents: 'auto', // Restore pointer events (layer has pointer-events: none)
   };
 
   return (
@@ -683,6 +700,7 @@ function renderMediaElement(element: MediaElementDefinition, assetsBase?: string
     ...style,
     ...(animationAttrs?.style ?? {}),
     ...(skipCssAnimation && { opacity: 0 }),
+    pointerEvents: 'auto', // Restore pointer events (layer has pointer-events: none)
   };
   const resolvedSrc = resolveAssetPath(element.src, assetsBase);
 
@@ -703,16 +721,30 @@ function renderMediaElement(element: MediaElementDefinition, assetsBase?: string
     );
   }
 
+  // For images, wrap in a container div (like the editor does) to properly handle bounds + objectFit
+  // Note: element was originally ImageElementDefinition before conversion to MediaElementDefinition
+  const objectFit = (element as any).objectFit || 'cover';
+  const imgStyle: CSSProperties = {
+    width: '100%',
+    height: '100%',
+    objectFit: objectFit,
+    display: 'block',
+  };
+
   return (
-    <img
+    <div
       key={element.id}
       className={className}
       style={combinedStyle}
       data-element-id={element.id}
-      src={resolvedSrc}
-      alt={String((element.metadata as Record<string, unknown> | undefined)?.alt ?? '')}
       {...(animationAttrs?.dataAttrs ?? {})}
-    />
+    >
+      <img
+        src={resolvedSrc}
+        alt={String((element.metadata as Record<string, unknown> | undefined)?.alt ?? '')}
+        style={imgStyle}
+      />
+    </div>
   );
 }
 
@@ -723,28 +755,24 @@ function renderShapeElement(element: ShapeElementDefinition, _assetsBase?: strin
   const combinedStyle: CSSPropertiesWithVars = {
     ...style,
     ...(animationAttrs?.style ?? {}),
-    ...(skipCssAnimation && { opacity: 0 }),
+    pointerEvents: 'auto', // Restore pointer events (layer has pointer-events: none)
   };
-  
-  // Convert fill to background if fill is present and background is not
-  if (element.style && !combinedStyle.background && !combinedStyle.backgroundColor) {
+
+  // Convert gradient fills to background (string fills are handled in applyStyleRecord)
+  if (element.style) {
     const fill = (element.style as Record<string, unknown>).fill;
-    if (fill) {
-      if (typeof fill === 'string') {
-        combinedStyle.background = fill;
-      } else if (fill && typeof fill === 'object') {
-        const grad = fill as any;
-        if (grad.type === 'linear') {
-          const stops = grad.stops?.map((s: any) => `${s.color} ${s.position}%`).join(', ') || '';
-          combinedStyle.background = `linear-gradient(${grad.angle || 0}deg, ${stops})`;
-        } else if (grad.type === 'radial') {
-          const stops = grad.stops?.map((s: any) => `${s.color} ${s.position}%`).join(', ') || '';
-          combinedStyle.background = `radial-gradient(${stops})`;
-        }
+    if (fill && typeof fill === 'object') {
+      const grad = fill as any;
+      if (grad.type === 'linear') {
+        const stops = grad.stops?.map((s: any) => `${s.color} ${s.position}%`).join(', ') || '';
+        combinedStyle.background = `linear-gradient(${grad.angle || 0}deg, ${stops})`;
+      } else if (grad.type === 'radial') {
+        const stops = grad.stops?.map((s: any) => `${s.color} ${s.position}%`).join(', ') || '';
+        combinedStyle.background = `radial-gradient(${stops})`;
       }
     }
   }
-  
+
   // Handle stroke (border) from style
   if (element.style) {
     const styleRecord = element.style as Record<string, unknown>;
@@ -756,11 +784,70 @@ function renderShapeElement(element: ShapeElementDefinition, _assetsBase?: strin
       combinedStyle.border = `${width}px solid ${color}`;
     }
   }
-  
+
+  // Ensure shapes have minimum dimensions to be visible
+  if (!combinedStyle.minWidth) combinedStyle.minWidth = '1px';
+  if (!combinedStyle.minHeight) combinedStyle.minHeight = '1px';
+
+  // Explicitly ensure opacity is applied from element.style if present
+  // This must come AFTER all other style processing to ensure it's not overridden
+  // NOTE: PropertiesPanel stores opacity as 0-100, but CSS expects 0-1, so we need to convert
+  if (element.style && typeof (element.style as Record<string, unknown>).opacity !== 'undefined') {
+    const opacityValue = (element.style as Record<string, unknown>).opacity;
+    if (typeof opacityValue === 'number') {
+      // Convert from 0-100 to 0-1 if needed (values > 1 are assumed to be percentages)
+      combinedStyle.opacity = opacityValue > 1 ? opacityValue / 100 : opacityValue;
+    } else if (typeof opacityValue === 'string') {
+      const numOpacity = Number(opacityValue);
+      combinedStyle.opacity = numOpacity > 1 ? numOpacity / 100 : numOpacity;
+    }
+  }
+
+  // Timeline-controlled elements start hidden to avoid flash
+  if (skipCssAnimation) {
+    combinedStyle.opacity = 0;
+  }
+
   if (element.shapeType === 'ellipse') {
     combinedStyle.borderRadius = '50%';
   } else if (element.shapeType === 'rect') {
     combinedStyle.borderRadius = combinedStyle.borderRadius ?? 0;
+  } else if (element.shapeType === 'triangle') {
+    // Use CSS clip-path to create a triangle
+    (combinedStyle as any).clipPath = 'polygon(50% 0%, 0% 100%, 100% 100%)';
+  } else if (element.shapeType === 'line') {
+    // Render line as a thin rectangle rotated
+    const data = element.data || {};
+    const x1 = (data.x1 as number) || 0;
+    const y1 = (data.y1 as number) || 0;
+    const x2 = (data.x2 as number) || 100;
+    const y2 = (data.y2 as number) || 0;
+
+    const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+    const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
+    const styleRecord = element.style as Record<string, unknown> | undefined;
+    const strokeWidth = (styleRecord?.strokeWidth as number) || 2;
+
+    combinedStyle.width = `${length}px`;
+    combinedStyle.height = `${strokeWidth}px`;
+    combinedStyle.transform = `rotate(${angle}deg)`;
+    combinedStyle.transformOrigin = 'left center';
+    combinedStyle.position = 'absolute';
+    combinedStyle.left = `${x1}%`;
+    combinedStyle.top = `${y1}%`;
+  } else if (element.shapeType === 'polygon') {
+    // Create regular polygon using clip-path
+    const sides = (element.data?.sides as number) || 6;
+    const points: string[] = [];
+
+    for (let i = 0; i < sides; i++) {
+      const angle = (i * 2 * Math.PI) / sides - Math.PI / 2; // Start from top
+      const x = 50 + 50 * Math.cos(angle);
+      const y = 50 + 50 * Math.sin(angle);
+      points.push(`${x}% ${y}%`);
+    }
+
+    (combinedStyle as any).clipPath = `polygon(${points.join(', ')})`;
   }
 
   return (
@@ -908,10 +995,10 @@ function mergeStyles(
 
   if (element.bounds) {
     const { x, y, width, height, rotation, scaleX, scaleY, originX, originY } = element.bounds;
-    style.left = x;
-    style.top = y;
-    style.width = width;
-    style.height = height;
+    style.left = `${x}px`;
+    style.top = `${y}px`;
+    style.width = `${width}px`;
+    style.height = `${height}px`;
 
     // Calculate transform origin from originX/originY (default is center)
     let transformOrigin = 'center';
@@ -967,6 +1054,11 @@ function isValidCSSProperty(key: string, value: unknown): boolean {
 }
 
 function applyStyleRecord(target: CSSPropertiesWithVars, styleRecord: Record<string, unknown>) {
+  // Handle fill property for shapes - convert to background if it's a simple color
+  if (styleRecord.fill && typeof styleRecord.fill === 'string' && !styleRecord.background && !styleRecord.backgroundColor) {
+    target.background = styleRecord.fill as string;
+  }
+
   if (typeof styleRecord.position === 'string') {
     target.position = styleRecord.position as CSSProperties['position'];
   }
@@ -998,10 +1090,13 @@ function applyStyleRecord(target: CSSPropertiesWithVars, styleRecord: Record<str
     target.backgroundColor = styleRecord.backgroundColor;
   }
   if (typeof styleRecord.opacity === 'number') {
-    target.opacity = styleRecord.opacity;
+    // PropertiesPanel stores opacity as 0-100, CSS expects 0-1
+    // Values > 1 are assumed to be percentages and need conversion
+    target.opacity = styleRecord.opacity > 1 ? styleRecord.opacity / 100 : styleRecord.opacity;
   }
   if (typeof styleRecord.opacity === 'string') {
-    target.opacity = Number(styleRecord.opacity);
+    const numOpacity = Number(styleRecord.opacity);
+    target.opacity = numOpacity > 1 ? numOpacity / 100 : numOpacity;
   }
   if (typeof styleRecord.fontSize === 'number') {
     target.fontSize = styleRecord.fontSize;
@@ -1124,8 +1219,15 @@ function applyStyleRecord(target: CSSPropertiesWithVars, styleRecord: Record<str
 }
 
 function resolveAssetPath(src: string, assetsBase?: string): string {
-  if (!assetsBase) return src;
   if (!src) return src;
+
+  // Handle asset:// references
+  if (src.startsWith('asset://sha256:')) {
+    const hash = src.substring('asset://sha256:'.length);
+    return `/api/asset/${hash}`;
+  }
+
+  if (!assetsBase) return src;
   // Don't modify absolute URLs (http/https), absolute paths (/), or data URLs (data:)
   if (/^https?:\/\//.test(src) || src.startsWith('/') || src.startsWith('data:')) return src;
 

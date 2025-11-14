@@ -66,7 +66,7 @@ export interface DeckMeta {
 export interface SlideSize {
   width: number;
   height: number;
-  preset?: 'standard' | 'ultrawide' | 'cinema' | 'square' | 'custom';
+  preset?: 'standard' | 'ultrawide' | '4k' | 'cinema' | 'square' | 'custom';
   units?: 'pixels' | 'points' | 'inches' | 'centimeters';
 }
 
@@ -478,8 +478,8 @@ export interface ImageElementDefinition extends BaseElementDefinition {
 
 export interface ShapeElementDefinition extends BaseElementDefinition {
   type: 'shape';
-  shapeType: 'rect' | 'ellipse' | 'path' | 'polygon';
-  data?: Record<string, unknown>;
+  shapeType: 'rect' | 'ellipse' | 'triangle' | 'line' | 'path' | 'polygon';
+  data?: Record<string, unknown>; // For polygon: { sides: number }, for line: { x1, y1, x2, y2 }
 }
 
 export interface ChartElementDefinition extends BaseElementDefinition {

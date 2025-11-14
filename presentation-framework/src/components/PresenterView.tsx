@@ -7,6 +7,7 @@ import { keyboardService } from '../services/KeyboardService';
 import '../styles/PresenterView.css';
 import { AutopilotHUD } from '../autopilot/ui/AutopilotHUD';
 import { EmojiFloaters } from './EmojiFloaters';
+import { ScalableSlidePreview } from './ScalableSlidePreview';
 import { SlideData } from '../types/presentation';
 import { ReactionData, CountdownState } from '../types/services';
 
@@ -140,8 +141,10 @@ export function PresenterView({
         <div className="presenter-main">
           <div className="current-slide-preview">
             <h2>Current Slide</h2>
-            <div className={`slide-preview ${current.className}`}>
-              {current.content}
+            <div className="slide-preview">
+              <ScalableSlidePreview className={current.className}>
+                {current.content}
+              </ScalableSlidePreview>
             </div>
           </div>
 
@@ -157,8 +160,10 @@ export function PresenterView({
           {next && (
             <div className="next-slide-preview">
               <h2>Next Slide</h2>
-              <div className={`slide-preview-small ${next.className}`}>
-                {next.content}
+              <div className="slide-preview-small">
+                <ScalableSlidePreview className={next.className}>
+                  {next.content}
+                </ScalableSlidePreview>
               </div>
             </div>
           )}
@@ -173,8 +178,10 @@ export function PresenterView({
                   onClick={() => handleSlideClick(index)}
                 >
                   <div className="thumbnail-number">{index + 1}</div>
-                  <div className={`thumbnail-preview ${slide.className}`}>
-                    {slide.id}
+                  <div className="thumbnail-preview">
+                    <ScalableSlidePreview className={slide.className}>
+                      {slide.content}
+                    </ScalableSlidePreview>
                   </div>
                 </div>
               ))}

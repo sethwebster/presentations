@@ -2,6 +2,72 @@
 
 import { useState, useEffect, useRef } from 'react';
 
+/**
+ * Extract alpha value from color string
+ * Supports: #RRGGBBAA, rgba(r,g,b,a), transparent
+ */
+function extractAlpha(color: string): number {
+  if (color === 'transparent') return 0;
+
+  // Check for #RRGGBBAA format
+  if (color.startsWith('#') && color.length === 9) {
+    const alpha = parseInt(color.slice(7, 9), 16) / 255;
+    return Math.round(alpha * 100) / 100;
+  }
+
+  // Check for rgba() format
+  if (color.startsWith('rgba(')) {
+    const match = color.match(/rgba?\([\d\s]+,[\d\s]+,[\d\s]+,\s*([\d.]+)\)/);
+    if (match) {
+      return parseFloat(match[1]);
+    }
+  }
+
+  // Check for rgb() format (alpha = 1)
+  if (color.startsWith('rgb(')) {
+    return 1;
+  }
+
+  return 1;
+}
+
+/**
+ * Convert hex color to hex without alpha
+ */
+function stripAlpha(color: string): string {
+  if (color.startsWith('#') && color.length === 9) {
+    return color.slice(0, 7);
+  }
+  if (color.startsWith('rgba(') || color.startsWith('rgb(')) {
+    const match = color.match(/rgba?\(([\d\s]+),([\d\s]+),([\d\s]+)/);
+    if (match) {
+      const r = parseInt(match[1].trim());
+      const g = parseInt(match[2].trim());
+      const b = parseInt(match[3].trim());
+      return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    }
+  }
+  return color;
+}
+
+/**
+ * Apply alpha to hex color
+ */
+function applyAlpha(hexColor: string, alpha: number): string {
+  if (alpha === 0) return 'transparent';
+
+  // Remove any existing alpha
+  const baseColor = stripAlpha(hexColor);
+
+  if (alpha === 1) {
+    return baseColor;
+  }
+
+  // Convert to #RRGGBBAA format
+  const alphaHex = Math.round(alpha * 255).toString(16).padStart(2, '0');
+  return `${baseColor}${alphaHex}`;
+}
+
 interface AngleWheelProps {
   angle: number;
   onChange: (angle: number) => void;
@@ -427,6 +493,7 @@ const GRADIENT_PRESETS = [
 interface GradientStop {
   color: string;
   position: number;
+  alpha?: number; // Optional alpha for gradient stops
 }
 
 interface CustomGradient {
@@ -443,6 +510,13 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
   const [solidColor, setSolidColor] = useState(
     typeof value === 'string' ? value : '#16C2C7'
   );
+  const [solidAlpha, setSolidAlpha] = useState(() => {
+    if (typeof value === 'string') {
+      const alpha = extractAlpha(value);
+      return alpha;
+    }
+    return 1;
+  });
   const [customGradient, setCustomGradient] = useState<CustomGradient>(() => {
     if (typeof value === 'object' && value) {
       const grad = value as any;
@@ -469,7 +543,8 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
   useEffect(() => {
     if (typeof value === 'string') {
       setMode('solid');
-      setSolidColor(value);
+      setSolidColor(stripAlpha(value));
+      setSolidAlpha(extractAlpha(value));
     } else {
       setMode('gradient');
       if (value && typeof value === 'object') {
@@ -497,9 +572,19 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
-  const handleSolidColorChange = (color: string) => {
-    setSolidColor(color);
-    onChange(color);
+  const handleSolidColorChange = (color: string, alpha?: number) => {
+    const baseColor = stripAlpha(color);
+    setSolidColor(baseColor);
+
+    const alphaValue = alpha !== undefined ? alpha : solidAlpha;
+    const finalColor = applyAlpha(baseColor, alphaValue);
+    onChange(finalColor);
+  };
+
+  const handleAlphaChange = (alpha: number) => {
+    setSolidAlpha(alpha);
+    const finalColor = applyAlpha(solidColor, alpha);
+    onChange(finalColor);
   };
 
   const handleGradientSelect = (gradient: any) => {
@@ -538,7 +623,15 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
 
   const updateStopColor = (index: number, color: string) => {
     const newStops = [...customGradient.stops];
-    newStops[index] = { ...newStops[index], color };
+    const currentAlpha = newStops[index].alpha ?? extractAlpha(newStops[index].color);
+    newStops[index] = { ...newStops[index], color: applyAlpha(color, currentAlpha), alpha: currentAlpha };
+    updateCustomGradient({ stops: newStops });
+  };
+
+  const updateStopAlpha = (index: number, alpha: number) => {
+    const newStops = [...customGradient.stops];
+    const baseColor = stripAlpha(newStops[index].color);
+    newStops[index] = { ...newStops[index], color: applyAlpha(baseColor, alpha), alpha };
     updateCustomGradient({ stops: newStops });
   };
 
@@ -751,7 +844,7 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
               </div>
 
               {/* Custom Color Input */}
-              <div>
+              <div style={{ marginBottom: '12px' }}>
                 <label style={{ fontSize: '10px', color: 'rgba(236, 236, 236, 0.6)', marginBottom: '6px', display: 'block' }}>
                   Custom Color
                 </label>
@@ -767,6 +860,44 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
                     cursor: 'pointer',
                   }}
                 />
+              </div>
+
+              {/* Alpha Slider */}
+              <div>
+                <label style={{ fontSize: '10px', color: 'rgba(236, 236, 236, 0.6)', marginBottom: '6px', display: 'block' }}>
+                  Opacity: {Math.round(solidAlpha * 100)}%
+                </label>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={Math.round(solidAlpha * 100)}
+                    onChange={(e) => handleAlphaChange(parseInt(e.target.value) / 100)}
+                    style={{
+                      flex: 1,
+                      cursor: 'pointer',
+                      accentColor: 'var(--lume-primary)',
+                    }}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={Math.round(solidAlpha * 100)}
+                    onChange={(e) => handleAlphaChange(Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) / 100)}
+                    style={{
+                      width: '50px',
+                      padding: '4px 6px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(236, 236, 236, 0.2)',
+                      borderRadius: '4px',
+                      color: 'var(--lume-mist)',
+                      fontSize: '11px',
+                      textAlign: 'center',
+                    }}
+                  />
+                </div>
               </div>
             </>
           ) : (
@@ -920,7 +1051,7 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                         <input
                           type="color"
-                          value={customGradient.stops[editingStopIndex]?.color === 'transparent' ? '#FFFFFF' : customGradient.stops[editingStopIndex]?.color || '#FFFFFF'}
+                          value={stripAlpha(customGradient.stops[editingStopIndex]?.color || '#FFFFFF')}
                           onChange={(e) => updateStopColor(editingStopIndex, e.target.value)}
                           style={{
                             width: '40px',
@@ -930,23 +1061,44 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
                             cursor: 'pointer',
                           }}
                         />
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={customGradient.stops[editingStopIndex]?.position || 0}
-                          onChange={(e) => updateStopPosition(editingStopIndex, parseInt(e.target.value) || 0)}
-                          style={{
-                            flex: 1,
-                            padding: '6px',
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            border: '1px solid rgba(236, 236, 236, 0.2)',
-                            borderRadius: '4px',
-                            color: 'var(--lume-mist)',
-                            fontSize: '12px',
-                          }}
-                        />
-                        <span style={{ fontSize: '11px', color: 'rgba(236, 236, 236, 0.6)' }}>%</span>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={customGradient.stops[editingStopIndex]?.position || 0}
+                              onChange={(e) => updateStopPosition(editingStopIndex, parseInt(e.target.value) || 0)}
+                              style={{
+                                flex: 1,
+                                padding: '6px',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                border: '1px solid rgba(236, 236, 236, 0.2)',
+                                borderRadius: '4px',
+                                color: 'var(--lume-mist)',
+                                fontSize: '12px',
+                              }}
+                            />
+                            <span style={{ fontSize: '11px', color: 'rgba(236, 236, 236, 0.6)' }}>%</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={Math.round((customGradient.stops[editingStopIndex]?.alpha ?? extractAlpha(customGradient.stops[editingStopIndex]?.color || '#FFFFFF')) * 100)}
+                              onChange={(e) => updateStopAlpha(editingStopIndex, parseInt(e.target.value) / 100)}
+                              style={{
+                                flex: 1,
+                                cursor: 'pointer',
+                                accentColor: 'var(--lume-primary)',
+                              }}
+                            />
+                            <span style={{ fontSize: '10px', color: 'rgba(236, 236, 236, 0.6)', width: '35px' }}>
+                              {Math.round((customGradient.stops[editingStopIndex]?.alpha ?? extractAlpha(customGradient.stops[editingStopIndex]?.color || '#FFFFFF')) * 100)}%
+                            </span>
+                          </div>
+                        </div>
                         {customGradient.stops.length > 2 && (
                           <button
                             onClick={() => removeGradientStop(editingStopIndex)}

@@ -433,6 +433,12 @@ export function Presentation({ slides, config = {} }: PresentationProps): React.
       return;
     }
 
+    // Skip if a transition is already in progress to prevent abort errors
+    if (slideTransitionInProgressRef.current) {
+      console.log('⏭️ Skipping slide transition - transition already in progress');
+      return;
+    }
+
     const config = resolveTransitionConfig(fromIndex, targetIndex, options?.overrideType ?? null);
     console.log('🎬 Slide transition requested', {
       from: fromIndex,
@@ -1040,7 +1046,7 @@ function resolveAnimationPhases(
   }
 
   phases.initialOpacity = ensureOpacity(phases.initialOpacity, fallbackOpacity || '0');
-  phases.finalOpacity = ensureOpacity(phases.finalOpacity, fallbackOpacity || '');
+  phases.finalOpacity = ensureOpacity(phases.finalOpacity, fallbackOpacity || '1');
 
   return phases;
 }

@@ -72,22 +72,8 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
   const finalHeight = orientation === 'portrait' ? canvasWidth : canvasHeight;
 
   const handleClick = (e: React.MouseEvent) => {
-    // Handle background-like elements (images that fill canvas) - select slide and let event bubble
-    const fillsCanvas = bounds.x === 0 && bounds.y === 0 && 
-      bounds.width >= finalWidth - 1 && bounds.height >= finalHeight - 1; // Allow for small rounding differences
-    const isBackgroundLike = fillsCanvas && element.type === 'image';
-    
-    if (isBackgroundLike) {
-      // Select the slide immediately, don't stop propagation so canvas can handle it too
-      const currentState = editor.getState();
-      const currentSlide = currentState.deck?.slides[currentState.currentSlideIndex];
-      if (currentSlide) {
-        editor.setSelectedSlide(currentSlide.id);
-      }
-      // Don't stop propagation - let canvas handle it for immediate feedback
-      return;
-    }
-    
+    // All elements (including full-screen images) now behave the same
+    // To select slide instead, click outside canvas or use sidebar
     e.stopPropagation();
     editor.selectElement(element.id, e.shiftKey);
   };
@@ -153,7 +139,7 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return; // Only left mouse button
     if (isEditingText) return; // Don't drag while editing text
-    
+
     // Check if element is locked - show padlock cursor and prevent drag
     if (isLocked) {
       e.preventDefault();
@@ -166,22 +152,10 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
       }, 300);
       return;
     }
-    
-    // Prevent dragging of background-like elements (images that fill the canvas)
-    // Background images should never be draggable - they're CSS properties, not elements
-    const fillsCanvas = bounds.x === 0 && bounds.y === 0 && 
-      bounds.width >= finalWidth - 1 && bounds.height >= finalHeight - 1;
-    const isBackgroundLike = fillsCanvas && element.type === 'image';
-    
-    if (isBackgroundLike) {
-      // Don't prevent default or stop propagation - let clicks bubble to canvas for slide selection
-      // Only prevent dragging
-      return;
-    }
-    
+
     e.preventDefault(); // Prevent text selection
     e.stopPropagation();
-    
+
     if (!isSelected) {
       editor.selectElement(element.id, e.shiftKey);
     }
@@ -378,13 +352,8 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
 
   // Check if element fills the entire canvas (expanded to fill)
   // This must be calculated before outerStyle uses it
-  const fillsCanvas = bounds.x === 0 && bounds.y === 0 && 
+  const fillsCanvas = bounds.x === 0 && bounds.y === 0 &&
     bounds.width >= finalWidth - 1 && bounds.height >= finalHeight - 1; // Allow for small rounding differences
-  
-  // If an element fills the canvas and is an image, it's likely a background
-  // Background images should never be draggable - they're CSS properties, not elements
-  // Prevent dragging if element fills canvas (treated as background-like)
-  const isBackgroundLike = fillsCanvas && element.type === 'image';
 
   // Calculate transform origin from bounds.originX/originY
   // Default is center (0, 0 offset)
@@ -454,19 +423,20 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
       onContextMenu={handleContextMenu}
       className={`
         absolute outline-none select-none
-        ${isDragging ? 'cursor-grabbing' : isLocked ? 'cursor-not-allowed' : isBackgroundLike ? 'cursor-default' : 'cursor-grab'}
+        ${isDragging ? 'cursor-grabbing' : isLocked ? 'cursor-not-allowed' : 'cursor-grab'}
       `}
       style={{
         ...outerStyle,
         display: isHidden ? 'none' : undefined,
-        border: isSelected && !fillsCanvas 
-          ? '2px solid var(--lume-primary, #16C2C7)' 
-          : fillsCanvas 
-            ? 'none' 
+        border: isSelected && !fillsCanvas
+          ? '2px solid var(--lume-primary, #16C2C7)'
+          : fillsCanvas
+            ? 'none'
             : '2px solid transparent',
         // Use renderIndex for z-index to match layer panel order (higher index = on top)
         // renderIndex starts at 1, so elements with higher renderIndex appear above
-        zIndex: isBackgroundLike ? 0 : (renderIndex !== undefined ? renderIndex : 1),
+        // Note: Background-like images now participate in normal z-ordering (no longer forced to 0)
+        zIndex: renderIndex !== undefined ? renderIndex : 1,
       }}
       onMouseDown={handleMouseDown}
     >
@@ -493,8 +463,8 @@ export function BaseElement({ element, slideId, onContextMenu: propOnContextMenu
         )}
       </div>
 
-      {/* Selection handles - don't show for background-like elements */}
-      {isSelected && !isBackgroundLike && (
+      {/* Selection handles */}
+      {isSelected && (
         <SelectionHandles element={element} />
       )}
 
