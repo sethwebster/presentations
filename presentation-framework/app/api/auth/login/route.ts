@@ -76,7 +76,14 @@ export async function POST(request: Request) {
       }
     } else {
       // Fallback to global password for backwards compatibility
-      const expectedPassword = process.env.LUME_CONTROL_SECRET || 'your_super_secret_key_here';
+      const expectedPassword = process.env.LUME_CONTROL_SECRET;
+      
+      if (!expectedPassword) {
+        console.error('LUME_CONTROL_SECRET is not configured');
+        const errorResponse: LoginResponse = { error: 'Server configuration error: authentication not configured' };
+        return NextResponse.json(errorResponse, { status: 503, headers: corsHeaders });
+      }
+      
       if (password !== expectedPassword) {
         const errorResponse: LoginResponse = { error: 'Invalid password' };
         return NextResponse.json(errorResponse, { status: 401, headers: corsHeaders });

@@ -1,2 +1,6 @@
 .DS_Store
 .vercel
+
+# Environment variables
+.env*
+!.env.example
