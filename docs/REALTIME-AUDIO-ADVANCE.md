@@ -44,8 +44,7 @@ presentation-framework/
 OPENAI_API_KEY=sk-...   # server-side only
 
 # Lume control
-LUME_CONTROL_SECRET=superlong_presenter_secret       # server-side
-VITE_LUME_CONTROL_SECRET=superlong_presenter_secret  # presenter client (only on presenter UI)
+LUME_CONTROL_SECRET=superlong_presenter_secret       # server-side only
 
 # Vercel KV (Redis by Upstash)
 KV_URL=...
@@ -53,7 +52,10 @@ KV_REST_API_URL=...
 KV_REST_API_TOKEN=...
 KV_REST_API_READ_ONLY_TOKEN=...
 
-Security: Only the presenter page gets VITE_LUME_CONTROL_SECRET. Viewer pages MUST NOT include it.
+Security: 
+- NEVER use VITE_ prefix for secrets - they are inlined in the public client bundle
+- Presenter authentication uses the /api/auth/login endpoint to obtain a session token
+- The token is stored securely and used for subsequent authenticated requests
 
 ⸻
 
@@ -94,7 +96,7 @@ send ONLY {"type":"advance"} over the data channel. Avoid false positives.`,
 }
 
 3.2 POST /api/control/advance/:deckId  (Edge)
-	•	Auth: Authorization: Bearer ${LUME_CONTROL_SECRET}
+	•	Auth: Requires presenter authentication token from /api/auth/login
 	•	Body: { "slide": number }
 	•	Effect: kv.hset(deck:<id>:state, { slide }) + kv.publish(deck:<id>:events, evt)
 
@@ -321,12 +323,16 @@ src/autopilot/ui/AutopilotHUD.tsx
 Usage (presenter page):
 
 const { connected, finalTranscript, connect, disconnect, sendSlideContext } = useRealtimeSpeech();
+// Note: Authentication token should be obtained via /api/auth/login
+// and stored in session/local storage, NOT embedded via VITE_ env vars
+const authToken = getPresenterAuthToken(); // Get from session storage
+
 const { getScore } = useAutoAdvance({
   deckId,
   currentSlide,
   transcript: finalTranscript,
   notesBySlide: speakerNotes,
-  bearer: import.meta.env.VITE_LUME_CONTROL_SECRET,
+  bearer: authToken,
 });
 
 useEffect(() => {
@@ -337,9 +343,10 @@ useEffect(() => {
 useEffect(() => {
   const onKey = (e: KeyboardEvent) => {
     if (e.code === 'Space') {
+      const authToken = getPresenterAuthToken(); // Get from session storage
       fetch(`/api/control/advance/${deckId}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${import.meta.env.VITE_LUME_CONTROL_SECRET}` },
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${authToken}` },
         body: JSON.stringify({ slide: currentSlide + 1 }),
       });
     }
@@ -429,9 +436,9 @@ npm run dev      # port 5173 (Vite; proxy /api to 3000)
 14) Cut-and-Paste Checklist
 	•	Add api/rt/ephemeral.ts (Edge) with OPENAI_API_KEY.
 	•	Implement useRealtimeSpeech.ts, useAutoAdvance.ts, matching.ts.
-	•	Wire HUD on presenter page; pass VITE_LUME_CONTROL_SECRET.
+	•	Wire HUD on presenter page; pass presenter auth token from session storage.
 	•	On currentSlide change → sendSlideContext(slide, notes[slide]).
-	•	Verify /api/control/advance/:deckId works (200) via curl.
+	•	Verify /api/control/advance/:deckId works (200) via curl with valid auth token.
 	•	Tune threshold, cooldown during rehearsal (start 0.78/4000ms).
 	•	Ship.
 

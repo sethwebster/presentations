@@ -27,7 +27,6 @@ KV_REST_API_URL=your_api_url
 KV_REST_API_TOKEN=your_token
 KV_REST_API_READ_ONLY_TOKEN=your_readonly_token
 LUME_CONTROL_SECRET=generate_a_long_random_secret
-VITE_LUME_CONTROL_SECRET=same_secret_as_above
 ```
 
 ### 2. Deploy to Vercel
@@ -77,7 +76,7 @@ SSE stream for realtime updates
 ### `/api/control/advance/[deckId]`
 Presenter control to advance slides
 - Method: `POST`
-- Auth: `Bearer {LUME_CONTROL_SECRET}`
+- Auth: Requires presenter authentication via `/api/auth/login` endpoint
 - Body: `{ slide: number }`
 
 ### `/api/react/[deckId]`
@@ -118,8 +117,9 @@ Presenter                    Vercel KV (Redis)              Viewers
 
 ## Security
 
-- Presenter control requires `LUME_CONTROL_SECRET`
+- Presenter control requires authentication (set `LUME_CONTROL_SECRET` environment variable)
 - Per-deck isolation using unique deck IDs
+- Deck-specific presenter passwords can be set via deck metadata
 - Reactions are public (no auth required)
 
 ## Performance

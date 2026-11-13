@@ -72,7 +72,6 @@ Current keys already use `lume-` prefix:
 
 ### 5.2 Environment Variables (Already Lume)
 - `LUME_CONTROL_SECRET` ✓
-- `VITE_LUME_CONTROL_SECRET` ✓
 
 ## Phase 6: Asset References
 

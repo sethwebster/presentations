@@ -72,8 +72,8 @@ test.describe('Authentication Flow', () => {
   // Note: Testing actual authentication requires the correct password
   // which should be set in environment variables for CI
   test.skip('valid password grants presenter mode', async ({ page }) => {
-    // This test requires VITE_LUME_CONTROL_SECRET to be set
-    const presenterPassword = process.env.VITE_LUME_CONTROL_SECRET;
+    // This test requires LUME_CONTROL_SECRET to be set
+    const presenterPassword = process.env.LUME_CONTROL_SECRET;
 
     if (!presenterPassword) {
       test.skip();
